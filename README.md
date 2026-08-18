@@ -16,7 +16,7 @@ Sign up for free at [disjoint.com](https://www.disjoint.com). Closure is enabled
 
 1. Set up metering and entitlement actions in your codebase
 1. Set up payment processing
-1. Integrate with the rest of the [Disjoint tool suite](https://www.disjoint.com/tools).
+1. Integrate with the rest of the [Disjoint tool suite](https://www.disjoint.com/tools)
 
 ### Self-hosted (advanced)
 
