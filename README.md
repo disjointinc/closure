@@ -23,5 +23,5 @@ Sign up for free at [disjoint.com](https://www.disjoint.com). Closure is enabled
 If you want to self-host, you can deploy a hobby instance in one line on Linux using Docker.
 
 ```
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/disjointinc/rts/HEAD/bin/deploy-hobby)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/disjointinc/closure/HEAD/bin/deploy-hobby)"
 ```

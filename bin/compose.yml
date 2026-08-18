@@ -1,18 +1,18 @@
 services:
-  rts-db:
+  closure-db:
     image: postgres:18
     ports:
-      - "${RTS_POSTGRES_PORT:-54326}:5432"
+      - "${CLOSURE_POSTGRES_PORT:-54326}:5432"
     environment:
-      POSTGRES_DB: rts_local
+      POSTGRES_DB: closure_local
       POSTGRES_PASSWORD: password
       POSTGRES_USER: postgres
     volumes:
-      - rts-pgdata:/var/lib/postgresql
-  rts-redis:
+      - closure-pgdata:/var/lib/postgresql
+  closure-redis:
     image: redis:8-alpine
     ports:
-      - "${RTS_REDIS_PORT:-63796}:6379"
+      - "${CLOSURE_REDIS_PORT:-63796}:6379"
 
 volumes:
-  rts-pgdata:
+  closure-pgdata:
