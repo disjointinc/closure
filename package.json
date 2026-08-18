@@ -9,16 +9,11 @@
   "scripts": {
     "prepare": "lefthook install",
     "build": "turbo run build",
-    "dev": "sst dev",
-    "deploy": "sst deploy",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "typecheck": "turbo run typecheck"
-  },
-  "dependencies": {
-    "sst": "^4.5.1"
   },
   "devDependencies": {
     "@types/node": "^24.12.0",
