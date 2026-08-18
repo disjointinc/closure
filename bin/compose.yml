@@ -11,6 +11,7 @@ services:
       - closure-pgdata:/var/lib/postgresql
   closure-redis:
     image: redis:8-alpine
+    command: ["redis-server", "--requirepass", "password"]
     ports:
       - "${CLOSURE_REDIS_PORT:-63796}:6379"
 
