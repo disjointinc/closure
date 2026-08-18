@@ -1,12 +1,22 @@
-# RTS
+# Closure
 
-Real-time, schematic entitlements, idempotent metering, billing, pricing versioning, and pricing experimentation.
+Real-time, configurable metering, entitlements, billing, pricing versioning, and pricing experimentation. Built on a few principles:
+
+1. Pricing should be managed in code
+1. Pricing schemas should be immutable
+1. Metering shouldn't introduce a visible delay for users
+1. Metering actions should be idempotent
+1. Payment info shouldn't be stored on your servers
 
 ## Getting started
 
 ### Guided (recommended)
 
-RTS is enabled by default for all Disjoint users. Sign up for free at [disjoint.com](https://www.disjoint.com).
+Sign up for free at [disjoint.com](https://www.disjoint.com). Closure is enabled by default for all Disjoint users. We do some more nice things:
+
+1. Set up metering and entitlement actions in your codebase
+1. Set up payment processing
+1. Integrate with the rest of the [Disjoint tool suite](https://www.disjoint.com/tools).
 
 ### Self-hosted (advanced)
 
