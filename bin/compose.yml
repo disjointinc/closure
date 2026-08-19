@@ -14,6 +14,22 @@ services:
     command: ["redis-server", "--requirepass", "password"]
     ports:
       - "${CLOSURE_REDIS_PORT:-63796}:6379"
+  closure-api:
+    image: node:24-alpine
+    working_dir: /app
+    volumes:
+      - ..:/app:ro
+    command: node src/server.ts
+    ports:
+      - "${CLOSURE_API_PORT:-3216}:3216"
+    environment:
+      CLOSURE_POSTGRES_HOST: closure-db
+      CLOSURE_POSTGRES_PORT: "5432"
+      CLOSURE_REDIS_HOST: closure-redis
+      CLOSURE_REDIS_PORT: "6379"
+    depends_on:
+      - closure-db
+      - closure-redis
 
 volumes:
   closure-pgdata:
