@@ -25,6 +25,10 @@ export const config = {
     port: envPort("CLOSURE_REDIS_PORT", 63796),
     password: env("CLOSURE_REDIS_PASSWORD", "password"),
   },
+  api: {
+    host: env("CLOSURE_API_HOST", "0.0.0.0"),
+    port: envPort("CLOSURE_API_PORT", 3216),
+  },
 } as const;
 
 export type Config = typeof config;
