@@ -35,7 +35,7 @@ services:
     working_dir: /closure
     volumes:
       # Read-write: the TanStack Router vite plugin writes its generated
-      # route tree (web/src/routeTree.gen.ts) during dev.
+      # route tree (web/routeTree.gen.ts) during dev.
       - ..:/closure
       # Keeps container-installed Linux binaries out of the host's
       # node_modules.

@@ -1,4 +1,4 @@
 package-lock.json
 .turbo/
 web/dist/
-web/src/routeTree.gen.ts
+web/routeTree.gen.ts
