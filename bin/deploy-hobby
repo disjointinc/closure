@@ -7,7 +7,7 @@
 #
 set -euo pipefail
 
-COMPOSE_URL="https://raw.githubusercontent.com/disjointinc/closure/HEAD/bin/compose.yml"
+SOURCE_URL="https://codeload.github.com/disjointinc/closure/tar.gz/HEAD"
 
 log()  { printf '==> %s\n' "$*"; }
 fail() { printf 'Error: %s\n' "$*" >&2; exit 1; }
@@ -22,7 +22,7 @@ cat <<'EOF'
   (https://www.disjoint.com/tools).
 
   This script is the handroll path: it boots Closure's prerequisites
-  (PostgreSQL + Redis) locally via Docker Compose.
+  (PostgreSQL + Redis) and the Closure API locally via Docker Compose.
 
 EOF
 
@@ -36,22 +36,25 @@ docker compose version >/dev/null 2>&1 || fail "Docker Compose is not available.
 docker info >/dev/null 2>&1 || fail "Docker is installed but the daemon is not running. Start Docker and re-run this script."
 
 # 4. Find the compose file. Use the copy next to this script when running from
-#    a repo checkout; otherwise (curl one-liner) download it.
+# a repo checkout; otherwise (curl one-liner) download the repo source, which
+# the API service mounts and runs.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
 if [[ -n "${SCRIPT_DIR:-}" && -f "$SCRIPT_DIR/compose.yml" ]]; then
   COMPOSE_FILE="$SCRIPT_DIR/compose.yml"
 else
   CLOSURE_HOME="${CLOSURE_HOME:-$HOME/.closure}"
   mkdir -p "$CLOSURE_HOME"
-  COMPOSE_FILE="$CLOSURE_HOME/compose.yml"
-  log "Downloading compose.yml -> $COMPOSE_FILE"
-  curl -fsSL "$COMPOSE_URL" -o "$COMPOSE_FILE"
+  COMPOSE_FILE="$CLOSURE_HOME/bin/compose.yml"
+  log "Downloading Closure source -> $CLOSURE_HOME"
+  curl -fsSL "$SOURCE_URL" | tar -xz -C "$CLOSURE_HOME" --strip-components=1
 fi
 
-# 5. Boot the prerequisites (PostgreSQL + Redis).
-log "Starting Closure prerequisites (Postgres + Redis)"
+# 5. Boot the prerequisites (PostgreSQL + Redis) and the Closure API.
+log "Starting Closure"
 docker compose --project-name closure -f "$COMPOSE_FILE" up -d
 
 log "Done."
+log "Web:      localhost:${CLOSURE_API_PORT:-3216}"
+log "API:      localhost:${CLOSURE_WEB_PORT:-3226}"
 log "Postgres: localhost:${CLOSURE_POSTGRES_PORT:-54326}"
 log "Redis:    localhost:${CLOSURE_REDIS_PORT:-63796}"
