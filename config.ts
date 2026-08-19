@@ -29,6 +29,10 @@ export const config = {
     host: env("CLOSURE_API_HOST", "0.0.0.0"),
     port: envPort("CLOSURE_API_PORT", 3216),
   },
+  web: {
+    host: env("CLOSURE_WEB_HOST", "0.0.0.0"),
+    port: envPort("CLOSURE_WEB_PORT", 3226),
+  },
 } as const;
 
 export type Config = typeof config;

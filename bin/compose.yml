@@ -16,10 +16,10 @@ services:
       - "${CLOSURE_REDIS_PORT:-63796}:6379"
   closure-api:
     image: node:24-alpine
-    working_dir: /app
+    working_dir: /closure
     volumes:
-      - ..:/app:ro
-    command: node src/server.ts
+      - ..:/closure:ro
+    command: node api/server.ts
     ports:
       - "${CLOSURE_API_PORT:-3216}:3216"
     environment:
@@ -30,6 +30,14 @@ services:
     depends_on:
       - closure-db
       - closure-redis
+  closure-web:
+    image: node:24-alpine
+    working_dir: /closure
+    volumes:
+      - ..:/closure:ro
+    command: node web/server.ts
+    ports:
+      - "${CLOSURE_WEB_PORT:-3226}:3226"
 
 volumes:
   closure-pgdata:
