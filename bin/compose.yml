@@ -34,10 +34,18 @@ services:
     image: node:24-alpine
     working_dir: /closure
     volumes:
-      - ..:/closure:ro
-    command: node web/server.ts
+      # Read-write: the TanStack Router vite plugin writes its generated
+      # route tree (web/src/routeTree.gen.ts) during dev.
+      - ..:/closure
+      # Keeps container-installed Linux binaries out of the host's
+      # node_modules.
+      - closure-web-node-modules:/closure/node_modules
+    # --ignore-scripts: skips the repo's "prepare" hook (lefthook), which
+    # has no .git to install into here.
+    command: sh -c "npm ci --ignore-scripts && exec npm run dev -w web"
     ports:
       - "${CLOSURE_WEB_PORT:-3226}:3226"
 
 volumes:
   closure-pgdata:
+  closure-web-node-modules:
