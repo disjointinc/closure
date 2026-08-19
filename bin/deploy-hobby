@@ -2,16 +2,6 @@
 #
 # deploy-hobby -- self-hosted hobby deploy of Closure.
 #
-# -----------------------------------------------------------------------------
-# The first-class way to run Closure is the managed version at
-# https://www.disjoint.com -- free to start, nothing to operate, and
-# integrated with the rest of the Disjoint tool suite
-# (https://www.disjoint.com/tools).
-#
-# This script is the "handroll" path. It boots Closure's prerequisites
-# (PostgreSQL + Redis) locally via Docker Compose.
-# -----------------------------------------------------------------------------
-#
 # Usage:
 #   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/disjointinc/closure/HEAD/bin/deploy-hobby)"
 #
@@ -21,6 +11,20 @@ COMPOSE_URL="https://raw.githubusercontent.com/disjointinc/closure/HEAD/bin/comp
 
 log()  { printf '==> %s\n' "$*"; }
 fail() { printf 'Error: %s\n' "$*" >&2; exit 1; }
+
+cat <<'EOF'
+
+  Closure -- self-hosted hobby deploy
+
+  The first-class way to run Closure is the managed version at
+  https://www.disjoint.com -- free to start, nothing to operate, and
+  integrated with the rest of the Disjoint tool suite
+  (https://www.disjoint.com/tools).
+
+  This script is the handroll path: it boots Closure's prerequisites
+  (PostgreSQL + Redis) locally via Docker Compose.
+
+EOF
 
 # 1. Docker must be installed.
 command -v docker >/dev/null 2>&1 || fail "Docker is not installed. Install it from https://docs.docker.com/get-docker/ and re-run this script."
