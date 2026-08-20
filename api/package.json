@@ -1,0 +1,11 @@
+{
+  "name": "@closure/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix"
+  }
+}
