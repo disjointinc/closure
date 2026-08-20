@@ -25,3 +25,30 @@ If you want to self-host, you can deploy a hobby instance in one line on Linux u
 ```
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/disjointinc/closure/HEAD/bin/deploy-hobby)"
 ```
+
+### Developing locally
+
+Run the whole stack (Postgres, Redis, API, web) in Docker from your checkout:
+
+```
+docker compose -p closure -f bin/compose.yml up -d
+```
+
+This starts the same services as the one-liner above: `deploy-hobby` uses the
+checkout's `bin/compose.yml` when run from a clone, so both paths produce the
+same result. (The curl one-liner just runs a pristine snapshot downloaded to
+`~/.closure` instead of your working tree.)
+
+Code changes are picked up live: the API restarts itself on file changes
+(`node --watch`), and the web app hot-reloads (Vite).
+
+#### Migrations
+
+The API's database schema lives in `api/db/schema.ts` (Drizzle). To change it:
+
+1. Edit `api/db/schema.ts`.
+1. Generate the SQL: `npm run db:generate -w api` (writes `api/db/migrations/`).
+1. Apply it. Pending migrations run automatically on the next
+   `docker compose -p closure -f bin/compose.yml up -d` (via the one-shot
+   `closure-migrate` service), or apply them to your local db immediately with
+   `npm run db:migrate -w api`.

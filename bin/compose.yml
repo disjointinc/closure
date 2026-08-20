@@ -9,9 +9,6 @@ services:
       POSTGRES_USER: postgres
     volumes:
       - closure-pgdata:/var/lib/postgresql
-      # Postgres runs these Drizzle-generated SQL migrations on first boot
-      # only (empty data dir). Regenerate with `npm run db:generate -w api`.
-      - ../api/db/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d closure_local"]
       interval: 5s
@@ -22,12 +19,46 @@ services:
     command: ["redis-server", "--requirepass", "password"]
     ports:
       - "${CLOSURE_REDIS_PORT:-63796}:6379"
+  # One-shot: applies Drizzle migrations (api/db/migrations) on every `up`,
+  # then exits. closure-api waits for it, so the schema is always in place
+  # before traffic. Regenerate migrations with `npm run db:generate -w api`;
+  # apply to a local db from the host with `npm run db:migrate -w api`.
+  closure-migrate:
+    image: node:24-alpine
+    working_dir: /closure
+    volumes:
+      # Read-write, like closure-web: npm ci needs to manage node_modules.
+      - ..:/closure
+      # Container-local node_modules: a fresh (curl-installed) checkout has
+      # none, and the host's may hold binaries for the wrong platform.
+      - closure-migrate-node-modules:/closure/node_modules
+      # web/node_modules holds the web container's Vite cache; shadow it so
+      # npm ci here neither deletes it nor races with it.
+      - closure-migrate-web-node-modules:/closure/web/node_modules
+    # --ignore-scripts: skips the repo's "prepare" hook (lefthook), which
+    # has no .git to install into here.
+    command: sh -c "npm ci --ignore-scripts && exec node api/db/migrate.ts"
+    restart: "no"
+    environment:
+      CLOSURE_POSTGRES_HOST: closure-db
+      CLOSURE_POSTGRES_PORT: "5432"
+    depends_on:
+      closure-db:
+        condition: service_healthy
   closure-api:
     image: node:24-alpine
     working_dir: /closure
     volumes:
-      - ..:/closure:ro
-    command: node api/server.ts
+      # Read-write, like closure-web: npm ci needs to manage node_modules.
+      - ..:/closure
+      # Container-local node_modules (see closure-migrate above). Separate
+      # volumes from closure-migrate: npm ci wipes node_modules, which would
+      # break this long-running service if shared.
+      - closure-api-node-modules:/closure/node_modules
+      - closure-api-web-node-modules:/closure/web/node_modules
+    # --ignore-scripts: see closure-migrate. --watch: restart the server when
+    # the mounted source changes (dev).
+    command: sh -c "npm ci --ignore-scripts && exec node --watch api/server.ts"
     ports:
       - "${CLOSURE_API_PORT:-3226}:3226"
     environment:
@@ -40,6 +71,8 @@ services:
         condition: service_healthy
       closure-redis:
         condition: service_started
+      closure-migrate:
+        condition: service_completed_successfully
   closure-web:
     image: node:24-alpine
     working_dir: /closure
@@ -58,4 +91,8 @@ services:
 
 volumes:
   closure-pgdata:
+  closure-api-node-modules:
+  closure-api-web-node-modules:
+  closure-migrate-node-modules:
+  closure-migrate-web-node-modules:
   closure-web-node-modules:
