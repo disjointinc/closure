@@ -9,6 +9,14 @@ services:
       POSTGRES_USER: postgres
     volumes:
       - closure-pgdata:/var/lib/postgresql
+      # Postgres runs these Drizzle-generated SQL migrations on first boot
+      # only (empty data dir). Regenerate with `npm run db:generate -w api`.
+      - ../api/db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d closure_local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   closure-redis:
     image: redis:8-alpine
     command: ["redis-server", "--requirepass", "password"]
@@ -28,8 +36,10 @@ services:
       CLOSURE_REDIS_HOST: closure-redis
       CLOSURE_REDIS_PORT: "6379"
     depends_on:
-      - closure-db
-      - closure-redis
+      closure-db:
+        condition: service_healthy
+      closure-redis:
+        condition: service_started
   closure-web:
     image: node:24-alpine
     working_dir: /closure

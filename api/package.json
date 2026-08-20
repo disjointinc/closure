@@ -6,10 +6,16 @@
     "start": "node server.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
-    "lint:fix": "eslint --fix"
+    "lint:fix": "eslint --fix",
+    "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
-    "hono": "^4.13.3"
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.13.3",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.10"
   }
 }
