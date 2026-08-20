@@ -26,6 +26,10 @@ If you want to self-host, you can deploy a hobby instance in one line on Linux u
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/disjointinc/closure/HEAD/bin/deploy-hobby)"
 ```
 
+## Contributing
+
+We love contributions! We'll have a contributing guidelines section soon.
+
 ### Developing locally
 
 Run the whole stack (Postgres, Redis, API, web) in Docker from your checkout:
