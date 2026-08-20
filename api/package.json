@@ -7,7 +7,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node db/migrate.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
