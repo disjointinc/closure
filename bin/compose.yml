@@ -27,17 +27,15 @@ services:
     image: node:24-alpine
     working_dir: /closure
     volumes:
-      # Read-write, like closure-web: npm ci needs to manage node_modules.
+      # Read-write, like closure-web: npm install needs to manage node_modules.
       - ..:/closure
       # Container-local node_modules: a fresh (curl-installed) checkout has
       # none, and the host's may hold binaries for the wrong platform.
       - closure-migrate-node-modules:/closure/node_modules
-      # web/node_modules holds the web container's Vite cache; shadow it so
-      # npm ci here neither deletes it nor races with it.
-      - closure-migrate-web-node-modules:/closure/web/node_modules
-    # --ignore-scripts: skips the repo's "prepare" hook (lefthook), which
-    # has no .git to install into here.
-    command: sh -c "npm ci --ignore-scripts && exec node api/db/migrate.ts"
+    # npm install (not ci): reconciles the root node_modules only, so web's
+    # node_modules (its live Vite cache) is never touched. --ignore-scripts:
+    # skips the repo's "prepare" hook (lefthook), which has no .git here.
+    command: sh -c "npm install --ignore-scripts && exec node api/db/migrate.ts"
     restart: "no"
     environment:
       CLOSURE_POSTGRES_HOST: closure-db
@@ -49,16 +47,15 @@ services:
     image: node:24-alpine
     working_dir: /closure
     volumes:
-      # Read-write, like closure-web: npm ci needs to manage node_modules.
+      # Read-write, like closure-web: npm install needs to manage node_modules.
       - ..:/closure
       # Container-local node_modules (see closure-migrate above). Separate
-      # volumes from closure-migrate: npm ci wipes node_modules, which would
-      # break this long-running service if shared.
+      # volume from closure-migrate: an install there must never pull
+      # node_modules out from under this long-running service.
       - closure-api-node-modules:/closure/node_modules
-      - closure-api-web-node-modules:/closure/web/node_modules
-    # --ignore-scripts: see closure-migrate. --watch: restart the server when
-    # the mounted source changes (dev).
-    command: sh -c "npm ci --ignore-scripts && exec node --watch api/server.ts"
+    # npm install / --ignore-scripts: see closure-migrate. --watch: restart
+    # the server when the mounted source changes (dev).
+    command: sh -c "npm install --ignore-scripts && exec node --watch api/server.ts"
     ports:
       - "${CLOSURE_API_PORT:-3226}:3226"
     environment:
@@ -92,7 +89,5 @@ services:
 volumes:
   closure-pgdata:
   closure-api-node-modules:
-  closure-api-web-node-modules:
   closure-migrate-node-modules:
-  closure-migrate-web-node-modules:
   closure-web-node-modules:
