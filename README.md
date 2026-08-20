@@ -34,6 +34,8 @@ Run the whole stack (Postgres, Redis, API, web) in Docker from your checkout:
 docker compose -p closure -f bin/compose.yml up -d
 ```
 
+Default UI is available at http://localhost:3216.
+
 This starts the same services as the one-liner above: `deploy-hobby` uses the
 checkout's `bin/compose.yml` when run from a clone, so both paths produce the
 same result. (The curl one-liner just runs a pristine snapshot downloaded to
