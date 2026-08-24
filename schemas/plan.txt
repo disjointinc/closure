@@ -1,0 +1,58 @@
+{
+    "unique_id": "plan_abc123",
+    "derived_from"?: "plan_def456",
+    "created_at": epochMs,
+    "deprecated_at"?: epochMs,
+    "name": "Pro plan",
+    "description"?: "The default plan for pro tenants",
+    "prices": [
+        {
+            "cycle": "cycle_abc123",
+            "value": "value_abc123"
+        },
+        {
+            "cycle": "cycle_def456",
+            "value": "value_def456",
+        }
+    ],
+    "features"?: [
+        {
+            "feature": "feature_abc123",
+            "set_to": boolean | string[],
+        },
+    ],
+    "meters"?: [
+        {
+            "meter": "meter_abc123",
+            "default": nonnegative multiple of 1e-6,
+            "limit"?: number >= default_value w/ default unlimited, multiple of 1e-6,
+            "reset"?: cron | "billing_cycle_end" w/ default never,
+            "rollovers"?: nonnegative integer w/ default unlimited,
+            "top_up_prices_per_credit"?: "price_ghi789" | [
+                {
+                    "starting_at": number, 0 < number <= allocation_limit - allocation_default and
+                        starting_at's can't be the same for different array elements,
+                    "prices": [
+                        {
+                            "cycle": "cycle_abc123",
+                            "value": "value_abc123"
+                        },
+                        {
+                            "cycle": "cycle_def456",
+                            "value": "value_def456",
+                        }
+                    ],
+                },
+            ],
+            "top_up_credit_pack_sizes"?: {
+                "static": Array(positive numbers),
+                "dynamic": {
+                    "interval": positive number >= 1e-6,
+                    "minimum": positive number,
+                    "maximum"?: minimum < number <= allocation_limit - allocation_default,
+                },
+            },
+        },
+    ],
+    "add_ons"?: ["add_on_abc123", "add_on_def456"],
+}

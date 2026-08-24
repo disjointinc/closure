@@ -1,0 +1,20 @@
+{
+    "unique_id": "experiment_abc123",
+    "created_at": epochMs,
+    "concluded_at"?: epochMs,
+    "plan_assignment_at_conclusion"?: "plan_def456",
+    "name": "Experiment 1",
+    "description"?: "This is a pricing experiment",
+    "treatments": [
+        {
+            "plan": "plan_abc123",
+            "tenant_percentage": number, 0 <= number <= 100, all percentages must sum to 100
+            "assigned_tenants"?: ["tenant_abc123", "tenant_def456"],
+        },
+        {
+            "plan": "plan_def456",
+            "tenant_percentage": number, 0 <= number <= 100, all percentages must sum to 100
+            "assigned_tenants"?: [],
+        }
+    ], array must have at least 2 elements
+}

@@ -1,0 +1,13 @@
+
+{
+    "unique_id": "value_abc123",
+    "created_at": epochMs,
+    "deprecated_at"?: epochMs,
+    "name": "Value 1",
+    "description"?: "This is a value",
+    "USD": positive number,
+    "EUR": positive number,
+    ...
+}
+
+

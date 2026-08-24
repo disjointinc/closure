@@ -1,0 +1,7 @@
+{
+    "unique_id": "tax_type_abc123",
+    "created_at": epochMs,
+    "deprecated_at"?: epochMs,
+    "name": "vat",
+    "description"?: "Value-added tax, often used in European countries.",
+}

@@ -1,0 +1,39 @@
+{
+    "unique_id": "coupon_abc123",
+    "created_at": epochMs,
+    "deprecated_at"?: epochMs,
+    "grantable_by_tenants": boolean,
+    "limit_per_granting_tenant"?: positive integer, only settable if grantable_by_tenants,
+        default no limit
+    "name": "Coupon 1",
+    "description"?: "This is a coupon for some product or pricing benefits",
+    "default_award"?: type award,
+    "features_granted"?: [
+        {
+            "feature": "feature_abc123",
+            "value": boolean | string[],
+            "award": type award,
+        },
+    ],
+    "credits_granted"?: [
+        {
+            "meter": "meter_abc123",
+            "amount": positive number,
+            "expiration"?: cron | "billing_cycle_end" w/ default never,
+            "rollovers"?: nonnegative integer w/ default unlimited,
+            "award": type award,
+        }
+    ],
+    "reciprocal_benefit_coupon"?: "coupon_def456", only settable if grantable_by_tenants,
+}
+
+type award = { 
+    "type": "payout",
+    "value": "value_abc123",
+} | {
+    "type": "flat_discount",
+    "value": "value_abc123",
+} | {
+    "type": "percentage_discount",
+    "value": number w/ 0 < number <= 100,
+}, default { "type": "percentage", "value": 100 }

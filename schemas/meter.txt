@@ -1,0 +1,8 @@
+{
+    "unique_id": "meter_abc123",
+    "created_at": epochMs,
+    "deprecated_at"?: epochMs,
+    "name": "Meter 1",
+    "description"?: "This is something you can use a variable amount",
+    "applicable_tax_types"?: tax_type[],
+}

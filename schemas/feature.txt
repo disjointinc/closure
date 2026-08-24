@@ -1,0 +1,21 @@
+{
+    "unique_id": "feature_abc123",
+    "created_at": epochMs,
+    "deprecated_at"?: epochMs,
+    "name": "Feature 1",
+    "description"?: "This is something you may or may not be allowed to use",
+    "options"?: [
+        {
+            "unique_id": "option_abc123",
+            "name": "Option 1",
+            "description"?: "This is a description of an option",
+        },
+        {
+            "unique_id": "option_abc123",
+            "name": "Option 2",
+            "description"?: "This is a description of another option",
+        },
+    ],
+    // if options aren't included, this is a boolean feature
+    "applicable_tax_types"?: tax_type[],
+}
