@@ -1,9 +1,0 @@
-{
-    "unique_id": "meter_event_abc123",
-    "ideally_unique_external_id": string,
-    "created_at": epochMs,
-    "meter": "meter_abc123",
-    "tenant": "tenant_abc123",
-    "amount": positive multiple of 1e-6,
-    "status": "succeeded" | "insufficient_balance" | "unexpected_error",
-}

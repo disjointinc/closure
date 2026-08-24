@@ -1,8 +1,0 @@
-{
-    "unique_id": "tax_abc123",
-    "created_at": epochMs,
-    "deprecated_at"?: epochMs,
-    "tax_type": "tax_type_abc123",
-    "name": "Dutch Standard VAT",
-    "description"?: "The standard Dutch VAT tax",
-}
