@@ -3,7 +3,10 @@
  */
 import { serve } from "@hono/node-server";
 import { config } from "../config.ts";
+import { startMeteringFlushLoop } from "./cache/metering.ts";
 import app from "./handler.ts";
+
+startMeteringFlushLoop();
 
 serve(
   {
