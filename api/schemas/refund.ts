@@ -7,6 +7,6 @@ export const refundSchema = z.object({
   on: epochMs,
   by: teamMemberIdSchema,
   value: valueIdSchema,
-  reason: z.string().optional(),
+  reason: z.string().nullable(),
 });
 export type Refund = z.infer<typeof refundSchema>;

@@ -5,6 +5,6 @@ import { optionIdSchema } from "./ids.ts";
 export const optionSchema = z.object({
   unique_id: optionIdSchema,
   name: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().nullable(),
 });
 export type Option = z.infer<typeof optionSchema>;

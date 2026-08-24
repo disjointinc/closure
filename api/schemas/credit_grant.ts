@@ -11,7 +11,7 @@ export const creditGrantSchema = z.object({
   meter: meterIdSchema,
   on: epochMs,
   by: teamMemberIdSchema,
-  reason: z.string().optional(),
+  reason: z.string().nullable(),
   amount: microcredits.positive(),
 });
 export type CreditGrant = z.infer<typeof creditGrantSchema>;

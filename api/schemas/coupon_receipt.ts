@@ -12,8 +12,8 @@ const receiptFields = {
   unique_id: couponReceiptIdSchema,
   coupon: couponIdSchema,
   on: epochMs,
-  used_at: epochMs.optional(),
-  reason: z.string().optional(),
+  used_at: epochMs.nullable(),
+  reason: z.string().nullable(),
 };
 
 /** A coupon received by a tenant. "by" depends on who granted it. */

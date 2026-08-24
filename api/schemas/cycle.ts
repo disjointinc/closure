@@ -24,7 +24,7 @@ export const arrearsChargingSchema = z.object({
   charged: z.literal("arrears"),
   cycle_length: cron,
   credit_period: cron,
-  grace_period: cron.optional(),
+  grace_period: cron.nullable(),
   dunning_schedule: z.array(
     z.object({
       after: cron,
@@ -43,9 +43,9 @@ export type Charging = z.infer<typeof chargingSchema>;
 const cycleFields = {
   unique_id: cycleIdSchema,
   created_at: epochMs,
-  deprecated_at: epochMs.optional(),
+  deprecated_at: epochMs.nullable(),
   name: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().nullable(),
 };
 
 export const cycleSchema = z.discriminatedUnion("charged", [

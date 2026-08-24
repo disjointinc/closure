@@ -8,6 +8,6 @@ export const featureOverrideSchema = planFeatureSchema.extend({
   unique_id: featureOverrideIdSchema,
   on: epochMs,
   by: teamMemberIdSchema,
-  reason: z.string().optional(),
+  reason: z.string().nullable(),
 });
 export type FeatureOverride = z.infer<typeof featureOverrideSchema>;

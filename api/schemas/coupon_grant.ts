@@ -8,7 +8,7 @@ export const couponGrantSchema = z.object({
   coupon: couponIdSchema,
   on: epochMs,
   to: tenantIdSchema,
-  used_at: epochMs.optional(),
-  reason: z.string().optional(),
+  used_at: epochMs.nullable(),
+  reason: z.string().nullable(),
 });
 export type CouponGrant = z.infer<typeof couponGrantSchema>;

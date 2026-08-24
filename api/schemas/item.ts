@@ -7,6 +7,6 @@ export const itemSchema = z.object({
   value: valueIdSchema,
   units: z.number().nonnegative(),
   name: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().nullable(),
 });
 export type Item = z.infer<typeof itemSchema>;

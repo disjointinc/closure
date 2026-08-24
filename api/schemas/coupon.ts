@@ -35,13 +35,13 @@ export const couponSchema = z
   .object({
     unique_id: couponIdSchema,
     created_at: epochMs,
-    deprecated_at: epochMs.optional(),
+    deprecated_at: epochMs.nullable(),
     grantable_by_tenants: z.boolean(),
-    /** Only settable when grantable_by_tenants. Absent means no limit. */
-    limit_per_granting_tenant: z.number().int().positive().optional(),
+    /** Only settable when grantable_by_tenants. Null means no limit. */
+    limit_per_granting_tenant: z.number().int().positive().nullable(),
     name: z.string().min(1),
-    description: z.string().optional(),
-    default_award: awardSchema.optional(),
+    description: z.string().nullable(),
+    default_award: awardSchema.nullable(),
     features_granted: z
       .array(
         z.object({
@@ -50,35 +50,35 @@ export const couponSchema = z
           award: awardSchema.default(defaultAward),
         }),
       )
-      .optional(),
+      .nullable(),
     credits_granted: z
       .array(
         z.object({
           meter: meterIdSchema,
           amount: microcredits.positive(),
-          /** Absent means the credits never expire. */
-          expiration: resetSchedule.optional(),
-          /** Absent means unlimited rollovers. */
-          rollovers: z.number().int().nonnegative().optional(),
+          /** Null means the credits never expire. */
+          expiration: resetSchedule.nullable(),
+          /** Null means unlimited rollovers. */
+          rollovers: z.number().int().nonnegative().nullable(),
           award: awardSchema.default(defaultAward),
         }),
       )
-      .optional(),
+      .nullable(),
     /** Only settable when grantable_by_tenants. */
-    reciprocal_benefit_coupon: couponIdSchema.optional(),
+    reciprocal_benefit_coupon: couponIdSchema.nullable(),
   })
   .superRefine((coupon, ctx) => {
     if (coupon.grantable_by_tenants) {
       return;
     }
-    if (coupon.limit_per_granting_tenant !== undefined) {
+    if (coupon.limit_per_granting_tenant !== null) {
       ctx.addIssue({
         code: "custom",
         path: ["limit_per_granting_tenant"],
         message: "only settable when grantable_by_tenants",
       });
     }
-    if (coupon.reciprocal_benefit_coupon !== undefined) {
+    if (coupon.reciprocal_benefit_coupon !== null) {
       ctx.addIssue({
         code: "custom",
         path: ["reciprocal_benefit_coupon"],

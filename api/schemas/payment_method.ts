@@ -9,7 +9,7 @@ import { paymentMethodIdSchema } from "./ids.ts";
 export const paymentMethodSchema = z.object({
   unique_id: paymentMethodIdSchema,
   created_at: epochMs,
-  deleted_at: epochMs.optional(),
+  deleted_at: epochMs.nullable(),
   /** At most one method per tenant may be default (enforced on the tenant). */
   is_default: z.boolean(),
   provider_internals: z.object({

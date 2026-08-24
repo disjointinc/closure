@@ -5,7 +5,7 @@ import { teamMemberIdSchema } from "./ids.ts";
 export const teamMemberSchema = z.object({
   unique_id: teamMemberIdSchema,
   email_address: z.email(),
-  name: z.string().min(1).optional(),
-  profile_picture_link: z.url().optional(),
+  name: z.string().min(1).nullable(),
+  profile_picture_link: z.url().nullable(),
 });
 export type TeamMember = z.infer<typeof teamMemberSchema>;

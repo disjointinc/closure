@@ -10,7 +10,7 @@ export const meterOverrideSchema = z
     unique_id: meterOverrideIdSchema,
     on: epochMs,
     by: teamMemberIdSchema,
-    reason: z.string().optional(),
+    reason: z.string().nullable(),
   })
   .superRefine(checkPlanMeter);
 export type MeterOverride = z.infer<typeof meterOverrideSchema>;

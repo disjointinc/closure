@@ -13,14 +13,14 @@ export const assignmentSchema = z.object({
   unique_id: assignmentIdSchema,
   plan: planIdSchema,
   /** Set when the assignment came from an experiment treatment. */
-  experiment: experimentIdSchema.optional(),
+  experiment: experimentIdSchema.nullable(),
   cycle: cycleIdSchema,
   start: epochMs,
-  end: epochMs.optional(),
+  end: epochMs.nullable(),
   add_ons: z.array(
     z.object({
       start: epochMs,
-      end: epochMs.optional(),
+      end: epochMs.nullable(),
       add_on: addOnIdSchema,
     }),
   ),

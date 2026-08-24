@@ -5,9 +5,9 @@ import { invoiceIdSchema, paymentIdSchema } from "./ids.ts";
 export const paymentSchema = z.object({
   unique_id: paymentIdSchema,
   created_at: epochMs,
-  started_processing_at: epochMs.optional(),
-  succeeded_at: epochMs.optional(),
-  failed_at: epochMs.optional(),
+  started_processing_at: epochMs.nullable(),
+  succeeded_at: epochMs.nullable(),
+  failed_at: epochMs.nullable(),
   provider_internals: z.object({
     /** Payment provider, e.g. "stripe", "adyen". */
     id: z.string().min(1),

@@ -38,11 +38,11 @@ const topUpCreditPackSizesSchema = z.object({
       interval: microcredits.positive(),
       minimum: microcredits.positive(),
       /** Must be > minimum and <= limit - default (checked on the parent). */
-      maximum: microcredits.positive().optional(),
+      maximum: microcredits.positive().nullable(),
     })
     .refine(
       (dynamic) =>
-        dynamic.maximum === undefined || dynamic.maximum > dynamic.minimum,
+        dynamic.maximum === null || dynamic.maximum > dynamic.minimum,
       {
         message: "maximum must be greater than minimum",
         path: ["maximum"],
@@ -58,17 +58,17 @@ const topUpCreditPackSizesSchema = z.object({
 export const planMeterFields = {
   meter: meterIdSchema,
   default: microcredits.nonnegative(),
-  /** Must be >= default. Absent means unlimited. */
-  limit: microcredits.positive().optional(),
-  /** Absent means the allocation never resets. */
-  reset: resetSchedule.optional(),
-  /** Reset periods unused credits roll over into. Absent means unlimited. */
-  rollovers: z.number().int().nonnegative().optional(),
+  /** Must be >= default. Null means unlimited. */
+  limit: microcredits.positive().nullable(),
+  /** Null means the allocation never resets. */
+  reset: resetSchedule.nullable(),
+  /** Reset periods unused credits roll over into. Null means unlimited. */
+  rollovers: z.number().int().nonnegative().nullable(),
   /** A flat per-credit value, or usage tiers with their own prices. */
   top_up_prices_per_credit: z
     .union([valueIdSchema, z.array(topUpTierSchema).min(1)])
-    .optional(),
-  top_up_credit_pack_sizes: topUpCreditPackSizesSchema.optional(),
+    .nullable(),
+  top_up_credit_pack_sizes: topUpCreditPackSizesSchema.nullable(),
 };
 
 const planMeterObject = z.object(planMeterFields);
@@ -76,7 +76,7 @@ export type PlanMeter = z.infer<typeof planMeterObject>;
 
 /** Cross-field rules for a plan meter entry (also reused by meter overrides). */
 export function checkPlanMeter(meter: PlanMeter, ctx: z.RefinementCtx): void {
-  if (meter.limit !== undefined && meter.limit < meter.default) {
+  if (meter.limit !== null && meter.limit < meter.default) {
     ctx.addIssue({
       code: "custom",
       path: ["limit"],
@@ -84,10 +84,10 @@ export function checkPlanMeter(meter: PlanMeter, ctx: z.RefinementCtx): void {
     });
   }
   // Headroom: how many microcredits above the default allocation a tenant
-  // can hold. Undefined limit means unlimited, which permits any
-  // tier/maximum. Integer arithmetic, so this difference is exact.
+  // can hold. Null limit means unlimited, which permits any tier/maximum.
+  // Integer arithmetic, so this difference is exact.
   const headroom =
-    meter.limit === undefined ? undefined : meter.limit - meter.default;
+    meter.limit === null ? undefined : meter.limit - meter.default;
 
   const tiers = meter.top_up_prices_per_credit;
   if (Array.isArray(tiers)) {
@@ -114,7 +114,7 @@ export function checkPlanMeter(meter: PlanMeter, ctx: z.RefinementCtx): void {
   const dynamicMaximum = meter.top_up_credit_pack_sizes?.dynamic.maximum;
   if (
     headroom !== undefined &&
-    dynamicMaximum !== undefined &&
+    typeof dynamicMaximum === "number" &&
     dynamicMaximum > headroom
   ) {
     ctx.addIssue({
@@ -130,14 +130,14 @@ export const planMeterSchema = planMeterObject.superRefine(checkPlanMeter);
 export const planSchema = z.object({
   unique_id: planIdSchema,
   /** The plan this version was derived from, if any. */
-  derived_from: planIdSchema.optional(),
+  derived_from: planIdSchema.nullable(),
   created_at: epochMs,
-  deprecated_at: epochMs.optional(),
+  deprecated_at: epochMs.nullable(),
   name: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().nullable(),
   prices: z.array(priceSchema),
-  features: z.array(planFeatureSchema).optional(),
-  meters: z.array(planMeterSchema).optional(),
-  add_ons: z.array(addOnIdSchema).optional(),
+  features: z.array(planFeatureSchema).nullable(),
+  meters: z.array(planMeterSchema).nullable(),
+  add_ons: z.array(addOnIdSchema).nullable(),
 });
 export type Plan = z.infer<typeof planSchema>;

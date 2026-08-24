@@ -6,9 +6,9 @@ import { itemIdSchema, taxIdSchema, taxationAmountIdSchema } from "./ids.ts";
 export const taxationAmountSchema = z.object({
   unique_id: taxationAmountIdSchema,
   tax: taxIdSchema,
-  /** Absent means the tax applies to the whole invoice. */
-  applies_to_items: z.array(itemIdSchema).optional(),
-  notes: z.string().optional(),
+  /** Null means the tax applies to the whole invoice. */
+  applies_to_items: z.array(itemIdSchema).nullable(),
+  notes: z.string().nullable(),
   /** The tax owed, in the invoice's smallest billable currency unit. */
   amount: currencyAmountSchema,
 });

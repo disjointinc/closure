@@ -12,9 +12,9 @@ export const valueSchema = z
   .object({
     unique_id: valueIdSchema,
     created_at: epochMs,
-    deprecated_at: epochMs.optional(),
+    deprecated_at: epochMs.nullable(),
     name: z.string().min(1),
-    description: z.string().optional(),
+    description: z.string().nullable(),
     amounts: z
       .array(
         currencyAmountSchema.extend({

@@ -5,7 +5,7 @@ import { experimentIdSchema, planIdSchema, tenantIdSchema } from "./ids.ts";
 const treatmentSchema = z.object({
   plan: planIdSchema,
   tenant_percentage: z.number().min(0).max(100),
-  assigned_tenants: z.array(tenantIdSchema).optional(),
+  assigned_tenants: z.array(tenantIdSchema).nullable(),
 });
 export type Treatment = z.infer<typeof treatmentSchema>;
 
@@ -13,10 +13,10 @@ export const experimentSchema = z
   .object({
     unique_id: experimentIdSchema,
     created_at: epochMs,
-    concluded_at: epochMs.optional(),
-    plan_assignment_at_conclusion: planIdSchema.optional(),
+    concluded_at: epochMs.nullable(),
+    plan_assignment_at_conclusion: planIdSchema.nullable(),
     name: z.string().min(1),
-    description: z.string().optional(),
+    description: z.string().nullable(),
     treatments: z.array(treatmentSchema).min(2),
   })
   .superRefine((experiment, ctx) => {
