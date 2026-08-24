@@ -16,8 +16,8 @@ export const idSuffixLengths = {
   cycle: 20,
   experiment: 20,
   feature: 20,
+  feature_option: 20,
   meter: 20,
-  option: 20,
   plan: 20,
   tax: 20,
   tax_type: 20,
@@ -74,13 +74,13 @@ export const creditGrantIdSchema = prefixedId("credit_grant");
 export const cycleIdSchema = prefixedId("cycle");
 export const experimentIdSchema = prefixedId("experiment");
 export const featureIdSchema = prefixedId("feature");
+export const featureOptionIdSchema = prefixedId("feature_option");
 export const featureOverrideIdSchema = prefixedId("feature_override");
 export const invoiceIdSchema = prefixedId("invoice");
 export const itemIdSchema = prefixedId("item");
 export const meterIdSchema = prefixedId("meter");
 export const meterEventIdSchema = prefixedId("meter_event");
 export const meterOverrideIdSchema = prefixedId("meter_override");
-export const optionIdSchema = prefixedId("option");
 export const paymentIdSchema = prefixedId("payment");
 export const paymentMethodIdSchema = prefixedId("payment_method");
 export const planIdSchema = prefixedId("plan");

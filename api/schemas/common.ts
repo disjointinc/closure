@@ -22,7 +22,7 @@ export const durationSchema = z
     (duration) =>
       Object.values(duration).filter((value) => value !== null).length === 1,
     {
-      message: "Exactly one of days or months must be set",
+      message: "exactly one of days or months must be set",
     },
   );
 export type Duration = z.infer<typeof durationSchema>;
