@@ -1,12 +1,14 @@
 # Closure
 
-Real-time, configurable metering, entitlements, billing, pricing versioning, and pricing experimentation. Built on a few principles:
+Real-time, configurable metering, entitlements, pricing, referrals, and billing. Built on a few principles:
 
 1. Pricing should be managed in code
-1. Pricing schemas should be immutable
+1. Pricing is always being tweaked
+1. Plans are versioned and immutable
 1. Metering shouldn't introduce a visible delay for users
-1. Metering actions should be idempotent
-1. Payment info shouldn't be stored on your servers
+1. Metering events should be idempotent
+1. Sensitive payment info shouldn't be stored on your servers
+1. 3P providers should process payment and calculate taxes
 
 ## Getting started
 
@@ -14,8 +16,9 @@ Real-time, configurable metering, entitlements, billing, pricing versioning, and
 
 Sign up for free at [disjoint.com](https://www.disjoint.com). Closure is enabled by default for all Disjoint users. We do some more nice things:
 
-1. Set up metering and entitlement actions in your codebase
-1. Set up payment processing
+1. Set up entitlement and metering checks in your codebase
+1. Set up payment processing and taxation
+1. Correlate your pricing with your internal costs
 1. Integrate with the rest of the [Disjoint tool suite](https://www.disjoint.com/tools)
 
 ### Self-hosted (advanced)
