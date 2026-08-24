@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { cron, epochMs } from "./common.ts";
+import { durationSchema, epochMs } from "./common.ts";
 import { cycleIdSchema, valueIdSchema } from "./ids.ts";
 
 export const dunningActionSchema = z.discriminatedUnion("type", [
@@ -17,17 +17,18 @@ export type DunningAction = z.infer<typeof dunningActionSchema>;
 
 export const upfrontChargingSchema = z.object({
   charged: z.literal("upfront"),
-  cycle_length: z.union([cron, z.literal("one-time")]),
+  cycle_length: z.union([durationSchema, z.literal("one-time")]),
 });
 
 export const arrearsChargingSchema = z.object({
   charged: z.literal("arrears"),
-  cycle_length: cron,
-  credit_period: cron,
-  grace_period: cron.nullable(),
+  cycle_length: durationSchema,
+  credit_period: durationSchema,
+  grace_period: durationSchema.nullable(),
   dunning_schedule: z.array(
     z.object({
-      after: cron,
+      /** How long after the due date these actions trigger. */
+      after: durationSchema,
       actions: z.array(dunningActionSchema).min(1),
     }),
   ),

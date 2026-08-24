@@ -1,3 +1,4 @@
+import currencyCodes from "currency-codes";
 import { z } from "zod";
 import { cycleIdSchema, valueIdSchema } from "./ids.ts";
 
@@ -5,70 +6,58 @@ import { cycleIdSchema, valueIdSchema } from "./ids.ts";
 export const epochMs = z.number().int();
 
 /**
- * A standard five-field cron expression: "minute hour day-of-month month
- * day-of-week", e.g. "* * * 5 *". Fields are numeric, supporting "*",
- * lists ("1,2,3"), ranges ("1-5"), and steps ("*\/5", "0-30/5").
+ * A length of time in whole days or months, e.g. { days: 7 }, { months: 12 }.
+ * Exactly one field must be non-null. Months are calendar units (a month is
+ * the same day next month, clamped), not fixed day counts.
+ *
+ * Sub-day durations are deliberately inexpressible: windows shorter than a
+ * day are rate limiting, not billing, and don't belong here.
  */
-const cronFieldRanges = [
-  { name: "minute", min: 0, max: 59 },
-  { name: "hour", min: 0, max: 23 },
-  { name: "day-of-month", min: 1, max: 31 },
-  { name: "month", min: 1, max: 12 },
-  { name: "day-of-week", min: 0, max: 7 },
-] as const;
+export const durationSchema = z
+  .object({
+    days: z.number().int().positive().nullable(),
+    months: z.number().int().positive().nullable(),
+  })
+  .refine(
+    (duration) =>
+      Object.values(duration).filter((value) => value !== null).length === 1,
+    {
+      message: "Exactly one of days or months must be set",
+    },
+  );
+export type Duration = z.infer<typeof durationSchema>;
 
-function isValidCronField(field: string, min: number, max: number): boolean {
-  return field.split(",").every((part) => {
-    const match = /^(\*|\d+)(?:-(\d+))?(?:\/(\d+))?$/.exec(part);
-    if (!match) {
-      return false;
-    }
-    const [, start, end, step] = match;
-    if (step !== undefined && Number(step) < 1) {
-      return false;
-    }
-    if (start !== "*") {
-      const value = Number(start);
-      if (value < min || value > max) {
-        return false;
-      }
-    }
-    if (end !== undefined) {
-      // "*-5" is not valid; a range needs a numeric start <= end, in bounds.
-      if (start === "*") {
-        return false;
-      }
-      const value = Number(end);
-      if (value < min || value > max || value < Number(start)) {
-        return false;
-      }
-    }
-    return true;
-  });
-}
+/**
+ * Common cryptocurrencies and stablecoins, which have no ISO 4217 code.
+ * Extend as needed.
+ */
+const cryptoCurrencyCodes = [
+  "ADA",
+  "AVAX",
+  "BCH",
+  "BTC",
+  "DAI",
+  "DOGE",
+  "DOT",
+  "ETH",
+  "LINK",
+  "LTC",
+  "MATIC",
+  "SOL",
+  "USDC",
+  "USDT",
+  "XRP",
+];
 
-export const cron = z.string().superRefine((value, ctx) => {
-  const fields = value.trim().split(/\s+/);
-  if (fields.length !== 5) {
-    ctx.addIssue({
-      code: "custom",
-      message: "expected 5 fields: minute hour day-of-month month day-of-week",
-    });
-    return;
-  }
-  fields.forEach((field, index) => {
-    const { name, min, max } = cronFieldRanges[index];
-    if (!isValidCronField(field, min, max)) {
-      ctx.addIssue({
-        code: "custom",
-        message: `invalid ${name} field ${JSON.stringify(field)}: use ${min}-${max}, "*", lists, ranges, steps`,
-      });
-    }
-  });
-});
-
-/** ISO 4217-style currency code, e.g. "USD". */
-export const currencyCode = z.string().regex(/^[A-Z]{3}$/);
+/**
+ * A currency code: any ISO 4217 alphabetic code (from the currency-codes
+ * package) or a common crypto/stablecoin code, e.g. "USD", "EUR", "BTC",
+ * "USDC".
+ */
+export const currencyCode = z.enum([
+  ...currencyCodes.codes(),
+  ...cryptoCurrencyCodes,
+]);
 
 /**
  * Credit quantities are integer microcredits (1 credit = 1e6 microcredits),
@@ -105,4 +94,7 @@ export const priceSchema = z.object({
 export type Price = z.infer<typeof priceSchema>;
 
 /** When credits expire or meter allocations reset. Null means "never". */
-export const resetSchedule = z.union([cron, z.literal("billing_cycle_end")]);
+export const resetSchedule = z.union([
+  durationSchema,
+  z.literal("billing_cycle_end"),
+]);
