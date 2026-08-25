@@ -751,7 +751,10 @@ export async function rebuildMissingMeterBalances(): Promise<number> {
   return rebuilt;
 }
 
-/** How many events to flush to pg per batch. */
+/**
+ * How many events to flush to pg per batch. One factor in the drain
+ * ceiling -- see FLUSH_DRAIN_BATCHES_PER_TICK.
+ */
 const FLUSH_BATCH_SIZE = 500;
 /** Batch-insert attempts before falling back to per-row inserts. */
 const FLUSH_BATCH_ATTEMPTS = 3;
@@ -994,7 +997,18 @@ export async function checkpointMeterBalances(): Promise<number> {
 /** How often buffered meter events flush to pg, and balances checkpoint. */
 const FLUSH_INTERVAL_MS = 1_000;
 const CHECKPOINT_INTERVAL_MS = 30_000;
-/** Flush batches per tick, bounding how long one tick can monopolize the loop. */
+/**
+ * Flush batches per tick, bounding how long one tick can monopolize the loop.
+ *
+ * Drain ceiling: at most FLUSH_BATCH_SIZE x FLUSH_DRAIN_BATCHES_PER_TICK
+ * events reach pg per FLUSH_INTERVAL_MS, per API process -- each replica
+ * runs its own loop, so replicas multiply the ceiling. The ceiling is
+ * global across all tenants and meters (one shared mev:pending stream) and
+ * bounds only the write-behind: ingest is uncapped, so sustained excess
+ * just grows the stream backlog. To lift it, raise FLUSH_BATCH_SIZE and/or
+ * FLUSH_DRAIN_BATCHES_PER_TICK; the next constraints are pg-side (per-row
+ * index/FK maintenance on meter_events, then server tuning).
+ */
 const FLUSH_DRAIN_BATCHES_PER_TICK = 10;
 
 /**
