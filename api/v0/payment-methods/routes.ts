@@ -5,7 +5,6 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { paymentMethodSchema } from "../../schemas/payment-method.ts";
-import { tenantParam } from "../helpers.ts";
 import {
   createPaymentMethod,
   deletePaymentMethod,
@@ -13,30 +12,30 @@ import {
   setDefaultPaymentMethod,
 } from "./service.ts";
 
-export const paymentMethodsApp = new Hono()
+export const paymentMethodsApp = new Hono<{ Variables: { tenantId: string } }>()
   .post("/", zValidator("json", paymentMethodSchema), async (c) => {
-    const tenantId = tenantParam(c);
+    const tenantId = c.get("tenantId");
     const body = c.req.valid("json");
     await createPaymentMethod({ paymentMethod: body, tenantId });
     return c.json(body, 201);
   })
   .get("/", async (c) => {
-    return c.json(await listPaymentMethods({ tenantId: tenantParam(c) }));
+    return c.json(await listPaymentMethods({ tenantId: c.get("tenantId") }));
   })
-  .post("/:pmid/default", async (c) => {
+  .post("/:payment_method_id/default", async (c) => {
     const paymentMethod = await setDefaultPaymentMethod({
-      paymentMethodId: c.req.param("pmid"),
-      tenantId: tenantParam(c),
+      paymentMethodId: c.req.param("payment_method_id"),
+      tenantId: c.get("tenantId"),
     });
     if (!paymentMethod) {
       return c.json({ error: "not found" }, 404);
     }
     return c.json(paymentMethod);
   })
-  .delete("/:pmid", async (c) => {
+  .delete("/:payment_method_id", async (c) => {
     const paymentMethod = await deletePaymentMethod({
-      paymentMethodId: c.req.param("pmid"),
-      tenantId: tenantParam(c),
+      paymentMethodId: c.req.param("payment_method_id"),
+      tenantId: c.get("tenantId"),
     });
     if (!paymentMethod) {
       return c.json({ error: "not found" }, 404);

@@ -14,7 +14,8 @@ import {
 } from "../../db/schema.ts";
 import type { Duration } from "../../schemas/common.ts";
 import type { Invoice } from "../../schemas/invoice.ts";
-import { resolveTaxRef, resolveValueRef } from "../helpers.ts";
+import { resolveTaxRef } from "../taxes/service.ts";
+import { resolveValueRef } from "../values/service.ts";
 import type { CloseInvoiceBody, InvoiceCreateBody } from "./routes.ts";
 
 export async function getInvoice({

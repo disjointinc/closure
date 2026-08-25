@@ -6,7 +6,8 @@ import { eq } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import { addOnFeatures, addOnPrices, addOns } from "../../db/schema.ts";
 import type { AddOn } from "../../schemas/add-on.ts";
-import { resolveCycleRef, resolveValueRef } from "../helpers.ts";
+import { resolveCycleRef } from "../cycles/service.ts";
+import { resolveValueRef } from "../values/service.ts";
 import type { AddOnCreateBody } from "./routes.ts";
 
 export async function getAddOn({

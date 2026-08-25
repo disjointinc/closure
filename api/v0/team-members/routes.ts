@@ -8,6 +8,7 @@ import { z } from "zod";
 import { teamMemberSchema } from "../../schemas/team-member.ts";
 import {
   createTeamMember,
+  deleteTeamMember,
   getTeamMember,
   listTeamMembers,
   patchTeamMember,
@@ -41,6 +42,15 @@ export const teamMembersApp = new Hono()
   .patch("/:id", zValidator("json", teamMemberPatchSchema), async (c) => {
     const teamMember = await patchTeamMember({
       patch: c.req.valid("json"),
+      uniqueId: c.req.param("id"),
+    });
+    if (!teamMember) {
+      return c.json({ error: "not found" }, 404);
+    }
+    return c.json(teamMember);
+  })
+  .delete("/:id", async (c) => {
+    const teamMember = await deleteTeamMember({
       uniqueId: c.req.param("id"),
     });
     if (!teamMember) {

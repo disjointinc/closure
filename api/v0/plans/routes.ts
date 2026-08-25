@@ -11,7 +11,8 @@ import {
   planMeterFields,
   planSchema,
 } from "../../schemas/plan.ts";
-import { cycleRefSchema, valueRefSchema } from "../helpers.ts";
+import { cycleRefSchema } from "../cycles/service.ts";
+import { valueRefSchema } from "../values/service.ts";
 import { createPlan, deprecatePlan, getPlan, listPlans } from "./service.ts";
 
 const priceInputSchema = z.object({

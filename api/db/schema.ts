@@ -120,6 +120,7 @@ export const teamMembers = pgTable(
   {
     uniqueId: text("unique_id").primaryKey(),
     emailAddress: text("email_address").notNull().unique(),
+    deletedAt: epochMs("deleted_at"),
     name: text("name"),
     profilePictureLink: text("profile_picture_link"),
   },
@@ -385,12 +386,86 @@ export const addOnFeatures = pgTable(
   (t) => [primaryKey({ columns: [t.addOn, t.feature] })],
 );
 
+/**
+ * Reusable coupon definitions (e.g. "the referral coupon"). Templates are
+ * deprecated, never deleted: coupons minted from one keep the definition
+ * they copied at creation.
+ */
+export const couponTemplates = pgTable(
+  "coupon_templates",
+  {
+    uniqueId: text("unique_id").primaryKey(),
+    createdAt: epochMs("created_at").notNull(),
+    deprecatedAt: epochMs("deprecated_at"),
+    grantableByTenants: boolean("grantable_by_tenants").notNull(),
+    /** Only settable when grantable_by_tenants. Null means no limit. */
+    limitPerGrantingTenant: integer("limit_per_granting_tenant"),
+    name: text("name").notNull(),
+    description: text("description"),
+    defaultAward: jsonb("default_award").$type<Award>(),
+    /** Only settable when grantable_by_tenants. */
+    reciprocalBenefitCouponTemplate: text(
+      "reciprocal_benefit_coupon_template",
+    ).references((): AnyPgColumn => couponTemplates.uniqueId),
+  },
+  (t) => [
+    idFormatCheck("coupon_template", t),
+    check(
+      "coupon_templates_grantable_gating",
+      sql`grantable_by_tenants or (limit_per_granting_tenant is null and reciprocal_benefit_coupon_template is null)`,
+    ),
+  ],
+);
+
+export const couponTemplateFeaturesGranted = pgTable(
+  "coupon_template_features_granted",
+  {
+    couponTemplate: text("coupon_template")
+      .notNull()
+      .references(() => couponTemplates.uniqueId),
+    feature: text("feature")
+      .notNull()
+      .references(() => features.uniqueId),
+    value: featureSetTo("value").notNull(),
+    award: jsonb("award").$type<Award>().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.couponTemplate, t.feature] })],
+);
+
+export const couponTemplateCreditsGranted = pgTable(
+  "coupon_template_credits_granted",
+  {
+    couponTemplate: text("coupon_template")
+      .notNull()
+      .references(() => couponTemplates.uniqueId),
+    meter: text("meter")
+      .notNull()
+      .references(() => meters.uniqueId),
+    amountMicrocredits: microcredits("amount_microcredits").notNull(),
+    /** Null means the credits never expire. */
+    expiration: resetSchedule("expiration"),
+    /** Null means unlimited rollovers. */
+    rollovers: integer("rollovers"),
+    award: jsonb("award").$type<Award>().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.couponTemplate, t.meter] }),
+    check(
+      "coupon_template_credits_amount_positive",
+      sql`amount_microcredits > 0`,
+    ),
+  ],
+);
+
 export const coupons = pgTable(
   "coupons",
   {
     uniqueId: text("unique_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
-    deprecatedAt: epochMs("deprecated_at"),
+    /** Coupons are consumables, so they're deleted, not deprecated. */
+    deletedAt: epochMs("deleted_at"),
+    /** The template this coupon's definition was copied from, if any. */
+    template: text("template").references(() => couponTemplates.uniqueId),
     grantableByTenants: boolean("grantable_by_tenants").notNull(),
     /** Only settable when grantable_by_tenants. Null means no limit. */
     limitPerGrantingTenant: integer("limit_per_granting_tenant"),

@@ -7,7 +7,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { epochMs } from "../../schemas/common.ts";
 import { paymentSchema } from "../../schemas/payment.ts";
-import { tenantParam } from "../helpers.ts";
 import {
   createPayment,
   getPayment,
@@ -25,28 +24,28 @@ const paymentPatchSchema = z
 
 export type PaymentPatchBody = z.infer<typeof paymentPatchSchema>;
 
-export const paymentsApp = new Hono()
+export const paymentsApp = new Hono<{ Variables: { tenantId: string } }>()
   .post("/", zValidator("json", paymentSchema), async (c) => {
     const body = c.req.valid("json");
     return c.json(
-      await createPayment({ payment: body, tenantId: tenantParam(c) }),
+      await createPayment({ payment: body, tenantId: c.get("tenantId") }),
       201,
     );
   })
   .get("/", async (c) => {
-    return c.json(await listPayments({ tenantId: tenantParam(c) }));
+    return c.json(await listPayments({ tenantId: c.get("tenantId") }));
   })
-  .get("/:pid", async (c) => {
-    const payment = await getPayment({ uniqueId: c.req.param("pid") });
+  .get("/:payment_id", async (c) => {
+    const payment = await getPayment({ uniqueId: c.req.param("payment_id") });
     if (!payment) {
       return c.json({ error: "not found" }, 404);
     }
     return c.json(payment);
   })
-  .patch("/:pid", zValidator("json", paymentPatchSchema), async (c) => {
+  .patch("/:payment_id", zValidator("json", paymentPatchSchema), async (c) => {
     const payment = await patchPayment({
       patch: c.req.valid("json"),
-      paymentId: c.req.param("pid"),
+      paymentId: c.req.param("payment_id"),
     });
     if (!payment) {
       return c.json({ error: "not found" }, 404);

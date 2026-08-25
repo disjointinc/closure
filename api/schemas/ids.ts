@@ -13,6 +13,7 @@ export const idSuffixLengths = {
   // pricing schema entities: ~1e3 per user -> ~1e11 each
   add_on: 20,
   coupon: 20,
+  coupon_template: 20,
   cycle: 20,
   experiment: 20,
   feature: 20,
@@ -70,6 +71,7 @@ export const assignmentIdSchema = prefixedId("assignment");
 export const couponIdSchema = prefixedId("coupon");
 export const couponGrantIdSchema = prefixedId("coupon_grant");
 export const couponReceiptIdSchema = prefixedId("coupon_receipt");
+export const couponTemplateIdSchema = prefixedId("coupon_template");
 export const creditGrantIdSchema = prefixedId("credit_grant");
 export const cycleIdSchema = prefixedId("cycle");
 export const experimentIdSchema = prefixedId("experiment");

@@ -7,7 +7,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import { refunds } from "../../db/schema.ts";
 import type { Refund } from "../../schemas/refund.ts";
-import { resolveValueRef } from "../helpers.ts";
+import { resolveValueRef } from "../values/service.ts";
 import type { RefundCreateBody, RefundPatchBody } from "./routes.ts";
 
 function rowToRefund(row: typeof refunds.$inferSelect): Refund {

@@ -29,6 +29,20 @@
       "when": 1787644951145,
       "tag": "0003_rename_external_id",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787659999799,
+      "tag": "0004_little_shotgun",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787660048337,
+      "tag": "0005_rename_coupons_deleted_at",
+      "breakpoints": true
     }
   ]
 }

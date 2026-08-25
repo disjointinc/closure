@@ -2,6 +2,10 @@
  * v0/tenants/routes.ts -- HTTP for /v0/tenants: request validation, wiring,
  * and the mount points for all tenant-scoped resources (each lives in its
  * own sibling folder). Business logic lives in service.ts.
+ *
+ * The /:id/* middleware hands the tenant id to mounted sub-routers as a
+ * typed context variable (c.get("tenantId")): Hono can't statically type a
+ * param declared by a parent mount, and per-handler guards were noise.
  */
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
@@ -42,7 +46,11 @@ const tenantPatchSchema = z.object({
 export type TenantCreateBody = z.infer<typeof tenantCreateSchema>;
 export type TenantPatchBody = z.infer<typeof tenantPatchSchema>;
 
-export const tenantsApp = new Hono()
+export const tenantsApp = new Hono<{ Variables: { tenantId: string } }>()
+  .use("/:id/*", async (c, next) => {
+    c.set("tenantId", c.req.param("id"));
+    await next();
+  })
   .post("/", zValidator("json", tenantCreateSchema), async (c) => {
     const body = c.req.valid("json");
     return c.json(await createTenant({ tenant: body }), 201);

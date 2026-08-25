@@ -12,7 +12,6 @@ import {
   couponReceiptIdSchema,
   teamMemberIdSchema,
 } from "../../schemas/ids.ts";
-import { tenantParam } from "../helpers.ts";
 import {
   createCouponReceipt,
   listCouponReceipts,
@@ -30,23 +29,26 @@ const receiptCreateSchema = z.object({
 
 export type ReceiptCreateBody = z.infer<typeof receiptCreateSchema>;
 
-export const couponReceiptsApp = new Hono()
+export const couponReceiptsApp = new Hono<{ Variables: { tenantId: string } }>()
   .post("/", zValidator("json", receiptCreateSchema), async (c) => {
     const body = c.req.valid("json");
     return c.json(
-      await createCouponReceipt({ receipt: body, tenantId: tenantParam(c) }),
+      await createCouponReceipt({
+        receipt: body,
+        tenantId: c.get("tenantId"),
+      }),
       201,
     );
   })
   .get("/", async (c) => {
-    return c.json(await listCouponReceipts({ tenantId: tenantParam(c) }));
+    return c.json(await listCouponReceipts({ tenantId: c.get("tenantId") }));
   })
   .post(
-    "/:rid/use",
+    "/:receipt_id/use",
     zValidator("json", z.object({ used_at: epochMs })),
     async (c) => {
       const receipt = await useCouponReceipt({
-        receiptId: c.req.param("rid"),
+        receiptId: c.req.param("receipt_id"),
         usedAt: c.req.valid("json").used_at,
       });
       if (!receipt) {

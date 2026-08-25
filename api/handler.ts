@@ -18,6 +18,7 @@ import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "./db/index.ts";
 import { addOnsApp } from "./v0/add-ons/routes.ts";
+import { couponTemplatesApp } from "./v0/coupon-templates/routes.ts";
 import { couponsApp } from "./v0/coupons/routes.ts";
 import { experimentsApp } from "./v0/experiments/routes.ts";
 import { featuresApp } from "./v0/features/routes.ts";
@@ -38,6 +39,7 @@ const app = new Hono()
     }
   })
   .route("/v0/add-ons", addOnsApp)
+  .route("/v0/coupon-templates", couponTemplatesApp)
   .route("/v0/coupons", couponsApp)
   .route("/v0/experiments", experimentsApp)
   .route("/v0/features", featuresApp)

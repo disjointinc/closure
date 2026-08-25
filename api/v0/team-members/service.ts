@@ -11,6 +11,7 @@ import type { TeamMemberPatchBody } from "./routes.ts";
 function rowToTeamMember(row: typeof teamMembers.$inferSelect): TeamMember {
   return {
     unique_id: row.uniqueId,
+    deleted_at: row.deletedAt,
     email_address: row.emailAddress,
     name: row.name,
     profile_picture_link: row.profilePictureLink,
@@ -46,11 +47,29 @@ export async function createTeamMember({
     .insert(teamMembers)
     .values({
       uniqueId: teamMember.unique_id,
+      deletedAt: teamMember.deleted_at,
       emailAddress: teamMember.email_address,
       name: teamMember.name,
       profilePictureLink: teamMember.profile_picture_link,
     })
     .onConflictDoNothing();
+}
+
+/** Soft-delete the team member, or return null if no such member exists. */
+export async function deleteTeamMember({
+  uniqueId,
+}: {
+  uniqueId: string;
+}): Promise<TeamMember | null> {
+  const updated = await db
+    .update(teamMembers)
+    .set({ deletedAt: Date.now() })
+    .where(eq(teamMembers.uniqueId, uniqueId))
+    .returning();
+  if (updated.length === 0) {
+    return null;
+  }
+  return rowToTeamMember(updated[0]);
 }
 
 /** Patch the team member, or return null if no such team member exists. */

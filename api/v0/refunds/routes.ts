@@ -7,7 +7,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { epochMs } from "../../schemas/common.ts";
 import { refundSchema } from "../../schemas/refund.ts";
-import { tenantParam, valueRefSchema } from "../helpers.ts";
+import { valueRefSchema } from "../values/service.ts";
 import {
   createRefund,
   getRefund,
@@ -31,28 +31,28 @@ const refundPatchSchema = z
 export type RefundCreateBody = z.infer<typeof refundCreateSchema>;
 export type RefundPatchBody = z.infer<typeof refundPatchSchema>;
 
-export const refundsApp = new Hono()
+export const refundsApp = new Hono<{ Variables: { tenantId: string } }>()
   .post("/", zValidator("json", refundCreateSchema), async (c) => {
     const body = c.req.valid("json");
     return c.json(
-      await createRefund({ refund: body, tenantId: tenantParam(c) }),
+      await createRefund({ refund: body, tenantId: c.get("tenantId") }),
       201,
     );
   })
   .get("/", async (c) => {
-    return c.json(await listRefunds({ tenantId: tenantParam(c) }));
+    return c.json(await listRefunds({ tenantId: c.get("tenantId") }));
   })
-  .get("/:rid", async (c) => {
-    const refund = await getRefund({ refundId: c.req.param("rid") });
+  .get("/:refund_id", async (c) => {
+    const refund = await getRefund({ refundId: c.req.param("refund_id") });
     if (!refund) {
       return c.json({ error: "not found" }, 404);
     }
     return c.json(refund);
   })
-  .patch("/:rid", zValidator("json", refundPatchSchema), async (c) => {
+  .patch("/:refund_id", zValidator("json", refundPatchSchema), async (c) => {
     const refund = await patchRefund({
       patch: c.req.valid("json"),
-      refundId: c.req.param("rid"),
+      refundId: c.req.param("refund_id"),
     });
     if (!refund) {
       return c.json({ error: "not found" }, 404);

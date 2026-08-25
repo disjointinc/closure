@@ -3,12 +3,13 @@
  * Business logic lives in service.ts.
  */
 import { Hono } from "hono";
-import { tenantParam } from "../helpers.ts";
 import { getBalance } from "./service.ts";
 
-export const meterBalancesApp = new Hono().get("/:meterId", async (c) => {
-  const tenantId = tenantParam(c);
-  const meterId = c.req.param("meterId");
+export const meterBalancesApp = new Hono<{
+  Variables: { tenantId: string };
+}>().get("/:meter_id", async (c) => {
+  const tenantId = c.get("tenantId");
+  const meterId = c.req.param("meter_id");
   return c.json({
     tenant: tenantId,
     meter: meterId,

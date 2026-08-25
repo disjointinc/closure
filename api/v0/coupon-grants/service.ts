@@ -2,11 +2,25 @@
  * v0/coupon-grants/service.ts -- coupon grant business logic: a tenant
  * grants a coupon to another tenant, which creates the recipient's receipt.
  */
+import { randomBytes } from "node:crypto";
 import { desc, eq } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import { couponGrants, couponReceipts } from "../../db/schema.ts";
 import type { CouponGrant } from "../../schemas/coupon-grant.ts";
-import { generateId } from "../helpers.ts";
+import { idSuffixLengths, type IdPrefix } from "../../schemas/ids.ts";
+
+const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+
+/** Generate a prefixed id server-side, e.g. for derived entities. */
+function generateId(prefix: IdPrefix): string {
+  const length = idSuffixLengths[prefix];
+  const bytes = randomBytes(length);
+  let suffix = "";
+  for (let i = 0; i < length; i++) {
+    suffix += ALPHABET[bytes[i] % 36];
+  }
+  return `${prefix}_${suffix}`;
+}
 
 function rowToGrant(row: typeof couponGrants.$inferSelect): CouponGrant {
   return {

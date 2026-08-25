@@ -6,12 +6,11 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { MeterBalanceUnavailableError } from "../../cache/metering.ts";
 import { creditGrantSchema } from "../../schemas/credit-grant.ts";
-import { tenantParam } from "../helpers.ts";
 import { createCreditGrant, listCreditGrants } from "./service.ts";
 
-export const creditGrantsApp = new Hono()
+export const creditGrantsApp = new Hono<{ Variables: { tenantId: string } }>()
   .post("/", zValidator("json", creditGrantSchema), async (c) => {
-    const tenantId = tenantParam(c);
+    const tenantId = c.get("tenantId");
     const body = c.req.valid("json");
     try {
       await createCreditGrant({ grant: body, tenantId });
@@ -37,5 +36,5 @@ export const creditGrantsApp = new Hono()
     return c.json(body, 201);
   })
   .get("/", async (c) => {
-    return c.json(await listCreditGrants({ tenantId: tenantParam(c) }));
+    return c.json(await listCreditGrants({ tenantId: c.get("tenantId") }));
   });

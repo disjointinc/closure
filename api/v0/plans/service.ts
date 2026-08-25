@@ -13,7 +13,8 @@ import {
   plans,
 } from "../../db/schema.ts";
 import type { Plan, PlanMeter } from "../../schemas/plan.ts";
-import { resolveCycleRef, resolveValueRef } from "../helpers.ts";
+import { resolveCycleRef } from "../cycles/service.ts";
+import { resolveValueRef } from "../values/service.ts";
 import type { PlanCreateBody, PlanMeterInput } from "./routes.ts";
 
 /** Resolve inline cycle/value refs, returning the db-ready meter entry. */

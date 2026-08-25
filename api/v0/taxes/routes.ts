@@ -6,7 +6,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import { taxSchema } from "../../schemas/tax.ts";
-import { taxTypeRefSchema } from "../helpers.ts";
+import { taxTypeRefSchema } from "../tax-types/service.ts";
 import { createTax, deprecateTax, getTax, listTaxes } from "./service.ts";
 
 const taxCreateSchema = z.object({

@@ -6,7 +6,8 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import { addOnSchema } from "../../schemas/add-on.ts";
-import { cycleRefSchema, valueRefSchema } from "../helpers.ts";
+import { cycleRefSchema } from "../cycles/service.ts";
+import { valueRefSchema } from "../values/service.ts";
 import {
   createAddOn,
   deprecateAddOn,

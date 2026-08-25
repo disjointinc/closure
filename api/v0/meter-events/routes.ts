@@ -7,7 +7,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { MeterBalanceUnavailableError } from "../../cache/metering.ts";
 import { meterEventSchema } from "../../schemas/meter-event.ts";
-import { tenantParam } from "../helpers.ts";
 import { listMeterEvents, recordEvent } from "./service.ts";
 
 const meterEventCreateSchema = meterEventSchema.omit({
@@ -17,9 +16,9 @@ const meterEventCreateSchema = meterEventSchema.omit({
 
 export type MeterEventCreateBody = z.infer<typeof meterEventCreateSchema>;
 
-export const meterEventsApp = new Hono()
+export const meterEventsApp = new Hono<{ Variables: { tenantId: string } }>()
   .post("/", zValidator("json", meterEventCreateSchema), async (c) => {
-    const tenantId = tenantParam(c);
+    const tenantId = c.get("tenantId");
     const body = c.req.valid("json");
     try {
       const { balanceMicrocredits, status } = await recordEvent({
@@ -54,5 +53,7 @@ export const meterEventsApp = new Hono()
   })
   .get("/", async (c) => {
     const limit = Math.min(Number(c.req.query("limit")) || 100, 1000);
-    return c.json(await listMeterEvents({ limit, tenantId: tenantParam(c) }));
+    return c.json(
+      await listMeterEvents({ limit, tenantId: c.get("tenantId") }),
+    );
   });
