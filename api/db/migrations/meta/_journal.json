@@ -15,6 +15,20 @@
       "when": 1787616079973,
       "tag": "0001_quick_talkback",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787643220419,
+      "tag": "0002_lumpy_trauma",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787644951145,
+      "tag": "0003_rename_external_id",
+      "breakpoints": true
     }
   ]
 }

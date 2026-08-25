@@ -1,0 +1,2 @@
+ALTER TABLE "meter_events" DROP CONSTRAINT "meter_events_amount_positive";--> statement-breakpoint
+ALTER TABLE "meter_events" ADD CONSTRAINT "meter_events_amount_nonzero" CHECK (amount_microcredits != 0);
