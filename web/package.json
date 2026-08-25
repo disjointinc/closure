@@ -6,6 +6,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "start": "vite preview",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "lint:fix": "eslint --fix"
@@ -22,6 +23,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.5",
-    "vite": "^8.2.1"
+    "vite": "^8.2.1",
+    "vitest": "^4.1.11"
   }
 }

@@ -20,6 +20,7 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "start": "turbo run start",
+    "test": "turbo run test",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
