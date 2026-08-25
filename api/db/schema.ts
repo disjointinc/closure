@@ -852,8 +852,8 @@ export const meterEvents = pgTable(
   "meter_events",
   {
     uniqueId: text("unique_id").primaryKey(),
-    /** The caller's idempotency key. */
-    ideallyUniqueExternalId: text("ideally_unique_external_id").notNull(),
+    /** The caller's idempotency key; defaults to unique_id at ingest. */
+    uniqueExternalId: text("unique_external_id").notNull(),
     createdAt: epochMs("created_at").notNull(),
     /**
      * When the Redis ingest script applied the decrement, in MICROseconds
@@ -875,12 +875,12 @@ export const meterEvents = pgTable(
   },
   (t) => [
     idFormatCheck("meter_event", t),
-    check("meter_events_amount_positive", sql`amount_microcredits > 0`),
+    check("meter_events_amount_nonzero", sql`amount_microcredits != 0`),
     // Idempotency backstop: the Redis dedupe window is finite, this is not.
     uniqueIndex("meter_events_idempotency").on(
       t.tenant,
       t.meter,
-      t.ideallyUniqueExternalId,
+      t.uniqueExternalId,
     ),
     index("meter_events_tenant_meter_created").on(
       t.tenant,
