@@ -17,16 +17,16 @@
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "./db/index.ts";
-import { addOnsApp } from "./v0/add-ons/routes.ts";
-import { couponTemplatesApp } from "./v0/coupon-templates/routes.ts";
-import { couponsApp } from "./v0/coupons/routes.ts";
-import { experimentsApp } from "./v0/experiments/routes.ts";
-import { featuresApp } from "./v0/features/routes.ts";
-import { metersApp } from "./v0/meters/routes.ts";
-import { plansApp } from "./v0/plans/routes.ts";
-import { taxesApp } from "./v0/taxes/routes.ts";
-import { teamMembersApp } from "./v0/team-members/routes.ts";
-import { tenantsApp } from "./v0/tenants/routes.ts";
+import { addOnApp } from "./v0/add-on/routes.ts";
+import { couponApp } from "./v0/coupon/routes.ts";
+import { couponTemplateApp } from "./v0/coupon-template/routes.ts";
+import { experimentApp } from "./v0/experiment/routes.ts";
+import { featureApp } from "./v0/feature/routes.ts";
+import { meterApp } from "./v0/meter/routes.ts";
+import { planApp } from "./v0/plan/routes.ts";
+import { taxApp } from "./v0/tax/routes.ts";
+import { teamMemberApp } from "./v0/team-member/routes.ts";
+import { tenantApp } from "./v0/tenant/routes.ts";
 
 const app = new Hono()
   .get("/", (c) => c.text("hello world\n"))
@@ -38,16 +38,16 @@ const app = new Hono()
       return c.text("db unavailable\n", 503);
     }
   })
-  .route("/v0/add-ons", addOnsApp)
-  .route("/v0/coupon-templates", couponTemplatesApp)
-  .route("/v0/coupons", couponsApp)
-  .route("/v0/experiments", experimentsApp)
-  .route("/v0/features", featuresApp)
-  .route("/v0/meters", metersApp)
-  .route("/v0/plans", plansApp)
-  .route("/v0/taxes", taxesApp)
-  .route("/v0/team-members", teamMembersApp)
-  .route("/v0/tenants", tenantsApp)
+  .route("/v0/add-on", addOnApp)
+  .route("/v0/coupon", couponApp)
+  .route("/v0/coupon-template", couponTemplateApp)
+  .route("/v0/experiment", experimentApp)
+  .route("/v0/feature", featureApp)
+  .route("/v0/meter", meterApp)
+  .route("/v0/plan", planApp)
+  .route("/v0/tax", taxApp)
+  .route("/v0/team-member", teamMemberApp)
+  .route("/v0/tenant", tenantApp)
   .notFound((c) => c.json({ error: "not found" }, 404));
 
 export type AppType = typeof app;
