@@ -2,7 +2,7 @@
  * cache/keys.ts -- Closure's Redis key layout.
  *
  * mbal:{tenant}:{meter}      string  current balance in microcredits
- * midem:{tenant}:{meter}:{externalId}
+ * midem:{tenant}:{meter}:{uniqueExternalId}
  *                            string  idempotency marker for a meter event;
  *                                    the value is the event's outcome status
  * mev:pending                stream  meter events awaiting batched flush to pg
@@ -25,14 +25,14 @@ export const keys = {
     tenantId: string;
   }) => `mbal:${tenantId}:${meterId}`,
   meterEventIdempotency: ({
-    externalId,
+    uniqueExternalId,
     meterId,
     tenantId,
   }: {
-    externalId: string;
+    uniqueExternalId: string;
     meterId: string;
     tenantId: string;
-  }) => `midem:${tenantId}:${meterId}:${externalId}`,
+  }) => `midem:${tenantId}:${meterId}:${uniqueExternalId}`,
   pendingMeterEvents: "mev:pending",
   trackedMeterBalances: "mbal:tracked",
   meterGrantMarker: ({ grantId }: { grantId: string }) => `mgrant:${grantId}`,

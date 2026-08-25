@@ -362,11 +362,16 @@ export async function recordMeterEvent({
 }: {
   event: MeterEventPayload;
 }): Promise<RecordedMeterEvent> {
+  // Default the idempotency key to the event's own id so callers who don't
+  // need idempotent redelivery never mint a second id. The buffered payload
+  // carries the resolved value, so the flush always writes a non-null
+  // unique_external_id to pg.
+  const uniqueExternalId = event.unique_external_id ?? event.unique_id;
   // Ordered args: numberOfKeys: 3 on the defineCommand above splits this
   // list into KEYS (idempotency, balance, stream) and ARGV (the rest).
   const args = [
     keys.meterEventIdempotency({
-      externalId: event.ideally_unique_external_id,
+      uniqueExternalId,
       meterId: event.meter,
       tenantId: event.tenant,
     }),
@@ -374,7 +379,7 @@ export async function recordMeterEvent({
     keys.pendingMeterEvents,
     event.amount,
     METER_EVENT_IDEMPOTENCY_TTL_MS,
-    JSON.stringify(event),
+    JSON.stringify({ ...event, unique_external_id: uniqueExternalId }),
     keys.trackedMeterBalances,
   ] as const;
   const first = await commands.meterEventIngest(...args);
@@ -803,7 +808,9 @@ export async function flushPendingMeterEvents(): Promise<number> {
   );
   const values = parseable.map((row) => ({
     uniqueId: row.event.unique_id,
-    ideallyUniqueExternalId: row.event.ideally_unique_external_id,
+    // Ingest resolves this before buffering; the fallback covers entries
+    // buffered by other means (e.g. hand-repaired streams).
+    uniqueExternalId: row.event.unique_external_id ?? row.event.unique_id,
     createdAt: row.event.created_at,
     receivedAt: row.receivedAt,
     meter: row.event.meter,
@@ -888,12 +895,9 @@ export async function flushPendingMeterEvents(): Promise<number> {
   }
 
   for (const row of compensations) {
-    const {
-      amount,
-      ideally_unique_external_id: externalId,
-      meter,
-      tenant,
-    } = row.event;
+    const { amount, meter, tenant } = row.event;
+    const uniqueExternalId =
+      row.event.unique_external_id ?? row.event.unique_id;
     const balanceKey = keys.meterBalance({ meterId: meter, tenantId: tenant });
     // Only credit back if the key still holds the duplicate charge; a key
     // lost and rebuilt since is already correct from pg.
@@ -901,7 +905,7 @@ export async function flushPendingMeterEvents(): Promise<number> {
       await redis.incrby(balanceKey, amount);
       console.error("compensated duplicate meter event charge", {
         amount,
-        externalId,
+        uniqueExternalId,
         meter,
         tenant,
       });
@@ -909,7 +913,7 @@ export async function flushPendingMeterEvents(): Promise<number> {
     // Re-warm the Redis idempotency marker so later retries short-circuit.
     await redis.set(
       keys.meterEventIdempotency({
-        externalId,
+        uniqueExternalId,
         meterId: meter,
         tenantId: tenant,
       }),
