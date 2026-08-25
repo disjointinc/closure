@@ -74,8 +74,23 @@ export const planMeterFields = {
 const planMeterObject = z.object(planMeterFields);
 export type PlanMeter = z.infer<typeof planMeterObject>;
 
+/**
+ * The subset of a plan meter entry the cross-field checks read. Structural
+ * (rather than PlanMeter) so the API's create input -- where value refs may
+ * still be inline objects -- can reuse the same check.
+ */
+export interface PlanMeterCheckInput {
+  default: number;
+  limit: number | null;
+  top_up_prices_per_credit: unknown;
+  top_up_credit_pack_sizes: { dynamic: { maximum: number | null } } | null;
+}
+
 /** Cross-field rules for a plan meter entry (also reused by meter overrides). */
-export function checkPlanMeter(meter: PlanMeter, ctx: z.RefinementCtx): void {
+export function checkPlanMeter(
+  meter: PlanMeterCheckInput,
+  ctx: z.RefinementCtx,
+): void {
   if (meter.limit !== null && meter.limit < meter.default) {
     ctx.addIssue({
       code: "custom",
@@ -92,7 +107,7 @@ export function checkPlanMeter(meter: PlanMeter, ctx: z.RefinementCtx): void {
   const tiers = meter.top_up_prices_per_credit;
   if (Array.isArray(tiers)) {
     const seen = new Set<number>();
-    tiers.forEach((tier, index) => {
+    (tiers as { starting_at: number }[]).forEach((tier, index) => {
       if (seen.has(tier.starting_at)) {
         ctx.addIssue({
           code: "custom",

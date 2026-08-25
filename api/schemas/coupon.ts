@@ -31,6 +31,34 @@ export type Award = z.infer<typeof awardSchema>;
 /** Awards default to a full (100%) discount when unspecified. */
 const defaultAward = { type: "percentage_discount", value: 100 } as const;
 
+/** Cross-field rules for a coupon (also reused by the API's create input). */
+export function checkCoupon(
+  coupon: {
+    grantable_by_tenants: boolean;
+    limit_per_granting_tenant: number | null;
+    reciprocal_benefit_coupon: string | null;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (coupon.grantable_by_tenants) {
+    return;
+  }
+  if (coupon.limit_per_granting_tenant !== null) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["limit_per_granting_tenant"],
+      message: "only settable when grantable_by_tenants",
+    });
+  }
+  if (coupon.reciprocal_benefit_coupon !== null) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["reciprocal_benefit_coupon"],
+      message: "only settable when grantable_by_tenants",
+    });
+  }
+}
+
 export const couponSchema = z
   .object({
     unique_id: couponIdSchema,
@@ -67,23 +95,5 @@ export const couponSchema = z
     /** Only settable when grantable_by_tenants. */
     reciprocal_benefit_coupon: couponIdSchema.nullable(),
   })
-  .superRefine((coupon, ctx) => {
-    if (coupon.grantable_by_tenants) {
-      return;
-    }
-    if (coupon.limit_per_granting_tenant !== null) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["limit_per_granting_tenant"],
-        message: "only settable when grantable_by_tenants",
-      });
-    }
-    if (coupon.reciprocal_benefit_coupon !== null) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["reciprocal_benefit_coupon"],
-        message: "only settable when grantable_by_tenants",
-      });
-    }
-  });
+  .superRefine(checkCoupon);
 export type Coupon = z.infer<typeof couponSchema>;

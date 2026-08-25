@@ -1,12 +1,22 @@
 /**
  * Serves api/handler.ts over node:http for the hobby deploy.
+ *
+ * Before accepting traffic, rebuild any meter balances whose Redis keys were
+ * lost (Redis restart, flush, failover) from the pg checkpoints; then start
+ * the write-behind and reconcile loops.
  */
 import { serve } from "@hono/node-server";
 import { config } from "../config.ts";
-import { startMeteringFlushLoop } from "./cache/metering.ts";
+import {
+  rebuildMissingMeterBalances,
+  startMeteringFlushLoop,
+} from "./cache/metering.ts";
+import { startMeteringReconcileLoop } from "./cache/reconcile.ts";
 import app from "./handler.ts";
 
+await rebuildMissingMeterBalances();
 startMeteringFlushLoop();
+startMeteringReconcileLoop();
 
 serve(
   {

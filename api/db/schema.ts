@@ -775,6 +775,14 @@ export const creditGrants = pgTable(
       .references(() => teamMembers.uniqueId),
     reason: text("reason"),
     amountMicrocredits: microcredits("amount_microcredits").notNull(),
+    /**
+     * When the grant was applied to the Redis balance, in MICROseconds on
+     * the Redis server's clock (see meter_events.received_at). NULL means
+     * "never applied" -- the reconciler applies such grants (idempotently).
+     * Stamped at most once (UPDATE ... WHERE applied_at IS NULL) so replay
+     * never double-counts a grant already folded into a checkpoint.
+     */
+    appliedAt: bigint("applied_at", { mode: "number" }),
   },
   (t) => [
     idFormatCheck("credit_grant", t),
@@ -847,6 +855,15 @@ export const meterEvents = pgTable(
     /** The caller's idempotency key. */
     ideallyUniqueExternalId: text("ideally_unique_external_id").notNull(),
     createdAt: epochMs("created_at").notNull(),
+    /**
+     * When the Redis ingest script applied the decrement, in MICROseconds
+     * since the epoch on the Redis server's clock -- the same clock
+     * meter_balances.updated_at uses, so rebuild replay
+     * (received_at > updated_at) orders events against checkpoints exactly.
+     * Null for events flushed before this column existed; those are already
+     * folded into checkpoints and excluded from replay.
+     */
+    receivedAt: bigint("received_at", { mode: "number" }),
     meter: text("meter")
       .notNull()
       .references(() => meters.uniqueId),
@@ -895,3 +912,26 @@ export const meterBalances = pgTable(
     check("meter_balances_nonnegative", sql`balance_microcredits >= 0`),
   ],
 );
+
+/**
+ * Dead-letter queue for meter events that repeatedly fail to flush into
+ * meter_events (e.g. FK violations, corrupt payloads). A DLQ'd event DID
+ * decrement the Redis balance if its status is "succeeded", so balance
+ * rebuilds replay succeeded rows from here too -- excluding them would
+ * rebuild balances too high. Deliberately no FK constraints: the reason a
+ * row lands here may be that its tenant/meter reference is invalid.
+ */
+export const meterEventsDlq = pgTable("meter_events_dlq", {
+  id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+  /** The raw payload JSON from the pending stream, unmodified. */
+  payload: text("payload").notNull(),
+  /** Columns below are extracted when the payload parses; null otherwise. */
+  status: meterEventStatusEnum("status"),
+  tenant: text("tenant"),
+  meter: text("meter"),
+  amountMicrocredits: microcredits("amount_microcredits"),
+  receivedAt: bigint("received_at", { mode: "number" }),
+  /** Why the flush gave up (pg error code + message). */
+  error: text("error").notNull(),
+  failedAt: epochMs("failed_at").notNull(),
+});

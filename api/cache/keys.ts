@@ -17,19 +17,34 @@
  *                                    balance key is rebuilt from pg
  */
 export const keys = {
-  meterBalance: (tenantId: string, meterId: string) =>
-    `mbal:${tenantId}:${meterId}`,
-  meterEventIdempotency: (
-    tenantId: string,
-    meterId: string,
-    externalId: string,
-  ) => `midem:${tenantId}:${meterId}:${externalId}`,
+  meterBalance: ({
+    meterId,
+    tenantId,
+  }: {
+    meterId: string;
+    tenantId: string;
+  }) => `mbal:${tenantId}:${meterId}`,
+  meterEventIdempotency: ({
+    externalId,
+    meterId,
+    tenantId,
+  }: {
+    externalId: string;
+    meterId: string;
+    tenantId: string;
+  }) => `midem:${tenantId}:${meterId}:${externalId}`,
   pendingMeterEvents: "mev:pending",
   trackedMeterBalances: "mbal:tracked",
-  meterGrantMarker: (grantId: string) => `mgrant:${grantId}`,
-  meterFlushMarker: (meterEventId: string) => `mflush:${meterEventId}`,
-  meterBalanceRebuildLock: (tenantId: string, meterId: string) =>
-    `mblock:${tenantId}:${meterId}`,
+  meterGrantMarker: ({ grantId }: { grantId: string }) => `mgrant:${grantId}`,
+  meterFlushMarker: ({ meterEventId }: { meterEventId: string }) =>
+    `mflush:${meterEventId}`,
+  meterBalanceRebuildLock: ({
+    meterId,
+    tenantId,
+  }: {
+    meterId: string;
+    tenantId: string;
+  }) => `mblock:${tenantId}:${meterId}`,
 } as const;
 
 /**

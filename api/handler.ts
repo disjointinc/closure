@@ -12,6 +12,15 @@
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "./db/index.ts";
+import { addOnsApp } from "./routes/add_ons.ts";
+import { couponsApp } from "./routes/coupons.ts";
+import { experimentsApp } from "./routes/experiments.ts";
+import { featuresApp } from "./routes/features.ts";
+import { metersApp } from "./routes/meters.ts";
+import { plansApp } from "./routes/plans.ts";
+import { taxesApp } from "./routes/taxes.ts";
+import { teamMembersApp } from "./routes/team_members.ts";
+import { tenantsApp } from "./routes/tenants.ts";
 
 const app = new Hono()
   .get("/", (c) => c.text("hello world\n"))
@@ -23,7 +32,16 @@ const app = new Hono()
       return c.text("db unavailable\n", 503);
     }
   })
-  .notFound((c) => c.text("not found\n", 404));
+  .route("/features", featuresApp)
+  .route("/meters", metersApp)
+  .route("/plans", plansApp)
+  .route("/add-ons", addOnsApp)
+  .route("/coupons", couponsApp)
+  .route("/taxes", taxesApp)
+  .route("/experiments", experimentsApp)
+  .route("/team-members", teamMembersApp)
+  .route("/tenants", tenantsApp)
+  .notFound((c) => c.json({ error: "not found" }, 404));
 
 export type AppType = typeof app;
 export default app;
