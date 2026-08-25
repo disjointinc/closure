@@ -8,7 +8,8 @@
  * Write path (recordMeterEvent): one atomic Lua script per event --
  *   1. dedupe on the caller's idempotency key (repeat deliveries return the
  *      original outcome without double-charging),
- *   2. check and decrement the balance (exact integer arithmetic),
+ *   2. check and decrement the balance (exact integer arithmetic; amounts
+ *      are signed -- a negative amount is a refund and always succeeds),
  *   3. buffer the event on a stream for batched flush to pg, stamped with
  *      received_at on the Redis server's clock,
  *   4. mark the balance key as tracked for checkpointing.
@@ -69,11 +70,20 @@ type MeterEventStatus = MeterEvent["status"];
 export type MeterEventPayload = Omit<MeterEvent, "status">;
 
 /**
- * Ingest outcome: the two persisted statuses, plus "uninitialized" --
- * transport-only (never written to Redis markers, the stream, or pg) --
- * meaning the balance key is absent and must be rebuilt before retrying.
+ * Ingest outcome: "uninitialized" -- transport-only (never written to Redis
+ * markers, the stream, or pg) -- meaning the balance key is absent and must
+ * be rebuilt before retrying. Otherwise a [status, balance] pair: the
+ * event's persisted status and the post-decision balance (null only on a
+ * redelivery whose balance key has since been lost).
  */
-type IngestResult = MeterEventStatus | "uninitialized";
+type IngestResult =
+  "uninitialized" | [status: MeterEventStatus, balance: string | null];
+
+/** The settled outcome of a recorded meter event. */
+export type RecordedMeterEvent = {
+  status: MeterEventStatus;
+  balanceMicrocredits: number | null;
+};
 
 /**
  * The custom commands below are registered via defineCommand (which caches
@@ -121,7 +131,7 @@ redis.defineCommand("meterEventIngest", {
   lua: `
     local existing = redis.call("GET", KEYS[1])
     if existing then
-      return existing
+      return {existing, redis.call("GET", KEYS[2])}
     end
     local raw = redis.call("GET", KEYS[2])
     if not raw then
@@ -130,10 +140,10 @@ redis.defineCommand("meterEventIngest", {
     local balance = tonumber(raw)
     local amount = tonumber(ARGV[1])
     local status
-    if balance < amount then
+    if amount >= 0 and balance < amount then
       status = "insufficient_balance"
     else
-      redis.call("DECRBY", KEYS[2], amount)
+      balance = redis.call("DECRBY", KEYS[2], amount)
       redis.call("SADD", ARGV[4], KEYS[2])
       status = "succeeded"
     end
@@ -141,7 +151,7 @@ redis.defineCommand("meterEventIngest", {
     local time = redis.call("TIME")
     local received_at = tonumber(time[1]) * 1000000 + tonumber(time[2])
     redis.call("XADD", KEYS[3], "*", "payload", ARGV[3], "status", status, "received_at", received_at)
-    return status
+    return {status, balance}
   `,
 });
 
@@ -340,17 +350,18 @@ export function parsePendingEntry({
 
 /**
  * Record a meter event: idempotently check and decrement the tenant's
- * balance for the meter, and buffer the event for flush to pg. Returns the
- * event's status ("succeeded" | "insufficient_balance"); a repeat delivery
- * of the same external id returns the original status without re-charging.
- * A missing balance key is rebuilt from pg first (read repair); if it
- * cannot be restored, throws MeterBalanceUnavailableError (fail closed).
+ * balance for the meter, and buffer the event for flush to pg. Amounts are
+ * signed -- a negative amount is a refund (no balance check; always
+ * succeeds). A repeat delivery of the same external id returns the original
+ * status without re-charging. A missing balance key is rebuilt from pg first
+ * (read repair); if it cannot be restored, throws
+ * MeterBalanceUnavailableError (fail closed).
  */
 export async function recordMeterEvent({
   event,
 }: {
   event: MeterEventPayload;
-}): Promise<MeterEventStatus> {
+}): Promise<RecordedMeterEvent> {
   // Ordered args: numberOfKeys: 3 on the defineCommand above splits this
   // list into KEYS (idempotency, balance, stream) and ARGV (the rest).
   const args = [
@@ -368,7 +379,11 @@ export async function recordMeterEvent({
   ] as const;
   const first = await commands.meterEventIngest(...args);
   if (first !== "uninitialized") {
-    return first;
+    const [status, balance] = first;
+    return {
+      balanceMicrocredits: balance === null ? null : Number(balance),
+      status,
+    };
   }
   await ensureMeterBalance({ meterId: event.meter, tenantId: event.tenant });
   const retry = await commands.meterEventIngest(...args);
@@ -378,7 +393,11 @@ export async function recordMeterEvent({
       tenant: event.tenant,
     });
   }
-  return retry;
+  const [status, balance] = retry;
+  return {
+    balanceMicrocredits: balance === null ? null : Number(balance),
+    status,
+  };
 }
 
 /** The tenant's current balance for a meter, or null if never initialized. */
