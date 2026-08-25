@@ -33,7 +33,22 @@ import {
   sumSucceededMeterEvents,
 } from "./metering.ts";
 
-/** Above this backlog, skip the heal pass rather than XRANGE the world. */
+/**
+ * Pending-stream depth at which the reconciler skips its heal pass. The
+ * pass reads the whole mev:pending stream (this gates the heal work, not
+ * the read -- the XRANGE below has already returned everything) and then
+ * does per-key pg math, so a deep backlog makes the pass slow and adds
+ * load exactly when the flush loop is already behind. Skipping is safe:
+ * heals are commutative and repeated runs converge, so a skip just defers
+ * healing to the next pass, RECONCILE_INTERVAL_MS later.
+ *
+ * The value is a first-pass guess, not a measured limit; its similarity to
+ * the per-second flush drain ceiling (FLUSH_BATCH_SIZE x
+ * FLUSH_DRAIN_BATCHES_PER_TICK in metering.ts) is a coincidence -- stream
+ * depth and events/second are unrelated units. Raise it to let heal passes
+ * tolerate deeper backlogs (at the cost of slower, heavier passes); lower
+ * it to defer sooner under overload.
+ */
 const MAX_STREAM_SCAN = 5_000;
 /** How many unapplied grants to apply per pass. */
 const PENDING_GRANT_BATCH = 500;
