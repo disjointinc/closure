@@ -56,7 +56,7 @@ import {
   meterEvents,
   meterEventsDlq,
 } from "../db/schema.ts";
-import type { MeterEvent } from "../schemas/meter_event.ts";
+import type { MeterEvent } from "../schemas/meter-event.ts";
 import { redis } from "./index.ts";
 import {
   keys,

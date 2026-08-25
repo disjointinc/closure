@@ -38,7 +38,7 @@ import type { Award } from "../schemas/coupon.ts";
 import type { DunningAction } from "../schemas/cycle.ts";
 import { idSuffixLengths, type IdPrefix } from "../schemas/ids.ts";
 import type { Payment } from "../schemas/payment.ts";
-import type { PaymentMethod } from "../schemas/payment_method.ts";
+import type { PaymentMethod } from "../schemas/payment-method.ts";
 import type { PlanMeter } from "../schemas/plan.ts";
 
 /** Check constraint enforcing "<prefix>_<suffix of [a-z0-9]>" id format. */

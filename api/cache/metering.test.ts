@@ -12,7 +12,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "../db/index.ts";
 import { creditGrants, meterEvents, meterEventsDlq } from "../db/schema.ts";
-import { meterEventSchema } from "../schemas/meter_event.ts";
+import { meterEventSchema } from "../schemas/meter-event.ts";
 import { redis } from "./index.ts";
 import { keys } from "./keys.ts";
 import {

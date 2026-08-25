@@ -12,14 +12,14 @@
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "./db/index.ts";
-import { addOnsApp } from "./routes/add_ons.ts";
+import { addOnsApp } from "./routes/add-ons.ts";
 import { couponsApp } from "./routes/coupons.ts";
 import { experimentsApp } from "./routes/experiments.ts";
 import { featuresApp } from "./routes/features.ts";
 import { metersApp } from "./routes/meters.ts";
 import { plansApp } from "./routes/plans.ts";
 import { taxesApp } from "./routes/taxes.ts";
-import { teamMembersApp } from "./routes/team_members.ts";
+import { teamMembersApp } from "./routes/team-members.ts";
 import { tenantsApp } from "./routes/tenants.ts";
 
 const app = new Hono()

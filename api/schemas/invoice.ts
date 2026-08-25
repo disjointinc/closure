@@ -3,7 +3,7 @@ import { epochMs } from "./common.ts";
 import { arrearsChargingSchema, upfrontChargingSchema } from "./cycle.ts";
 import { invoiceIdSchema } from "./ids.ts";
 import { itemSchema } from "./item.ts";
-import { taxationAmountSchema } from "./taxation_amount.ts";
+import { taxationAmountSchema } from "./taxation-amount.ts";
 
 const invoiceFields = {
   unique_id: invoiceIdSchema,

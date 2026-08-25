@@ -1,15 +1,15 @@
 import { z } from "zod";
 import { epochMs } from "./common.ts";
 import { assignmentSchema } from "./assignment.ts";
-import { couponGrantSchema } from "./coupon_grant.ts";
-import { couponReceiptSchema } from "./coupon_receipt.ts";
-import { creditGrantSchema } from "./credit_grant.ts";
-import { featureOverrideSchema } from "./feature_override.ts";
+import { couponGrantSchema } from "./coupon-grant.ts";
+import { couponReceiptSchema } from "./coupon-receipt.ts";
+import { creditGrantSchema } from "./credit-grant.ts";
+import { featureOverrideSchema } from "./feature-override.ts";
 import { tenantIdSchema } from "./ids.ts";
 import { invoiceSchema } from "./invoice.ts";
-import { meterOverrideSchema } from "./meter_override.ts";
+import { meterOverrideSchema } from "./meter-override.ts";
 import { paymentSchema } from "./payment.ts";
-import { paymentMethodSchema } from "./payment_method.ts";
+import { paymentMethodSchema } from "./payment-method.ts";
 import { refundSchema } from "./refund.ts";
 
 export const tenantSchema = z

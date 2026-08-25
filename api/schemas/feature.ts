@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { epochMs } from "./common.ts";
 import { featureIdSchema, taxTypeIdSchema } from "./ids.ts";
-import { featureOptionSchema } from "./feature_option.ts";
+import { featureOptionSchema } from "./feature-option.ts";
 
 export const featureSchema = z.object({
   unique_id: featureIdSchema,
