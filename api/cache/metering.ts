@@ -948,13 +948,7 @@ export async function checkpointMeterBalances(): Promise<number> {
     if (raw === null) {
       return [];
     }
-    const parts = key.split(":");
-    if (parts.length !== 3) {
-      // A malformed tracked member must not fail the whole batch upsert.
-      console.error("skipping malformed tracked balance key", { key });
-      return [];
-    }
-    const [, tenant, meter] = parts;
+    const [, tenant, meter] = key.split(":");
     return [{ tenant, meter, balanceMicrocredits: Number(raw), updatedAt }];
   });
   if (rows.length === 0) {
