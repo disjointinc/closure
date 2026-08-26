@@ -57,7 +57,7 @@ const epochMs = (name: string) => bigint(name, { mode: "number" });
 /** Integer microcredits, as stored in the db. */
 const microcredits = (name: string) => bigint(name, { mode: "number" });
 
-/** A length of time: durationSchema, or a literal like "one-time". */
+/** A length of time: durationSchema, or a literal like "one_time". */
 const duration = (name: string) => jsonb(name).$type<Duration>();
 
 /** When credits expire or allocations reset. Null means "never". */
@@ -69,10 +69,10 @@ const featureSetTo = (name: string) => jsonb(name).$type<boolean | string[]>();
 
 /** A price per usage tier (plan meter top-ups). */
 const topUpPricesPerCredit = (name: string) =>
-  jsonb(name).$type<PlanMeter["top_up_prices_per_credit"]>();
+  jsonb(name).$type<PlanMeter["topUpPricesPerCredit"]>();
 
 const topUpCreditPackSizes = (name: string) =>
-  jsonb(name).$type<PlanMeter["top_up_credit_pack_sizes"]>();
+  jsonb(name).$type<PlanMeter["topUpCreditPackSizes"]>();
 
 export const chargedEnum = pgEnum("charged", ["upfront", "arrears"]);
 export const meterEventStatusEnum = pgEnum("meter_event_status", [
@@ -92,8 +92,8 @@ export const grantorTypeEnum = pgEnum("grantor_type", [
  */
 const chargingColumns = {
   charged: chargedEnum("charged").notNull(),
-  /** Duration, or "one-time" (upfront only). */
-  cycleLength: jsonb("cycle_length").$type<Duration | "one-time">().notNull(),
+  /** Duration, or "one_time" (upfront only). */
+  cycleLength: jsonb("cycle_length").$type<Duration | "one_time">().notNull(),
   creditPeriod: duration("credit_period"),
   gracePeriod: duration("grace_period"),
   dunningSchedule:
@@ -721,7 +721,7 @@ export const paymentMethods = pgTable(
     isDefault: boolean("is_default").notNull(),
     /** Provider references only -- no payment details on our servers. */
     providerInternals: jsonb("provider_internals")
-      .$type<PaymentMethod["provider_internals"]>()
+      .$type<PaymentMethod["providerInternals"]>()
       .notNull(),
   },
   (t) => [
@@ -745,7 +745,7 @@ export const payments = pgTable(
     succeededAt: epochMs("succeeded_at"),
     failedAt: epochMs("failed_at"),
     providerInternals: jsonb("provider_internals")
-      .$type<Payment["provider_internals"]>()
+      .$type<Payment["providerInternals"]>()
       .notNull(),
   },
   (t) => [idFormatCheck("payment", t), index("payments_tenant").on(t.tenant)],

@@ -366,7 +366,7 @@ export async function recordMeterEvent({
   // need idempotent redelivery never mint a second id. The buffered payload
   // carries the resolved value, so the flush always writes a non-null
   // unique_external_id to pg.
-  const uniqueExternalId = event.unique_external_id ?? event.unique_id;
+  const uniqueExternalId = event.uniqueExternalId ?? event.uniqueId;
   // Ordered args: numberOfKeys: 3 on the defineCommand above splits this
   // list into KEYS (idempotency, balance, stream) and ARGV (the rest).
   const args = [
@@ -379,7 +379,7 @@ export async function recordMeterEvent({
     keys.pendingMeterEvents,
     event.amount,
     METER_EVENT_IDEMPOTENCY_TTL_MS,
-    JSON.stringify({ ...event, unique_external_id: uniqueExternalId }),
+    JSON.stringify({ ...event, uniqueExternalId }),
     keys.trackedMeterBalances,
   ] as const;
   const first = await commands.meterEventIngest(...args);
@@ -798,23 +798,23 @@ export async function flushPendingMeterEvents(): Promise<number> {
     ? await commands.meterFlushMark(
         METER_MARKER_TTL_MS,
         ...parseable.map((row) =>
-          keys.meterFlushMarker({ meterEventId: row.event.unique_id }),
+          keys.meterFlushMarker({ meterEventId: row.event.uniqueId }),
         ),
       )
     : [];
   const firstAttemptById = new Map(
-    parseable.map((row, i) => [row.event.unique_id, marks[i] === 1]),
+    parseable.map((row, i) => [row.event.uniqueId, marks[i] === 1]),
   );
 
   const state = new Map<string, "inserted" | "conflict" | "poison" | "pending">(
-    parseable.map((row) => [row.event.unique_id, "pending"]),
+    parseable.map((row) => [row.event.uniqueId, "pending"]),
   );
   const values = parseable.map((row) => ({
-    uniqueId: row.event.unique_id,
+    uniqueId: row.event.uniqueId,
     // Ingest resolves this before buffering; the fallback covers entries
     // buffered by other means (e.g. hand-repaired streams).
-    uniqueExternalId: row.event.unique_external_id ?? row.event.unique_id,
-    createdAt: row.event.created_at,
+    uniqueExternalId: row.event.uniqueExternalId ?? row.event.uniqueId,
+    createdAt: row.event.createdAt,
     receivedAt: row.receivedAt,
     meter: row.event.meter,
     tenant: row.event.tenant,
@@ -882,7 +882,7 @@ export async function flushPendingMeterEvents(): Promise<number> {
   const doneEntryIds: string[] = [];
   const compensations: ParsedRow[] = [];
   for (const row of parseable) {
-    const rowState = state.get(row.event.unique_id);
+    const rowState = state.get(row.event.uniqueId);
     if (rowState !== "inserted" && rowState !== "conflict") {
       // "pending" rows (pg lost mid-batch) stay on the stream for next tick.
       continue;
@@ -891,7 +891,7 @@ export async function flushPendingMeterEvents(): Promise<number> {
     const isDuplicateIngest =
       rowState === "conflict" &&
       row.status === "succeeded" &&
-      firstAttemptById.get(row.event.unique_id) === true;
+      firstAttemptById.get(row.event.uniqueId) === true;
     if (isDuplicateIngest) {
       compensations.push(row);
     }
@@ -899,8 +899,7 @@ export async function flushPendingMeterEvents(): Promise<number> {
 
   for (const row of compensations) {
     const { amount, meter, tenant } = row.event;
-    const uniqueExternalId =
-      row.event.unique_external_id ?? row.event.unique_id;
+    const uniqueExternalId = row.event.uniqueExternalId ?? row.event.uniqueId;
     const balanceKey = keys.meterBalance({ meterId: meter, tenantId: tenant });
     // Only credit back if the key still holds the duplicate charge; a key
     // lost and rebuilt since is already correct from pg.

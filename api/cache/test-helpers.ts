@@ -81,9 +81,9 @@ export function makeEvent({
   tenant: string;
 }): MeterEventPayload {
   return {
-    unique_id: newMeterEventId(),
-    unique_external_id: `ext-${suffix({ length: 16 })}`,
-    created_at: Date.now(),
+    uniqueId: newMeterEventId(),
+    uniqueExternalId: `ext-${suffix({ length: 16 })}`,
+    createdAt: Date.now(),
     meter,
     tenant,
     amount,

@@ -141,9 +141,9 @@ describe("reconciler", () => {
     // expectation is now negative, which the hot path can never produce.
     const seeded = makeEvent({ amount: 100_000, meter, tenant });
     await db.insert(meterEvents).values({
-      uniqueId: seeded.unique_id,
-      uniqueExternalId: seeded.unique_external_id ?? seeded.unique_id,
-      createdAt: seeded.created_at,
+      uniqueId: seeded.uniqueId,
+      uniqueExternalId: seeded.uniqueExternalId ?? seeded.uniqueId,
+      createdAt: seeded.createdAt,
       receivedAt: await redisTimeMicros(),
       meter,
       tenant,
@@ -165,7 +165,7 @@ describe("reconciler", () => {
     // Keep cross-run state clean: remove the seeded inconsistency.
     await db
       .delete(meterEvents)
-      .where(eq(meterEvents.uniqueId, seeded.unique_id));
+      .where(eq(meterEvents.uniqueId, seeded.uniqueId));
     await redis.del(keys.meterBalance({ meterId: meter, tenantId: tenant }));
     await redis.srem(
       keys.trackedMeterBalances,

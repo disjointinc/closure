@@ -164,14 +164,14 @@ describe("metering durability", () => {
     const first = makeEvent({
       amount: 100_000,
       meter,
-      overrides: { unique_external_id: uniqueExternalId },
+      overrides: { uniqueExternalId },
       tenant,
     });
     expect((await recordMeterEvent({ event: first })).status).toBe("succeeded");
     expect(await flushPendingMeterEvents()).toBe(1);
 
     // Simulate Redis losing the idempotency marker, then a client retry with
-    // a new unique_id: Redis is charged a second time.
+    // a new uniqueId: Redis is charged a second time.
     await redis.del(
       keys.meterEventIdempotency({
         uniqueExternalId,
@@ -182,7 +182,7 @@ describe("metering durability", () => {
     const retry = makeEvent({
       amount: 100_000,
       meter,
-      overrides: { unique_external_id: uniqueExternalId },
+      overrides: { uniqueExternalId },
       tenant,
     });
     expect((await recordMeterEvent({ event: retry })).status).toBe("succeeded");
@@ -246,13 +246,13 @@ describe("metering durability", () => {
       tenantId: tenant,
     });
 
-    // unique_id violates the meter_event id-format CHECK constraint; the
+    // uniqueId violates the meter_event id-format CHECK constraint; the
     // Redis ingest path doesn't validate it, so the decrement happens and
     // the flush hits 23514.
     const poison = makeEvent({
       amount: 200_000,
       meter,
-      overrides: { unique_id: "meter_event_tooshort" },
+      overrides: { uniqueId: "meter_event_tooshort" },
       tenant,
     });
     expect((await recordMeterEvent({ event: poison })).status).toBe(
@@ -321,13 +321,13 @@ describe("metering durability", () => {
     const first = makeEvent({
       amount: 100_000,
       meter,
-      overrides: { unique_external_id: externalId },
+      overrides: { uniqueExternalId: externalId },
       tenant,
     });
     const redelivery = makeEvent({
       amount: 100_000,
       meter,
-      overrides: { unique_external_id: externalId },
+      overrides: { uniqueExternalId: externalId },
       tenant,
     });
     expect((await recordMeterEvent({ event: first })).status).toBe("succeeded");
@@ -343,7 +343,7 @@ describe("metering durability", () => {
     expect(await pgEventCount({ tenant })).toBe(1);
   });
 
-  it("defaults unique_external_id to unique_id when omitted", async () => {
+  it("defaults uniqueExternalId to uniqueId when omitted", async () => {
     const tenant = await makeTenant();
     const meter = await makeMeter();
     await setMeterBalance({
@@ -352,16 +352,16 @@ describe("metering durability", () => {
       tenantId: tenant,
     });
 
-    // No unique_external_id: the caller's first-time path.
+    // No uniqueExternalId: the caller's first-time path.
     const event: MeterEventPayload = {
-      unique_id: newMeterEventId(),
-      created_at: Date.now(),
+      uniqueId: newMeterEventId(),
+      createdAt: Date.now(),
       meter,
       tenant,
       amount: 100_000,
     };
     expect((await recordMeterEvent({ event })).status).toBe("succeeded");
-    // A redelivery with the same unique_id (and still no external id)
+    // A redelivery with the same uniqueId (and still no external id)
     // dedupes via the default: no second charge, one pg row.
     const redelivered = await recordMeterEvent({ event });
     expect(redelivered.status).toBe("succeeded");
@@ -373,7 +373,7 @@ describe("metering durability", () => {
       .select()
       .from(meterEvents)
       .where(eq(meterEvents.tenant, tenant));
-    expect(row.uniqueExternalId).toBe(event.unique_id);
+    expect(row.uniqueExternalId).toBe(event.uniqueId);
   });
 });
 
@@ -436,9 +436,9 @@ describe("refunds (signed amounts)", () => {
 
   it("rejects zero-amount events at the schema", () => {
     const parsed = meterEventSchema.safeParse({
-      unique_id: newMeterEventId(),
-      unique_external_id: "ext-zero",
-      created_at: Date.now(),
+      uniqueId: newMeterEventId(),
+      uniqueExternalId: "ext-zero",
+      createdAt: Date.now(),
       meter: newMeterId(),
       tenant: newTenantId(),
       amount: 0,
