@@ -16,6 +16,9 @@ export default defineConfig({
   },
   plugins: [
     tanstackStart({
+      // SPA mode: all data fetching happens browser-side (the console talks
+      // to the API on localhost), so there is nothing to render server-side.
+      spa: { enabled: true },
       router: {
         generatedRouteTree: "../routeTree.gen.ts",
       },

@@ -10,33 +10,193 @@
 
 import { Route as rootRouteImport } from './src/routes/__root'
 import { Route as IndexRouteImport } from './src/routes/index'
+import { Route as AddOnsRouteImport } from './src/routes/add-ons'
+import { Route as CouponTemplatesRouteImport } from './src/routes/coupon-templates'
+import { Route as CouponsRouteImport } from './src/routes/coupons'
+import { Route as ExperimentsRouteImport } from './src/routes/experiments'
+import { Route as FeaturesRouteImport } from './src/routes/features'
+import { Route as GuideRouteImport } from './src/routes/guide'
+import { Route as MetersRouteImport } from './src/routes/meters'
+import { Route as PlansRouteImport } from './src/routes/plans'
+import { Route as TaxesRouteImport } from './src/routes/taxes'
+import { Route as TeamMembersRouteImport } from './src/routes/team-members'
+import { Route as TenantsIndexRouteImport } from './src/routes/tenants.index'
+import { Route as TenantsTenantIdRouteImport } from './src/routes/tenants.$tenantId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AddOnsRoute = AddOnsRouteImport.update({
+  id: '/add-ons',
+  path: '/add-ons',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CouponTemplatesRoute = CouponTemplatesRouteImport.update({
+  id: '/coupon-templates',
+  path: '/coupon-templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CouponsRoute = CouponsRouteImport.update({
+  id: '/coupons',
+  path: '/coupons',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExperimentsRoute = ExperimentsRouteImport.update({
+  id: '/experiments',
+  path: '/experiments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FeaturesRoute = FeaturesRouteImport.update({
+  id: '/features',
+  path: '/features',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuideRoute = GuideRouteImport.update({
+  id: '/guide',
+  path: '/guide',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MetersRoute = MetersRouteImport.update({
+  id: '/meters',
+  path: '/meters',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlansRoute = PlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TaxesRoute = TaxesRouteImport.update({
+  id: '/taxes',
+  path: '/taxes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamMembersRoute = TeamMembersRouteImport.update({
+  id: '/team-members',
+  path: '/team-members',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TenantsIndexRoute = TenantsIndexRouteImport.update({
+  id: '/tenants/',
+  path: '/tenants/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TenantsTenantIdRoute = TenantsTenantIdRouteImport.update({
+  id: '/tenants/$tenantId',
+  path: '/tenants/$tenantId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/add-ons': typeof AddOnsRoute
+  '/coupon-templates': typeof CouponTemplatesRoute
+  '/coupons': typeof CouponsRoute
+  '/experiments': typeof ExperimentsRoute
+  '/features': typeof FeaturesRoute
+  '/guide': typeof GuideRoute
+  '/meters': typeof MetersRoute
+  '/plans': typeof PlansRoute
+  '/taxes': typeof TaxesRoute
+  '/team-members': typeof TeamMembersRoute
+  '/tenants/$tenantId': typeof TenantsTenantIdRoute
+  '/tenants/': typeof TenantsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/add-ons': typeof AddOnsRoute
+  '/coupon-templates': typeof CouponTemplatesRoute
+  '/coupons': typeof CouponsRoute
+  '/experiments': typeof ExperimentsRoute
+  '/features': typeof FeaturesRoute
+  '/guide': typeof GuideRoute
+  '/meters': typeof MetersRoute
+  '/plans': typeof PlansRoute
+  '/taxes': typeof TaxesRoute
+  '/team-members': typeof TeamMembersRoute
+  '/tenants/$tenantId': typeof TenantsTenantIdRoute
+  '/tenants': typeof TenantsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/add-ons': typeof AddOnsRoute
+  '/coupon-templates': typeof CouponTemplatesRoute
+  '/coupons': typeof CouponsRoute
+  '/experiments': typeof ExperimentsRoute
+  '/features': typeof FeaturesRoute
+  '/guide': typeof GuideRoute
+  '/meters': typeof MetersRoute
+  '/plans': typeof PlansRoute
+  '/taxes': typeof TaxesRoute
+  '/team-members': typeof TeamMembersRoute
+  '/tenants/$tenantId': typeof TenantsTenantIdRoute
+  '/tenants/': typeof TenantsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/add-ons'
+    | '/coupon-templates'
+    | '/coupons'
+    | '/experiments'
+    | '/features'
+    | '/guide'
+    | '/meters'
+    | '/plans'
+    | '/taxes'
+    | '/team-members'
+    | '/tenants/$tenantId'
+    | '/tenants/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/add-ons'
+    | '/coupon-templates'
+    | '/coupons'
+    | '/experiments'
+    | '/features'
+    | '/guide'
+    | '/meters'
+    | '/plans'
+    | '/taxes'
+    | '/team-members'
+    | '/tenants/$tenantId'
+    | '/tenants'
+  id:
+    | '__root__'
+    | '/'
+    | '/add-ons'
+    | '/coupon-templates'
+    | '/coupons'
+    | '/experiments'
+    | '/features'
+    | '/guide'
+    | '/meters'
+    | '/plans'
+    | '/taxes'
+    | '/team-members'
+    | '/tenants/$tenantId'
+    | '/tenants/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AddOnsRoute: typeof AddOnsRoute
+  CouponTemplatesRoute: typeof CouponTemplatesRoute
+  CouponsRoute: typeof CouponsRoute
+  ExperimentsRoute: typeof ExperimentsRoute
+  FeaturesRoute: typeof FeaturesRoute
+  GuideRoute: typeof GuideRoute
+  MetersRoute: typeof MetersRoute
+  PlansRoute: typeof PlansRoute
+  TaxesRoute: typeof TaxesRoute
+  TeamMembersRoute: typeof TeamMembersRoute
+  TenantsTenantIdRoute: typeof TenantsTenantIdRoute
+  TenantsIndexRoute: typeof TenantsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +208,107 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/add-ons': {
+      id: '/add-ons'
+      path: '/add-ons'
+      fullPath: '/add-ons'
+      preLoaderRoute: typeof AddOnsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coupon-templates': {
+      id: '/coupon-templates'
+      path: '/coupon-templates'
+      fullPath: '/coupon-templates'
+      preLoaderRoute: typeof CouponTemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coupons': {
+      id: '/coupons'
+      path: '/coupons'
+      fullPath: '/coupons'
+      preLoaderRoute: typeof CouponsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/experiments': {
+      id: '/experiments'
+      path: '/experiments'
+      fullPath: '/experiments'
+      preLoaderRoute: typeof ExperimentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/features': {
+      id: '/features'
+      path: '/features'
+      fullPath: '/features'
+      preLoaderRoute: typeof FeaturesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guide': {
+      id: '/guide'
+      path: '/guide'
+      fullPath: '/guide'
+      preLoaderRoute: typeof GuideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/meters': {
+      id: '/meters'
+      path: '/meters'
+      fullPath: '/meters'
+      preLoaderRoute: typeof MetersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plans': {
+      id: '/plans'
+      path: '/plans'
+      fullPath: '/plans'
+      preLoaderRoute: typeof PlansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/taxes': {
+      id: '/taxes'
+      path: '/taxes'
+      fullPath: '/taxes'
+      preLoaderRoute: typeof TaxesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/team-members': {
+      id: '/team-members'
+      path: '/team-members'
+      fullPath: '/team-members'
+      preLoaderRoute: typeof TeamMembersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tenants/': {
+      id: '/tenants/'
+      path: '/tenants'
+      fullPath: '/tenants/'
+      preLoaderRoute: typeof TenantsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tenants/$tenantId': {
+      id: '/tenants/$tenantId'
+      path: '/tenants/$tenantId'
+      fullPath: '/tenants/$tenantId'
+      preLoaderRoute: typeof TenantsTenantIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AddOnsRoute: AddOnsRoute,
+  CouponTemplatesRoute: CouponTemplatesRoute,
+  CouponsRoute: CouponsRoute,
+  ExperimentsRoute: ExperimentsRoute,
+  FeaturesRoute: FeaturesRoute,
+  GuideRoute: GuideRoute,
+  MetersRoute: MetersRoute,
+  PlansRoute: PlansRoute,
+  TaxesRoute: TaxesRoute,
+  TeamMembersRoute: TeamMembersRoute,
+  TenantsTenantIdRoute: TenantsTenantIdRoute,
+  TenantsIndexRoute: TenantsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

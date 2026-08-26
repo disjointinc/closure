@@ -23,6 +23,21 @@ function taxTypeToRow(taxType: TaxType) {
   };
 }
 
+function rowToTaxType(row: typeof taxTypes.$inferSelect): TaxType {
+  return {
+    unique_id: row.uniqueId,
+    created_at: row.createdAt,
+    deprecated_at: row.deprecatedAt,
+    name: row.name,
+    description: row.description,
+  };
+}
+
+export async function listTaxTypes(): Promise<TaxType[]> {
+  const rows = await db.select().from(taxTypes);
+  return rows.map(rowToTaxType);
+}
+
 /** Resolve a tax type reference to an id, upserting inline definitions. */
 export async function resolveTaxTypeRef(
   ref: z.infer<typeof taxTypeRefSchema>,

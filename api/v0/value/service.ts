@@ -24,6 +24,22 @@ function valueToRow(value: Value) {
   };
 }
 
+function rowToValue(row: typeof values.$inferSelect): Value {
+  return {
+    unique_id: row.uniqueId,
+    created_at: row.createdAt,
+    deprecated_at: row.deprecatedAt,
+    name: row.name,
+    description: row.description,
+    amounts: row.amounts,
+  };
+}
+
+export async function listValues(): Promise<Value[]> {
+  const rows = await db.select().from(values);
+  return rows.map(rowToValue);
+}
+
 /** Resolve a value reference to an id, upserting inline definitions. */
 export async function resolveValueRef(
   ref: z.infer<typeof valueRefSchema>,

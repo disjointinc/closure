@@ -7,6 +7,7 @@
 import { z } from "zod";
 import { db } from "../../db/index.ts";
 import { cycles } from "../../db/schema.ts";
+import type { Duration } from "../../schemas/common.ts";
 import { cycleSchema, type Cycle } from "../../schemas/cycle.ts";
 import { cycleIdSchema } from "../../schemas/ids.ts";
 
@@ -37,6 +38,33 @@ function cycleToRow(cycle: Cycle) {
     gracePeriod: cycle.grace_period,
     dunningSchedule: cycle.dunning_schedule,
   };
+}
+
+function rowToCycle(row: typeof cycles.$inferSelect): Cycle {
+  const base = {
+    unique_id: row.uniqueId,
+    created_at: row.createdAt,
+    deprecated_at: row.deprecatedAt,
+    name: row.name,
+    description: row.description,
+  };
+  if (row.charged === "upfront") {
+    return { ...base, charged: "upfront", cycle_length: row.cycleLength };
+  }
+  // The charging check constraint guarantees the arrears fields are set.
+  return {
+    ...base,
+    charged: "arrears",
+    cycle_length: row.cycleLength as Duration,
+    credit_period: row.creditPeriod as Duration,
+    grace_period: row.gracePeriod,
+    dunning_schedule: row.dunningSchedule ?? [],
+  };
+}
+
+export async function listCycles(): Promise<Cycle[]> {
+  const rows = await db.select().from(cycles);
+  return rows.map(rowToCycle);
 }
 
 /** Resolve a cycle reference to an id, upserting inline definitions. */

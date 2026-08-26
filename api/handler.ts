@@ -16,19 +16,26 @@
 
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { config } from "../config.ts";
 import { db } from "./db/index.ts";
 import { addOnApp } from "./v0/add-on/routes.ts";
 import { couponApp } from "./v0/coupon/routes.ts";
 import { couponTemplateApp } from "./v0/coupon-template/routes.ts";
+import { cycleApp } from "./v0/cycle/routes.ts";
 import { experimentApp } from "./v0/experiment/routes.ts";
 import { featureApp } from "./v0/feature/routes.ts";
 import { meterApp } from "./v0/meter/routes.ts";
 import { planApp } from "./v0/plan/routes.ts";
 import { taxApp } from "./v0/tax/routes.ts";
+import { taxTypeApp } from "./v0/tax-type/routes.ts";
 import { teamMemberApp } from "./v0/team-member/routes.ts";
 import { tenantApp } from "./v0/tenant/routes.ts";
+import { valueApp } from "./v0/value/routes.ts";
 
 const app = new Hono()
+  // Browser calls from the web console are cross-origin in the dev stack.
+  .use("*", cors({ origin: config.web.origin }))
   .get("/", (c) => c.text("hello world\n"))
   .get("/healthz", async (c) => {
     try {
@@ -41,13 +48,16 @@ const app = new Hono()
   .route("/v0/add-on", addOnApp)
   .route("/v0/coupon", couponApp)
   .route("/v0/coupon-template", couponTemplateApp)
+  .route("/v0/cycle", cycleApp)
   .route("/v0/experiment", experimentApp)
   .route("/v0/feature", featureApp)
   .route("/v0/meter", meterApp)
   .route("/v0/plan", planApp)
   .route("/v0/tax", taxApp)
+  .route("/v0/tax-type", taxTypeApp)
   .route("/v0/team-member", teamMemberApp)
   .route("/v0/tenant", tenantApp)
+  .route("/v0/value", valueApp)
   .notFound((c) => c.json({ error: "not found" }, 404));
 
 export type AppType = typeof app;
