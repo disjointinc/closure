@@ -11,14 +11,14 @@ function rowToMeterOverride(
   row: typeof meterOverrides.$inferSelect,
 ): MeterOverride {
   return {
-    unique_id: row.uniqueId,
+    uniqueId: row.uniqueId,
     meter: row.meter,
     default: row.defaultMicrocredits,
     limit: row.limitMicrocredits,
     reset: row.reset,
     rollovers: row.rollovers,
-    top_up_prices_per_credit: row.topUpPricesPerCredit,
-    top_up_credit_pack_sizes: row.topUpCreditPackSizes,
+    topUpPricesPerCredit: row.topUpPricesPerCredit,
+    topUpCreditPackSizes: row.topUpCreditPackSizes,
     on: row.on,
     by: row.byTeamMember,
     reason: row.reason,
@@ -48,15 +48,15 @@ export async function createMeterOverride({
   await db
     .insert(meterOverrides)
     .values({
-      uniqueId: override.unique_id,
+      uniqueId: override.uniqueId,
       tenant: tenantId,
       meter: override.meter,
       defaultMicrocredits: override.default,
       limitMicrocredits: override.limit,
       reset: override.reset,
       rollovers: override.rollovers,
-      topUpPricesPerCredit: override.top_up_prices_per_credit,
-      topUpCreditPackSizes: override.top_up_credit_pack_sizes,
+      topUpPricesPerCredit: override.topUpPricesPerCredit,
+      topUpCreditPackSizes: override.topUpCreditPackSizes,
       on: override.on,
       byTeamMember: override.by,
       reason: override.reason,

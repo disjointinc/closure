@@ -11,9 +11,9 @@ function rowToFeatureOverride(
   row: typeof featureOverrides.$inferSelect,
 ): FeatureOverride {
   return {
-    unique_id: row.uniqueId,
+    uniqueId: row.uniqueId,
     feature: row.feature,
-    set_to: row.setTo,
+    setTo: row.setTo,
     on: row.on,
     by: row.byTeamMember,
     reason: row.reason,
@@ -43,10 +43,10 @@ export async function createFeatureOverride({
   await db
     .insert(featureOverrides)
     .values({
-      uniqueId: override.unique_id,
+      uniqueId: override.uniqueId,
       tenant: tenantId,
       feature: override.feature,
-      setTo: override.set_to,
+      setTo: override.setTo,
       on: override.on,
       byTeamMember: override.by,
       reason: override.reason,

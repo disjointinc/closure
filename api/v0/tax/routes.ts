@@ -11,7 +11,7 @@ import { createTax, deprecateTax, getTax, listTaxes } from "./service.ts";
 
 const taxCreateSchema = z.object({
   ...taxSchema.shape,
-  tax_type: taxTypeRefSchema,
+  taxType: taxTypeRefSchema,
 });
 
 export type TaxCreateBody = z.infer<typeof taxCreateSchema>;

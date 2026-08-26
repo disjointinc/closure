@@ -16,8 +16,8 @@ import {
 } from "./service.ts";
 
 const concludeSchema = z.object({
-  concluded_at: epochMs,
-  plan_assignment_at_conclusion: planIdSchema.nullable(),
+  concludedAt: epochMs,
+  planAssignmentAtConclusion: planIdSchema.nullable(),
 });
 
 export type ConcludeExperimentBody = z.infer<typeof concludeSchema>;

@@ -12,11 +12,11 @@ import type { RefundCreateBody, RefundPatchBody } from "./routes.ts";
 
 function rowToRefund(row: typeof refunds.$inferSelect): Refund {
   return {
-    unique_id: row.uniqueId,
-    created_at: row.createdAt,
-    started_processing_at: row.startedProcessingAt,
-    succeeded_at: row.succeededAt,
-    failed_at: row.failedAt,
+    uniqueId: row.uniqueId,
+    createdAt: row.createdAt,
+    startedProcessingAt: row.startedProcessingAt,
+    succeededAt: row.succeededAt,
+    failedAt: row.failedAt,
     by: row.byTeamMember,
     value: row.value,
     reason: row.reason,
@@ -62,12 +62,12 @@ export async function createRefund({
   await db
     .insert(refunds)
     .values({
-      uniqueId: refund.unique_id,
+      uniqueId: refund.uniqueId,
       tenant: tenantId,
-      createdAt: refund.created_at,
-      startedProcessingAt: refund.started_processing_at,
-      succeededAt: refund.succeeded_at,
-      failedAt: refund.failed_at,
+      createdAt: refund.createdAt,
+      startedProcessingAt: refund.startedProcessingAt,
+      succeededAt: refund.succeededAt,
+      failedAt: refund.failedAt,
       byTeamMember: refund.by,
       value: valueId,
       reason: refund.reason,
@@ -87,13 +87,13 @@ export async function patchRefund({
   const updated = await db
     .update(refunds)
     .set({
-      ...(patch.started_processing_at !== undefined
-        ? { startedProcessingAt: patch.started_processing_at }
+      ...(patch.startedProcessingAt !== undefined
+        ? { startedProcessingAt: patch.startedProcessingAt }
         : {}),
-      ...(patch.succeeded_at !== undefined
-        ? { succeededAt: patch.succeeded_at }
+      ...(patch.succeededAt !== undefined
+        ? { succeededAt: patch.succeededAt }
         : {}),
-      ...(patch.failed_at !== undefined ? { failedAt: patch.failed_at } : {}),
+      ...(patch.failedAt !== undefined ? { failedAt: patch.failedAt } : {}),
     })
     .where(eq(refunds.uniqueId, refundId))
     .returning();

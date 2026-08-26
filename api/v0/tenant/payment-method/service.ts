@@ -12,11 +12,11 @@ function rowToPaymentMethod(
   row: typeof paymentMethods.$inferSelect,
 ): PaymentMethod {
   return {
-    unique_id: row.uniqueId,
-    created_at: row.createdAt,
-    deleted_at: row.deletedAt,
-    is_default: row.isDefault,
-    provider_internals: row.providerInternals,
+    uniqueId: row.uniqueId,
+    createdAt: row.createdAt,
+    deletedAt: row.deletedAt,
+    isDefault: row.isDefault,
+    providerInternals: row.providerInternals,
   };
 }
 
@@ -42,12 +42,12 @@ export async function createPaymentMethod({
   await db
     .insert(paymentMethods)
     .values({
-      uniqueId: paymentMethod.unique_id,
+      uniqueId: paymentMethod.uniqueId,
       tenant: tenantId,
-      createdAt: paymentMethod.created_at,
-      deletedAt: paymentMethod.deleted_at,
-      isDefault: paymentMethod.is_default,
-      providerInternals: paymentMethod.provider_internals,
+      createdAt: paymentMethod.createdAt,
+      deletedAt: paymentMethod.deletedAt,
+      isDefault: paymentMethod.isDefault,
+      providerInternals: paymentMethod.providerInternals,
     })
     .onConflictDoNothing();
 }

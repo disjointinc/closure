@@ -1,7 +1,7 @@
 /**
  * v0/plan/service.ts -- plan business logic. Prices (including inside meter
  * top-up tiers) accept existing cycle/value ids or inline definitions. Plans
- * are immutable and versioned (derived_from), so deletes deprecate.
+ * are immutable and versioned (derivedFrom), so deletes deprecate.
  */
 import { eq } from "drizzle-orm";
 import { db } from "../../db/index.ts";
@@ -23,21 +23,21 @@ async function resolveMeter({
 }: {
   meter: PlanMeterInput;
 }): Promise<PlanMeter> {
-  const topUps = meter.top_up_prices_per_credit;
+  const topUps = meter.topUpPricesPerCredit;
   if (topUps === null) {
-    return { ...meter, top_up_prices_per_credit: null };
+    return { ...meter, topUpPricesPerCredit: null };
   }
   if (!Array.isArray(topUps)) {
     return {
       ...meter,
-      top_up_prices_per_credit: await resolveValueRef(topUps),
+      topUpPricesPerCredit: await resolveValueRef(topUps),
     };
   }
   return {
     ...meter,
-    top_up_prices_per_credit: await Promise.all(
+    topUpPricesPerCredit: await Promise.all(
       topUps.map(async (tier) => ({
-        starting_at: tier.starting_at,
+        startingAt: tier.startingAt,
         prices: await Promise.all(
           tier.prices.map(async (price) => ({
             cycle: await resolveCycleRef(price.cycle),
@@ -78,10 +78,10 @@ export async function getPlan({
     .from(planAddOns)
     .where(eq(planAddOns.plan, uniqueId));
   return {
-    unique_id: row.uniqueId,
-    derived_from: row.derivedFrom,
-    created_at: row.createdAt,
-    deprecated_at: row.deprecatedAt,
+    uniqueId: row.uniqueId,
+    derivedFrom: row.derivedFrom,
+    createdAt: row.createdAt,
+    deprecatedAt: row.deprecatedAt,
     name: row.name,
     description: row.description,
     prices: priceRows.map((price) => ({
@@ -91,7 +91,7 @@ export async function getPlan({
     features: featureRows.length
       ? featureRows.map((feature) => ({
           feature: feature.feature,
-          set_to: feature.setTo,
+          setTo: feature.setTo,
         }))
       : null,
     meters: meterRows.length
@@ -101,11 +101,11 @@ export async function getPlan({
           limit: meter.limitMicrocredits,
           reset: meter.reset,
           rollovers: meter.rollovers,
-          top_up_prices_per_credit: meter.topUpPricesPerCredit,
-          top_up_credit_pack_sizes: meter.topUpCreditPackSizes,
+          topUpPricesPerCredit: meter.topUpPricesPerCredit,
+          topUpCreditPackSizes: meter.topUpCreditPackSizes,
         }))
       : null,
-    add_ons: addOnRows.length ? addOnRows.map((addOn) => addOn.addOn) : null,
+    addOns: addOnRows.length ? addOnRows.map((addOn) => addOn.addOn) : null,
   };
 }
 
@@ -125,10 +125,10 @@ export async function createPlan({
   await db
     .insert(plans)
     .values({
-      uniqueId: plan.unique_id,
-      derivedFrom: plan.derived_from,
-      createdAt: plan.created_at,
-      deprecatedAt: plan.deprecated_at,
+      uniqueId: plan.uniqueId,
+      derivedFrom: plan.derivedFrom,
+      createdAt: plan.createdAt,
+      deprecatedAt: plan.deprecatedAt,
       name: plan.name,
       description: plan.description,
     })
@@ -137,7 +137,7 @@ export async function createPlan({
     await db
       .insert(planPrices)
       .values({
-        plan: plan.unique_id,
+        plan: plan.uniqueId,
         cycle: await resolveCycleRef(price.cycle),
         value: await resolveValueRef(price.value),
       })
@@ -148,9 +148,9 @@ export async function createPlan({
       .insert(planFeatures)
       .values(
         plan.features.map((feature) => ({
-          plan: plan.unique_id,
+          plan: plan.uniqueId,
           feature: feature.feature,
-          setTo: feature.set_to,
+          setTo: feature.setTo,
         })),
       )
       .onConflictDoNothing();
@@ -161,25 +161,25 @@ export async function createPlan({
       await db
         .insert(planMeters)
         .values({
-          plan: plan.unique_id,
+          plan: plan.uniqueId,
           meter: resolved.meter,
           defaultMicrocredits: resolved.default,
           limitMicrocredits: resolved.limit,
           reset: resolved.reset,
           rollovers: resolved.rollovers,
-          topUpPricesPerCredit: resolved.top_up_prices_per_credit,
-          topUpCreditPackSizes: resolved.top_up_credit_pack_sizes,
+          topUpPricesPerCredit: resolved.topUpPricesPerCredit,
+          topUpCreditPackSizes: resolved.topUpCreditPackSizes,
         })
         .onConflictDoNothing();
     }
   }
-  if (plan.add_ons) {
+  if (plan.addOns) {
     await db
       .insert(planAddOns)
-      .values(plan.add_ons.map((addOn) => ({ plan: plan.unique_id, addOn })))
+      .values(plan.addOns.map((addOn) => ({ plan: plan.uniqueId, addOn })))
       .onConflictDoNothing();
   }
-  return getPlan({ uniqueId: plan.unique_id });
+  return getPlan({ uniqueId: plan.uniqueId });
 }
 
 /** Deprecate the plan, or return null if no such plan exists. */

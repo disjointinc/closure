@@ -25,12 +25,12 @@ export async function getPayment({
     .from(paymentInvoices)
     .where(eq(paymentInvoices.payment, uniqueId));
   return {
-    unique_id: row.uniqueId,
-    created_at: row.createdAt,
-    started_processing_at: row.startedProcessingAt,
-    succeeded_at: row.succeededAt,
-    failed_at: row.failedAt,
-    provider_internals: row.providerInternals,
+    uniqueId: row.uniqueId,
+    createdAt: row.createdAt,
+    startedProcessingAt: row.startedProcessingAt,
+    succeededAt: row.succeededAt,
+    failedAt: row.failedAt,
+    providerInternals: row.providerInternals,
     invoices: invoiceRows.map((invoice) => invoice.invoice),
   };
 }
@@ -61,13 +61,13 @@ export async function createPayment({
   await db
     .insert(payments)
     .values({
-      uniqueId: payment.unique_id,
+      uniqueId: payment.uniqueId,
       tenant: tenantId,
-      createdAt: payment.created_at,
-      startedProcessingAt: payment.started_processing_at,
-      succeededAt: payment.succeeded_at,
-      failedAt: payment.failed_at,
-      providerInternals: payment.provider_internals,
+      createdAt: payment.createdAt,
+      startedProcessingAt: payment.startedProcessingAt,
+      succeededAt: payment.succeededAt,
+      failedAt: payment.failedAt,
+      providerInternals: payment.providerInternals,
     })
     .onConflictDoNothing();
   if (payment.invoices.length > 0) {
@@ -75,13 +75,13 @@ export async function createPayment({
       .insert(paymentInvoices)
       .values(
         payment.invoices.map((invoice) => ({
-          payment: payment.unique_id,
+          payment: payment.uniqueId,
           invoice,
         })),
       )
       .onConflictDoNothing();
   }
-  return getPayment({ uniqueId: payment.unique_id });
+  return getPayment({ uniqueId: payment.uniqueId });
 }
 
 /** Patch the payment, or return null if no such payment exists. */
@@ -95,13 +95,13 @@ export async function patchPayment({
   const updated = await db
     .update(payments)
     .set({
-      ...(patch.started_processing_at !== undefined
-        ? { startedProcessingAt: patch.started_processing_at }
+      ...(patch.startedProcessingAt !== undefined
+        ? { startedProcessingAt: patch.startedProcessingAt }
         : {}),
-      ...(patch.succeeded_at !== undefined
-        ? { succeededAt: patch.succeeded_at }
+      ...(patch.succeededAt !== undefined
+        ? { succeededAt: patch.succeededAt }
         : {}),
-      ...(patch.failed_at !== undefined ? { failedAt: patch.failed_at } : {}),
+      ...(patch.failedAt !== undefined ? { failedAt: patch.failedAt } : {}),
     })
     .where(eq(payments.uniqueId, paymentId))
     .returning();

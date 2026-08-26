@@ -18,42 +18,29 @@ import {
 } from "../../db/schema.ts";
 import type { TenantCreateBody, TenantPatchBody } from "./routes.ts";
 
-function rowToTenant(row: typeof tenants.$inferSelect) {
-  return {
-    unique_id: row.uniqueId,
-    created_at: row.createdAt,
-    deleted_at: row.deletedAt,
-    external_ids: row.externalIds,
-  };
-}
-
 export async function getTenant({ uniqueId }: { uniqueId: string }) {
   const [row] = await db
     .select()
     .from(tenants)
     .where(eq(tenants.uniqueId, uniqueId));
-  if (!row) {
-    return null;
-  }
-  return rowToTenant(row);
+  return row ?? null;
 }
 
 export async function listTenants() {
-  const rows = await db.select().from(tenants);
-  return rows.map(rowToTenant);
+  return db.select().from(tenants);
 }
 
 export async function createTenant({ tenant }: { tenant: TenantCreateBody }) {
   await db
     .insert(tenants)
     .values({
-      uniqueId: tenant.unique_id,
-      createdAt: tenant.created_at,
+      uniqueId: tenant.uniqueId,
+      createdAt: tenant.createdAt,
       deletedAt: null,
-      externalIds: tenant.external_ids,
+      externalIds: tenant.externalIds,
     })
     .onConflictDoNothing();
-  return { ...tenant, deleted_at: null };
+  return { ...tenant, deletedAt: null };
 }
 
 /** Patch the tenant, or return null if no such tenant exists. */
@@ -66,13 +53,13 @@ export async function patchTenant({
 }) {
   const updated = await db
     .update(tenants)
-    .set({ externalIds: patch.external_ids })
+    .set({ externalIds: patch.externalIds })
     .where(eq(tenants.uniqueId, uniqueId))
     .returning();
   if (updated.length === 0) {
     return null;
   }
-  return rowToTenant(updated[0]);
+  return updated[0];
 }
 
 /** Soft-delete the tenant, or return null if no such tenant exists. */
@@ -85,7 +72,7 @@ export async function deleteTenant({ uniqueId }: { uniqueId: string }) {
   if (updated.length === 0) {
     return null;
   }
-  return rowToTenant(updated[0]);
+  return updated[0];
 }
 
 /**
@@ -179,16 +166,16 @@ export async function getEntitlements({ tenantId }: { tenantId: string }) {
   return {
     tenant: tenantId,
     assignment: assignment.uniqueId,
-    features: [...featureMap.entries()].map(([feature, set_to]) => ({
+    features: [...featureMap.entries()].map(([feature, setTo]) => ({
       feature,
-      set_to,
+      setTo,
     })),
     meters: await Promise.all(
       [...meterMap.entries()].map(async ([meter, config]) => ({
         meter,
-        default_microcredits: config.default,
-        limit_microcredits: config.limit,
-        balance_microcredits: await getMeterBalance({
+        defaultMicrocredits: config.default,
+        limitMicrocredits: config.limit,
+        balanceMicrocredits: await getMeterBalance({
           meterId: meter,
           tenantId,
         }),

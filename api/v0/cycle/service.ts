@@ -2,7 +2,7 @@
  * v0/cycles/service.ts -- cycle business logic. Cycles have no route of
  * their own: they're shared definitions composed into other resources,
  * referenced by id or defined inline (upserted by their client-provided
- * unique_id).
+ * uniqueId).
  */
 import { z } from "zod";
 import { db } from "../../db/index.ts";
@@ -16,13 +16,13 @@ export const cycleRefSchema = z.union([cycleIdSchema, cycleSchema]);
 
 function cycleToRow(cycle: Cycle) {
   const base = {
-    uniqueId: cycle.unique_id,
-    createdAt: cycle.created_at,
-    deprecatedAt: cycle.deprecated_at,
+    uniqueId: cycle.uniqueId,
+    createdAt: cycle.createdAt,
+    deprecatedAt: cycle.deprecatedAt,
     name: cycle.name,
     description: cycle.description,
     charged: cycle.charged,
-    cycleLength: cycle.cycle_length,
+    cycleLength: cycle.cycleLength,
   };
   if (cycle.charged === "upfront") {
     return {
@@ -34,31 +34,31 @@ function cycleToRow(cycle: Cycle) {
   }
   return {
     ...base,
-    creditPeriod: cycle.credit_period,
-    gracePeriod: cycle.grace_period,
-    dunningSchedule: cycle.dunning_schedule,
+    creditPeriod: cycle.creditPeriod,
+    gracePeriod: cycle.gracePeriod,
+    dunningSchedule: cycle.dunningSchedule,
   };
 }
 
 function rowToCycle(row: typeof cycles.$inferSelect): Cycle {
   const base = {
-    unique_id: row.uniqueId,
-    created_at: row.createdAt,
-    deprecated_at: row.deprecatedAt,
+    uniqueId: row.uniqueId,
+    createdAt: row.createdAt,
+    deprecatedAt: row.deprecatedAt,
     name: row.name,
     description: row.description,
   };
   if (row.charged === "upfront") {
-    return { ...base, charged: "upfront", cycle_length: row.cycleLength };
+    return { ...base, charged: "upfront", cycleLength: row.cycleLength };
   }
   // The charging check constraint guarantees the arrears fields are set.
   return {
     ...base,
     charged: "arrears",
-    cycle_length: row.cycleLength as Duration,
-    credit_period: row.creditPeriod as Duration,
-    grace_period: row.gracePeriod,
-    dunning_schedule: row.dunningSchedule ?? [],
+    cycleLength: row.cycleLength as Duration,
+    creditPeriod: row.creditPeriod as Duration,
+    gracePeriod: row.gracePeriod,
+    dunningSchedule: row.dunningSchedule ?? [],
   };
 }
 
@@ -75,5 +75,5 @@ export async function resolveCycleRef(
     return ref;
   }
   await db.insert(cycles).values(cycleToRow(ref)).onConflictDoNothing();
-  return ref.unique_id;
+  return ref.uniqueId;
 }

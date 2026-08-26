@@ -24,11 +24,11 @@ function generateId(prefix: IdPrefix): string {
 
 function rowToGrant(row: typeof couponGrants.$inferSelect): CouponGrant {
   return {
-    unique_id: row.uniqueId,
+    uniqueId: row.uniqueId,
     coupon: row.coupon,
     on: row.on,
     to: row.toTenant,
-    used_at: row.usedAt,
+    usedAt: row.usedAt,
     reason: row.reason,
   };
 }
@@ -57,7 +57,7 @@ export async function createCouponGrant({
   await db
     .insert(couponGrants)
     .values({
-      uniqueId: grant.unique_id,
+      uniqueId: grant.uniqueId,
       tenant: tenantId,
       coupon: grant.coupon,
       on: grant.on,

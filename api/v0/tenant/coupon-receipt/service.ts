@@ -9,19 +9,19 @@ import type { ReceiptCreateBody } from "./routes.ts";
 
 function rowToReceipt(row: typeof couponReceipts.$inferSelect) {
   const base = {
-    unique_id: row.uniqueId,
+    uniqueId: row.uniqueId,
     coupon: row.coupon,
     on: row.on,
-    used_at: row.usedAt,
+    usedAt: row.usedAt,
     reason: row.reason,
   };
   switch (row.grantorType) {
     case "team_member":
-      return { ...base, grantor_type: "team_member", by: row.byTeamMember };
+      return { ...base, grantorType: "team_member", by: row.byTeamMember };
     case "tenant":
-      return { ...base, grantor_type: "tenant", by: row.byTenant };
+      return { ...base, grantorType: "tenant", by: row.byTenant };
     case "reciprocal":
-      return { ...base, grantor_type: "reciprocal", by: row.byCouponGrant };
+      return { ...base, grantorType: "reciprocal", by: row.byCouponGrant };
   }
 }
 
@@ -44,7 +44,7 @@ export async function createCouponReceipt({
   await db
     .insert(couponReceipts)
     .values({
-      uniqueId: receipt.unique_id,
+      uniqueId: receipt.uniqueId,
       tenant: tenantId,
       coupon: receipt.coupon,
       on: receipt.on,
@@ -56,7 +56,7 @@ export async function createCouponReceipt({
       byCouponGrant: null,
     })
     .onConflictDoNothing();
-  return { ...receipt, used_at: null, grantor_type: "team_member" as const };
+  return { ...receipt, usedAt: null, grantorType: "team_member" as const };
 }
 
 /** Mark the receipt used, or return null if it's unknown or already used. */

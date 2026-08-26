@@ -8,16 +8,6 @@ import { teamMembers } from "../../db/schema.ts";
 import type { TeamMember } from "../../schemas/team-member.ts";
 import type { TeamMemberPatchBody } from "./routes.ts";
 
-function rowToTeamMember(row: typeof teamMembers.$inferSelect): TeamMember {
-  return {
-    unique_id: row.uniqueId,
-    deleted_at: row.deletedAt,
-    email_address: row.emailAddress,
-    name: row.name,
-    profile_picture_link: row.profilePictureLink,
-  };
-}
-
 export async function getTeamMember({
   uniqueId,
 }: {
@@ -27,15 +17,11 @@ export async function getTeamMember({
     .select()
     .from(teamMembers)
     .where(eq(teamMembers.uniqueId, uniqueId));
-  if (!row) {
-    return null;
-  }
-  return rowToTeamMember(row);
+  return row ?? null;
 }
 
 export async function listTeamMembers(): Promise<TeamMember[]> {
-  const rows = await db.select().from(teamMembers);
-  return rows.map(rowToTeamMember);
+  return db.select().from(teamMembers);
 }
 
 export async function createTeamMember({
@@ -43,16 +29,7 @@ export async function createTeamMember({
 }: {
   teamMember: TeamMember;
 }): Promise<void> {
-  await db
-    .insert(teamMembers)
-    .values({
-      uniqueId: teamMember.unique_id,
-      deletedAt: teamMember.deleted_at,
-      emailAddress: teamMember.email_address,
-      name: teamMember.name,
-      profilePictureLink: teamMember.profile_picture_link,
-    })
-    .onConflictDoNothing();
+  await db.insert(teamMembers).values(teamMember).onConflictDoNothing();
 }
 
 /** Soft-delete the team member, or return null if no such member exists. */
@@ -66,10 +43,7 @@ export async function deleteTeamMember({
     .set({ deletedAt: Date.now() })
     .where(eq(teamMembers.uniqueId, uniqueId))
     .returning();
-  if (updated.length === 0) {
-    return null;
-  }
-  return rowToTeamMember(updated[0]);
+  return updated[0] ?? null;
 }
 
 /** Patch the team member, or return null if no such team member exists. */
@@ -84,14 +58,11 @@ export async function patchTeamMember({
     .update(teamMembers)
     .set({
       ...(patch.name !== undefined ? { name: patch.name } : {}),
-      ...(patch.profile_picture_link !== undefined
-        ? { profilePictureLink: patch.profile_picture_link }
+      ...(patch.profilePictureLink !== undefined
+        ? { profilePictureLink: patch.profilePictureLink }
         : {}),
     })
     .where(eq(teamMembers.uniqueId, uniqueId))
     .returning();
-  if (updated.length === 0) {
-    return null;
-  }
-  return rowToTeamMember(updated[0]);
+  return updated[0] ?? null;
 }

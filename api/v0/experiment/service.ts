@@ -33,10 +33,10 @@ export async function getExperiment({
     .from(experimentTreatmentTenants)
     .where(eq(experimentTreatmentTenants.experiment, uniqueId));
   return {
-    unique_id: row.uniqueId,
-    created_at: row.createdAt,
-    concluded_at: row.concludedAt,
-    plan_assignment_at_conclusion: row.planAssignmentAtConclusion,
+    uniqueId: row.uniqueId,
+    createdAt: row.createdAt,
+    concludedAt: row.concludedAt,
+    planAssignmentAtConclusion: row.planAssignmentAtConclusion,
     name: row.name,
     description: row.description,
     treatments: treatmentRows.map((treatment) => {
@@ -47,8 +47,8 @@ export async function getExperiment({
       );
       return {
         plan: treatment.plan,
-        tenant_percentage: treatment.tenantPercentage,
-        assigned_tenants: assigned.length
+        tenantPercentage: treatment.tenantPercentage,
+        assignedTenants: assigned.length
           ? assigned.map((tenant) => tenant.tenant)
           : null,
       };
@@ -72,10 +72,10 @@ export async function createExperiment({
   await db
     .insert(experiments)
     .values({
-      uniqueId: experiment.unique_id,
-      createdAt: experiment.created_at,
-      concludedAt: experiment.concluded_at,
-      planAssignmentAtConclusion: experiment.plan_assignment_at_conclusion,
+      uniqueId: experiment.uniqueId,
+      createdAt: experiment.createdAt,
+      concludedAt: experiment.concludedAt,
+      planAssignmentAtConclusion: experiment.planAssignmentAtConclusion,
       name: experiment.name,
       description: experiment.description,
     })
@@ -84,17 +84,17 @@ export async function createExperiment({
     await db
       .insert(experimentTreatments)
       .values({
-        experiment: experiment.unique_id,
+        experiment: experiment.uniqueId,
         plan: treatment.plan,
-        tenantPercentage: treatment.tenant_percentage,
+        tenantPercentage: treatment.tenantPercentage,
       })
       .onConflictDoNothing();
-    if (treatment.assigned_tenants) {
+    if (treatment.assignedTenants) {
       await db
         .insert(experimentTreatmentTenants)
         .values(
-          treatment.assigned_tenants.map((tenant) => ({
-            experiment: experiment.unique_id,
+          treatment.assignedTenants.map((tenant) => ({
+            experiment: experiment.uniqueId,
             plan: treatment.plan,
             tenant,
           })),
@@ -102,7 +102,7 @@ export async function createExperiment({
         .onConflictDoNothing();
     }
   }
-  return getExperiment({ uniqueId: experiment.unique_id });
+  return getExperiment({ uniqueId: experiment.uniqueId });
 }
 
 /** Conclude the experiment, or return null if no such experiment exists. */
@@ -116,8 +116,8 @@ export async function concludeExperiment({
   const updated = await db
     .update(experiments)
     .set({
-      concludedAt: body.concluded_at,
-      planAssignmentAtConclusion: body.plan_assignment_at_conclusion,
+      concludedAt: body.concludedAt,
+      planAssignmentAtConclusion: body.planAssignmentAtConclusion,
     })
     .where(eq(experiments.uniqueId, uniqueId))
     .returning();

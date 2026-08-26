@@ -39,27 +39,27 @@ export async function getInvoice({
     .from(taxationAmounts)
     .where(eq(taxationAmounts.invoice, uniqueId));
   const base = {
-    unique_id: row.uniqueId,
-    created_at: row.createdAt,
-    closed_at: row.closedAt,
-    closed_reason: row.closedReason,
+    uniqueId: row.uniqueId,
+    createdAt: row.createdAt,
+    closedAt: row.closedAt,
+    closedReason: row.closedReason,
     items: itemRows.map((item) => ({
-      unique_id: item.uniqueId,
-      per_unit_value: item.perUnitValue,
+      uniqueId: item.uniqueId,
+      perUnitValue: item.perUnitValue,
       units: item.units,
       name: item.name,
       description: item.description,
     })),
-    taxation_amounts: await Promise.all(
+    taxationAmounts: await Promise.all(
       taxRows.map(async (tax) => {
         const appliesTo = await db
           .select()
           .from(taxationAmountItems)
           .where(eq(taxationAmountItems.taxationAmount, tax.uniqueId));
         return {
-          unique_id: tax.uniqueId,
+          uniqueId: tax.uniqueId,
           tax: tax.tax,
-          applies_to_items: appliesTo.length
+          appliesToItems: appliesTo.length
             ? appliesTo.map((item) => item.item)
             : null,
           notes: tax.notes,
@@ -69,16 +69,16 @@ export async function getInvoice({
     ),
   };
   if (row.charged === "upfront") {
-    return { ...base, charged: "upfront", cycle_length: row.cycleLength };
+    return { ...base, charged: "upfront", cycleLength: row.cycleLength };
   }
   // The charging check constraint guarantees the arrears fields are set.
   return {
     ...base,
     charged: "arrears",
-    cycle_length: row.cycleLength as Duration,
-    credit_period: row.creditPeriod as Duration,
-    grace_period: row.gracePeriod,
-    dunning_schedule: row.dunningSchedule ?? [],
+    cycleLength: row.cycleLength as Duration,
+    creditPeriod: row.creditPeriod as Duration,
+    gracePeriod: row.gracePeriod,
+    dunningSchedule: row.dunningSchedule ?? [],
   };
 }
 
@@ -109,20 +109,20 @@ export async function createInvoice({
     invoice.charged === "upfront"
       ? { creditPeriod: null, gracePeriod: null, dunningSchedule: null }
       : {
-          creditPeriod: invoice.credit_period,
-          gracePeriod: invoice.grace_period,
-          dunningSchedule: invoice.dunning_schedule,
+          creditPeriod: invoice.creditPeriod,
+          gracePeriod: invoice.gracePeriod,
+          dunningSchedule: invoice.dunningSchedule,
         };
   await db
     .insert(invoices)
     .values({
-      uniqueId: invoice.unique_id,
+      uniqueId: invoice.uniqueId,
       tenant: tenantId,
-      createdAt: invoice.created_at,
-      closedAt: invoice.closed_at,
-      closedReason: invoice.closed_reason,
+      createdAt: invoice.createdAt,
+      closedAt: invoice.closedAt,
+      closedReason: invoice.closedReason,
       charged: invoice.charged,
-      cycleLength: invoice.cycle_length,
+      cycleLength: invoice.cycleLength,
       ...charging,
     })
     .onConflictDoNothing();
@@ -130,39 +130,39 @@ export async function createInvoice({
     await db
       .insert(items)
       .values({
-        uniqueId: item.unique_id,
-        invoice: invoice.unique_id,
-        perUnitValue: await resolveValueRef(item.per_unit_value),
+        uniqueId: item.uniqueId,
+        invoice: invoice.uniqueId,
+        perUnitValue: await resolveValueRef(item.perUnitValue),
         units: item.units,
         name: item.name,
         description: item.description,
       })
       .onConflictDoNothing();
   }
-  for (const tax of invoice.taxation_amounts) {
+  for (const tax of invoice.taxationAmounts) {
     await db
       .insert(taxationAmounts)
       .values({
-        uniqueId: tax.unique_id,
-        invoice: invoice.unique_id,
+        uniqueId: tax.uniqueId,
+        invoice: invoice.uniqueId,
         tax: await resolveTaxRef(tax.tax),
         notes: tax.notes,
         amount: tax.amount,
       })
       .onConflictDoNothing();
-    if (tax.applies_to_items) {
+    if (tax.appliesToItems) {
       await db
         .insert(taxationAmountItems)
         .values(
-          tax.applies_to_items.map((item) => ({
-            taxationAmount: tax.unique_id,
+          tax.appliesToItems.map((item) => ({
+            taxationAmount: tax.uniqueId,
             item,
           })),
         )
         .onConflictDoNothing();
     }
   }
-  return getInvoice({ uniqueId: invoice.unique_id });
+  return getInvoice({ uniqueId: invoice.uniqueId });
 }
 
 /** Close the invoice, or return null if no such invoice exists. */
@@ -175,7 +175,7 @@ export async function closeInvoice({
 }): Promise<Invoice | null> {
   const updated = await db
     .update(invoices)
-    .set({ closedAt: body.closed_at, closedReason: body.closed_reason })
+    .set({ closedAt: body.closedAt, closedReason: body.closedReason })
     .where(eq(invoices.uniqueId, uniqueId))
     .returning();
   if (updated.length === 0) {

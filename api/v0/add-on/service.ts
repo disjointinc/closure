@@ -31,9 +31,9 @@ export async function getAddOn({
     .from(addOnFeatures)
     .where(eq(addOnFeatures.addOn, uniqueId));
   return {
-    unique_id: row.uniqueId,
-    created_at: row.createdAt,
-    deprecated_at: row.deprecatedAt,
+    uniqueId: row.uniqueId,
+    createdAt: row.createdAt,
+    deprecatedAt: row.deprecatedAt,
     name: row.name,
     description: row.description,
     prices: priceRows.map((price) => ({
@@ -42,7 +42,7 @@ export async function getAddOn({
     })),
     features: featureRows.map((feature) => ({
       feature: feature.feature,
-      set_to: feature.setTo,
+      setTo: feature.setTo,
     })),
   };
 }
@@ -63,9 +63,9 @@ export async function createAddOn({
   await db
     .insert(addOns)
     .values({
-      uniqueId: addOn.unique_id,
-      createdAt: addOn.created_at,
-      deprecatedAt: addOn.deprecated_at,
+      uniqueId: addOn.uniqueId,
+      createdAt: addOn.createdAt,
+      deprecatedAt: addOn.deprecatedAt,
       name: addOn.name,
       description: addOn.description,
     })
@@ -74,7 +74,7 @@ export async function createAddOn({
     await db
       .insert(addOnPrices)
       .values({
-        addOn: addOn.unique_id,
+        addOn: addOn.uniqueId,
         cycle: await resolveCycleRef(price.cycle),
         value: await resolveValueRef(price.value),
       })
@@ -84,13 +84,13 @@ export async function createAddOn({
     .insert(addOnFeatures)
     .values(
       addOn.features.map((feature) => ({
-        addOn: addOn.unique_id,
+        addOn: addOn.uniqueId,
         feature: feature.feature,
-        setTo: feature.set_to,
+        setTo: feature.setTo,
       })),
     )
     .onConflictDoNothing();
-  return getAddOn({ uniqueId: addOn.unique_id });
+  return getAddOn({ uniqueId: addOn.uniqueId });
 }
 
 /** Deprecate the add-on, or return null if no such add-on exists. */

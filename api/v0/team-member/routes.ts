@@ -17,7 +17,7 @@ import {
 const teamMemberPatchSchema = z
   .object({
     name: z.string().min(1).nullable(),
-    profile_picture_link: z.url().nullable(),
+    profilePictureLink: z.url().nullable(),
   })
   .partial();
 

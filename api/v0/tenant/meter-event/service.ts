@@ -36,9 +36,9 @@ export async function listMeterEvents({
     .orderBy(desc(meterEvents.createdAt))
     .limit(limit);
   return rows.map((row) => ({
-    unique_id: row.uniqueId,
-    unique_external_id: row.uniqueExternalId,
-    created_at: row.createdAt,
+    uniqueId: row.uniqueId,
+    uniqueExternalId: row.uniqueExternalId,
+    createdAt: row.createdAt,
     meter: row.meter,
     tenant: row.tenant,
     amount: row.amountMicrocredits,

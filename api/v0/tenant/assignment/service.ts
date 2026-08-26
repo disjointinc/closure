@@ -32,16 +32,16 @@ export async function getAssignment({
     .from(assignmentAddOns)
     .where(eq(assignmentAddOns.assignment, uniqueId));
   return {
-    unique_id: row.uniqueId,
+    uniqueId: row.uniqueId,
     plan: row.plan,
     experiment: row.experiment,
     cycle: row.cycle,
     start: row.start,
     end: row.end,
-    add_ons: addOnRows.map((addOn) => ({
+    addOns: addOnRows.map((addOn) => ({
       start: addOn.start,
       end: addOn.end,
-      add_on: addOn.addOn,
+      addOn: addOn.addOn,
     })),
   };
 }
@@ -77,7 +77,7 @@ export async function createAssignment({
   await db
     .insert(assignments)
     .values({
-      uniqueId: assignment.unique_id,
+      uniqueId: assignment.uniqueId,
       tenant: tenantId,
       plan: assignment.plan,
       experiment: assignment.experiment,
@@ -86,13 +86,13 @@ export async function createAssignment({
       end: assignment.end,
     })
     .onConflictDoNothing();
-  if (assignment.add_ons.length > 0) {
+  if (assignment.addOns.length > 0) {
     await db
       .insert(assignmentAddOns)
       .values(
-        assignment.add_ons.map((addOn) => ({
-          assignment: assignment.unique_id,
-          addOn: addOn.add_on,
+        assignment.addOns.map((addOn) => ({
+          assignment: assignment.uniqueId,
+          addOn: addOn.addOn,
           start: addOn.start,
           end: addOn.end,
         })),
@@ -111,7 +111,7 @@ export async function createAssignment({
       tenantId,
     });
   }
-  return getAssignment({ uniqueId: assignment.unique_id });
+  return getAssignment({ uniqueId: assignment.uniqueId });
 }
 
 /** Attach an add-on, or return null if no such assignment exists. */
@@ -133,7 +133,7 @@ export async function attachAddOn({
     .insert(assignmentAddOns)
     .values({
       assignment: assignmentId,
-      addOn: addOn.add_on,
+      addOn: addOn.addOn,
       start: addOn.start,
       end: addOn.end,
     })

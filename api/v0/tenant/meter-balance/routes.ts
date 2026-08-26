@@ -13,6 +13,6 @@ export const meterBalanceApp = new Hono<{
   return c.json({
     tenant: tenantId,
     meter: meterId,
-    balance_microcredits: await getBalance({ meterId, tenantId }),
+    balanceMicrocredits: await getBalance({ meterId, tenantId }),
   });
 });

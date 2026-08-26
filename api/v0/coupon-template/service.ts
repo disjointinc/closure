@@ -35,22 +35,22 @@ export async function getCouponTemplate({
     .from(couponTemplateCreditsGranted)
     .where(eq(couponTemplateCreditsGranted.couponTemplate, uniqueId));
   return {
-    unique_id: row.uniqueId,
-    created_at: row.createdAt,
-    deprecated_at: row.deprecatedAt,
-    grantable_by_tenants: row.grantableByTenants,
-    limit_per_granting_tenant: row.limitPerGrantingTenant,
+    uniqueId: row.uniqueId,
+    createdAt: row.createdAt,
+    deprecatedAt: row.deprecatedAt,
+    grantableByTenants: row.grantableByTenants,
+    limitPerGrantingTenant: row.limitPerGrantingTenant,
     name: row.name,
     description: row.description,
-    default_award: row.defaultAward,
-    features_granted: featureRows.length
+    defaultAward: row.defaultAward,
+    featuresGranted: featureRows.length
       ? featureRows.map((feature) => ({
           feature: feature.feature,
           value: feature.value,
           award: feature.award,
         }))
       : null,
-    credits_granted: creditRows.length
+    creditsGranted: creditRows.length
       ? creditRows.map((credit) => ({
           meter: credit.meter,
           amount: credit.amountMicrocredits,
@@ -59,7 +59,7 @@ export async function getCouponTemplate({
           award: credit.award,
         }))
       : null,
-    reciprocal_benefit_coupon_template: row.reciprocalBenefitCouponTemplate,
+    reciprocalBenefitCouponTemplate: row.reciprocalBenefitCouponTemplate,
   };
 }
 
@@ -79,26 +79,25 @@ export async function createCouponTemplate({
   await db
     .insert(couponTemplates)
     .values({
-      uniqueId: template.unique_id,
-      createdAt: template.created_at,
-      deprecatedAt: template.deprecated_at,
-      grantableByTenants: template.grantable_by_tenants,
-      limitPerGrantingTenant: template.limit_per_granting_tenant,
+      uniqueId: template.uniqueId,
+      createdAt: template.createdAt,
+      deprecatedAt: template.deprecatedAt,
+      grantableByTenants: template.grantableByTenants,
+      limitPerGrantingTenant: template.limitPerGrantingTenant,
       name: template.name,
       description: template.description,
-      defaultAward: template.default_award
-        ? await resolveAward(template.default_award)
+      defaultAward: template.defaultAward
+        ? await resolveAward(template.defaultAward)
         : null,
-      reciprocalBenefitCouponTemplate:
-        template.reciprocal_benefit_coupon_template,
+      reciprocalBenefitCouponTemplate: template.reciprocalBenefitCouponTemplate,
     })
     .onConflictDoNothing();
-  if (template.features_granted) {
-    for (const feature of template.features_granted) {
+  if (template.featuresGranted) {
+    for (const feature of template.featuresGranted) {
       await db
         .insert(couponTemplateFeaturesGranted)
         .values({
-          couponTemplate: template.unique_id,
+          couponTemplate: template.uniqueId,
           feature: feature.feature,
           value: feature.value,
           award: await resolveAward(feature.award),
@@ -106,12 +105,12 @@ export async function createCouponTemplate({
         .onConflictDoNothing();
     }
   }
-  if (template.credits_granted) {
-    for (const credit of template.credits_granted) {
+  if (template.creditsGranted) {
+    for (const credit of template.creditsGranted) {
       await db
         .insert(couponTemplateCreditsGranted)
         .values({
-          couponTemplate: template.unique_id,
+          couponTemplate: template.uniqueId,
           meter: credit.meter,
           amountMicrocredits: credit.amount,
           expiration: credit.expiration,
@@ -121,7 +120,7 @@ export async function createCouponTemplate({
         .onConflictDoNothing();
     }
   }
-  return getCouponTemplate({ uniqueId: template.unique_id });
+  return getCouponTemplate({ uniqueId: template.uniqueId });
 }
 
 /** Deprecate the template, or return null if no such template exists. */

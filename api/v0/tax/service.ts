@@ -1,5 +1,5 @@
 /**
- * v0/tax/service.ts -- tax business logic. tax_type may be an existing id
+ * v0/tax/service.ts -- tax business logic. taxType may be an existing id
  * or an inline tax type. Immutable, so deletes deprecate.
  */
 import { eq } from "drizzle-orm";
@@ -17,7 +17,7 @@ import type { TaxCreateBody } from "./routes.ts";
  */
 export const taxRefSchema = z.union([
   taxIdSchema,
-  z.object({ ...taxSchema.shape, tax_type: taxTypeRefSchema }),
+  z.object({ ...taxSchema.shape, taxType: taxTypeRefSchema }),
 ]);
 
 /** Resolve a tax reference to an id, upserting inline definitions. */
@@ -27,30 +27,12 @@ export async function resolveTaxRef(
   if (typeof ref === "string") {
     return ref;
   }
-  const taxTypeId = await resolveTaxTypeRef(ref.tax_type);
+  const taxTypeId = await resolveTaxTypeRef(ref.taxType);
   await db
     .insert(taxes)
-    .values({
-      uniqueId: ref.unique_id,
-      createdAt: ref.created_at,
-      deprecatedAt: ref.deprecated_at,
-      taxType: taxTypeId,
-      name: ref.name,
-      description: ref.description,
-    })
+    .values({ ...ref, taxType: taxTypeId })
     .onConflictDoNothing();
-  return ref.unique_id;
-}
-
-function rowToTax(row: typeof taxes.$inferSelect): Tax {
-  return {
-    unique_id: row.uniqueId,
-    created_at: row.createdAt,
-    deprecated_at: row.deprecatedAt,
-    tax_type: row.taxType,
-    name: row.name,
-    description: row.description,
-  };
+  return ref.uniqueId;
 }
 
 export async function getTax({
@@ -62,31 +44,20 @@ export async function getTax({
     .select()
     .from(taxes)
     .where(eq(taxes.uniqueId, uniqueId));
-  if (!row) {
-    return null;
-  }
-  return rowToTax(row);
+  return row ?? null;
 }
 
 export async function listTaxes(): Promise<Tax[]> {
-  const rows = await db.select().from(taxes);
-  return rows.map(rowToTax);
+  return db.select().from(taxes);
 }
 
 export async function createTax({ tax }: { tax: TaxCreateBody }): Promise<Tax> {
-  const taxTypeId = await resolveTaxTypeRef(tax.tax_type);
+  const taxTypeId = await resolveTaxTypeRef(tax.taxType);
   await db
     .insert(taxes)
-    .values({
-      uniqueId: tax.unique_id,
-      createdAt: tax.created_at,
-      deprecatedAt: tax.deprecated_at,
-      taxType: taxTypeId,
-      name: tax.name,
-      description: tax.description,
-    })
+    .values({ ...tax, taxType: taxTypeId })
     .onConflictDoNothing();
-  return { ...tax, tax_type: taxTypeId };
+  return { ...tax, taxType: taxTypeId };
 }
 
 /** Deprecate the tax, or return null if no such tax exists. */

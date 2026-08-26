@@ -30,7 +30,7 @@ export const meterEventApp = new Hono<{ Variables: { tenantId: string } }>()
           ...body,
           tenant: tenantId,
           status,
-          balance_microcredits: balanceMicrocredits,
+          balanceMicrocredits,
         },
         201,
       );

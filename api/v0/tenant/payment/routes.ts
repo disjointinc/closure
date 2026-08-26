@@ -16,9 +16,9 @@ import {
 
 const paymentPatchSchema = z
   .object({
-    started_processing_at: epochMs.nullable(),
-    succeeded_at: epochMs.nullable(),
-    failed_at: epochMs.nullable(),
+    startedProcessingAt: epochMs.nullable(),
+    succeededAt: epochMs.nullable(),
+    failedAt: epochMs.nullable(),
   })
   .partial();
 

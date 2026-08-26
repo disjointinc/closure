@@ -24,12 +24,12 @@ export async function getMeter({
     .from(meterTaxTypes)
     .where(eq(meterTaxTypes.meter, uniqueId));
   return {
-    unique_id: row.uniqueId,
-    created_at: row.createdAt,
-    deprecated_at: row.deprecatedAt,
+    uniqueId: row.uniqueId,
+    createdAt: row.createdAt,
+    deprecatedAt: row.deprecatedAt,
     name: row.name,
     description: row.description,
-    applicable_tax_types: taxTypeRows.length
+    applicableTaxTypes: taxTypeRows.length
       ? taxTypeRows.map((taxType) => taxType.taxType)
       : null,
   };
@@ -47,19 +47,19 @@ export async function createMeter({ meter }: { meter: Meter }): Promise<void> {
   await db
     .insert(meters)
     .values({
-      uniqueId: meter.unique_id,
-      createdAt: meter.created_at,
-      deprecatedAt: meter.deprecated_at,
+      uniqueId: meter.uniqueId,
+      createdAt: meter.createdAt,
+      deprecatedAt: meter.deprecatedAt,
       name: meter.name,
       description: meter.description,
     })
     .onConflictDoNothing();
-  if (meter.applicable_tax_types) {
+  if (meter.applicableTaxTypes) {
     await db
       .insert(meterTaxTypes)
       .values(
-        meter.applicable_tax_types.map((taxType) => ({
-          meter: meter.unique_id,
+        meter.applicableTaxTypes.map((taxType) => ({
+          meter: meter.uniqueId,
           taxType,
         })),
       )

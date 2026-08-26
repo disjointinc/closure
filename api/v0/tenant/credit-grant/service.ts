@@ -16,7 +16,7 @@ import type { CreditGrant } from "../../../schemas/credit-grant.ts";
 
 function rowToCreditGrant(row: typeof creditGrants.$inferSelect): CreditGrant {
   return {
-    unique_id: row.uniqueId,
+    uniqueId: row.uniqueId,
     meter: row.meter,
     on: row.on,
     by: row.byTeamMember,
@@ -53,7 +53,7 @@ export async function createCreditGrant({
   await db
     .insert(creditGrants)
     .values({
-      uniqueId: grant.unique_id,
+      uniqueId: grant.uniqueId,
       tenant: tenantId,
       meter: grant.meter,
       on: grant.on,
@@ -67,8 +67,8 @@ export async function createCreditGrant({
       amount: grant.amount,
       meter: grant.meter,
       tenant: tenantId,
-      uniqueId: grant.unique_id,
+      uniqueId: grant.uniqueId,
     },
   });
-  await stampGrantApplied({ grantId: grant.unique_id });
+  await stampGrantApplied({ grantId: grant.uniqueId });
 }

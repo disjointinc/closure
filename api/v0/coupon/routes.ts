@@ -27,13 +27,13 @@ import {
 } from "./service.ts";
 
 const couponDefinitionFields = {
-  grantable_by_tenants: z.boolean(),
-  /** Only settable when grantable_by_tenants. Null means no limit. */
-  limit_per_granting_tenant: z.number().int().positive().nullable(),
+  grantableByTenants: z.boolean(),
+  /** Only settable when grantableByTenants. Null means no limit. */
+  limitPerGrantingTenant: z.number().int().positive().nullable(),
   name: z.string().min(1),
   description: z.string().nullable(),
-  default_award: awardInputSchema.nullable(),
-  features_granted: z
+  defaultAward: awardInputSchema.nullable(),
+  featuresGranted: z
     .array(
       z.object({
         feature: featureIdSchema,
@@ -42,7 +42,7 @@ const couponDefinitionFields = {
       }),
     )
     .nullable(),
-  credits_granted: z
+  creditsGranted: z
     .array(
       z.object({
         meter: meterIdSchema,
@@ -53,17 +53,17 @@ const couponDefinitionFields = {
       }),
     )
     .nullable(),
-  /** Only settable when grantable_by_tenants. */
-  reciprocal_benefit_coupon: couponIdSchema.nullable(),
+  /** Only settable when grantableByTenants. */
+  reciprocalBenefitCoupon: couponIdSchema.nullable(),
 };
 
 const couponCreateSchema = z.union([
   // Inline definition.
   z
     .object({
-      unique_id: couponIdSchema,
-      created_at: epochMs,
-      deleted_at: epochMs.nullable(),
+      uniqueId: couponIdSchema,
+      createdAt: epochMs,
+      deletedAt: epochMs.nullable(),
       template: z.null().optional(),
       ...couponDefinitionFields,
     })
@@ -73,11 +73,11 @@ const couponCreateSchema = z.union([
   // silently strip them.)
   z
     .object({
-      unique_id: couponIdSchema,
-      created_at: epochMs,
-      deleted_at: epochMs.nullable(),
+      uniqueId: couponIdSchema,
+      createdAt: epochMs,
+      deletedAt: epochMs.nullable(),
       template: couponTemplateIdSchema,
-      reciprocal_benefit_coupon: couponIdSchema.nullable(),
+      reciprocalBenefitCoupon: couponIdSchema.nullable(),
     })
     .strict(),
 ]);

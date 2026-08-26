@@ -28,19 +28,19 @@ export async function getFeature({
     .from(featureTaxTypes)
     .where(eq(featureTaxTypes.feature, uniqueId));
   return {
-    unique_id: row.uniqueId,
-    created_at: row.createdAt,
-    deprecated_at: row.deprecatedAt,
+    uniqueId: row.uniqueId,
+    createdAt: row.createdAt,
+    deprecatedAt: row.deprecatedAt,
     name: row.name,
     description: row.description,
     options: options.length
       ? options.map((option) => ({
-          unique_id: option.uniqueId,
+          uniqueId: option.uniqueId,
           name: option.name,
           description: option.description,
         }))
       : null,
-    applicable_tax_types: taxTypeRows.length
+    applicableTaxTypes: taxTypeRows.length
       ? taxTypeRows.map((taxType) => taxType.taxType)
       : null,
   };
@@ -62,9 +62,9 @@ export async function createFeature({
   await db
     .insert(features)
     .values({
-      uniqueId: feature.unique_id,
-      createdAt: feature.created_at,
-      deprecatedAt: feature.deprecated_at,
+      uniqueId: feature.uniqueId,
+      createdAt: feature.createdAt,
+      deprecatedAt: feature.deprecatedAt,
       name: feature.name,
       description: feature.description,
     })
@@ -74,20 +74,20 @@ export async function createFeature({
       .insert(featureOptions)
       .values(
         feature.options.map((option) => ({
-          uniqueId: option.unique_id,
-          feature: feature.unique_id,
+          uniqueId: option.uniqueId,
+          feature: feature.uniqueId,
           name: option.name,
           description: option.description,
         })),
       )
       .onConflictDoNothing();
   }
-  if (feature.applicable_tax_types) {
+  if (feature.applicableTaxTypes) {
     await db
       .insert(featureTaxTypes)
       .values(
-        feature.applicable_tax_types.map((taxType) => ({
-          feature: feature.unique_id,
+        feature.applicableTaxTypes.map((taxType) => ({
+          feature: feature.uniqueId,
           taxType,
         })),
       )

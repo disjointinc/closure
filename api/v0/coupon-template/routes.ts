@@ -26,8 +26,8 @@ import {
 const couponTemplateCreateSchema = z
   .object({
     ...couponTemplateSchema.shape,
-    default_award: awardInputSchema.nullable(),
-    features_granted: z
+    defaultAward: awardInputSchema.nullable(),
+    featuresGranted: z
       .array(
         z.object({
           feature: featureIdSchema,
@@ -36,7 +36,7 @@ const couponTemplateCreateSchema = z
         }),
       )
       .nullable(),
-    credits_granted: z
+    creditsGranted: z
       .array(
         z.object({
           meter: meterIdSchema,

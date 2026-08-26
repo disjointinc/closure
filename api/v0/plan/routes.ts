@@ -23,13 +23,13 @@ const priceInputSchema = z.object({
 const planMeterInputSchema = z
   .object({
     ...planMeterFields,
-    top_up_prices_per_credit: z
+    topUpPricesPerCredit: z
       .union([
         valueRefSchema,
         z
           .array(
             z.object({
-              starting_at: microcredits.positive(),
+              startingAt: microcredits.positive(),
               prices: z.array(priceInputSchema).min(1),
             }),
           )

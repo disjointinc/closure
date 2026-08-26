@@ -5,8 +5,11 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
-import { durationSchema, epochMs } from "../../../schemas/common.ts";
-import { dunningActionSchema } from "../../../schemas/cycle.ts";
+import { epochMs } from "../../../schemas/common.ts";
+import {
+  arrearsChargingSchema,
+  upfrontChargingSchema,
+} from "../../../schemas/cycle.ts";
 import { invoiceIdSchema } from "../../../schemas/ids.ts";
 import { itemSchema } from "../../../schemas/item.ts";
 import { taxationAmountSchema } from "../../../schemas/taxation-amount.ts";
@@ -21,7 +24,7 @@ import {
 
 const itemInputSchema = z.object({
   ...itemSchema.shape,
-  per_unit_value: valueRefSchema,
+  perUnitValue: valueRefSchema,
 });
 
 const taxationAmountInputSchema = z.object({
@@ -30,38 +33,22 @@ const taxationAmountInputSchema = z.object({
 });
 
 const invoiceInputFields = {
-  unique_id: invoiceIdSchema,
-  created_at: epochMs,
-  closed_at: epochMs.nullable(),
-  closed_reason: z.string().nullable(),
+  uniqueId: invoiceIdSchema,
+  createdAt: epochMs,
+  closedAt: epochMs.nullable(),
+  closedReason: z.string().nullable(),
   items: z.array(itemInputSchema),
-  taxation_amounts: z.array(taxationAmountInputSchema),
+  taxationAmounts: z.array(taxationAmountInputSchema),
 };
 
 const invoiceCreateSchema = z.discriminatedUnion("charged", [
-  z.object({
-    charged: z.literal("upfront"),
-    cycle_length: z.union([durationSchema, z.literal("one-time")]),
-    ...invoiceInputFields,
-  }),
-  z.object({
-    charged: z.literal("arrears"),
-    cycle_length: durationSchema,
-    credit_period: durationSchema,
-    grace_period: durationSchema.nullable(),
-    dunning_schedule: z.array(
-      z.object({
-        after: durationSchema,
-        actions: z.array(dunningActionSchema).min(1),
-      }),
-    ),
-    ...invoiceInputFields,
-  }),
+  upfrontChargingSchema.extend(invoiceInputFields),
+  arrearsChargingSchema.extend(invoiceInputFields),
 ]);
 
 const closeInvoiceSchema = z.object({
-  closed_at: epochMs,
-  closed_reason: z.string().nullable(),
+  closedAt: epochMs,
+  closedReason: z.string().nullable(),
 });
 
 export type InvoiceCreateBody = z.infer<typeof invoiceCreateSchema>;

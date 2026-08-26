@@ -11,7 +11,7 @@ import { addOnIdSchema } from "../../../schemas/ids.ts";
 import { attachAddOn, createAssignment, listAssignments } from "./service.ts";
 
 const addOnAttachSchema = z.object({
-  add_on: addOnIdSchema,
+  addOn: addOnIdSchema,
   start: epochMs,
   end: epochMs.nullable(),
 });

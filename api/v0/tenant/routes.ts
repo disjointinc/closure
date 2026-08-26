@@ -34,13 +34,13 @@ import {
 } from "./service.ts";
 
 const tenantCreateSchema = z.object({
-  unique_id: tenantIdSchema,
-  created_at: epochMs,
-  external_ids: z.record(z.string(), z.string()),
+  uniqueId: tenantIdSchema,
+  createdAt: epochMs,
+  externalIds: z.record(z.string(), z.string()),
 });
 
 const tenantPatchSchema = z.object({
-  external_ids: z.record(z.string(), z.string()),
+  externalIds: z.record(z.string(), z.string()),
 });
 
 export type TenantCreateBody = z.infer<typeof tenantCreateSchema>;

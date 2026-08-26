@@ -1,6 +1,6 @@
 /**
  * v0/coupon/service.ts -- coupon business logic. Coupons are consumables
- * (deletes mark deleted_at) minted either inline or from a coupon template;
+ * (deletes mark deletedAt) minted either inline or from a coupon template;
  * minting copies the template's definition, so issued coupons never change
  * when the template is edited or deprecated later.
  */
@@ -37,23 +37,23 @@ export async function getCoupon({
     .from(couponCreditsGranted)
     .where(eq(couponCreditsGranted.coupon, uniqueId));
   return {
-    unique_id: row.uniqueId,
-    created_at: row.createdAt,
-    deleted_at: row.deletedAt,
+    uniqueId: row.uniqueId,
+    createdAt: row.createdAt,
+    deletedAt: row.deletedAt,
     template: row.template,
-    grantable_by_tenants: row.grantableByTenants,
-    limit_per_granting_tenant: row.limitPerGrantingTenant,
+    grantableByTenants: row.grantableByTenants,
+    limitPerGrantingTenant: row.limitPerGrantingTenant,
     name: row.name,
     description: row.description,
-    default_award: row.defaultAward,
-    features_granted: featureRows.length
+    defaultAward: row.defaultAward,
+    featuresGranted: featureRows.length
       ? featureRows.map((feature) => ({
           feature: feature.feature,
           value: feature.value,
           award: feature.award,
         }))
       : null,
-    credits_granted: creditRows.length
+    creditsGranted: creditRows.length
       ? creditRows.map((credit) => ({
           meter: credit.meter,
           amount: credit.amountMicrocredits,
@@ -62,7 +62,7 @@ export async function getCoupon({
           award: credit.award,
         }))
       : null,
-    reciprocal_benefit_coupon: row.reciprocalBenefitCoupon,
+    reciprocalBenefitCoupon: row.reciprocalBenefitCoupon,
   };
 }
 
@@ -95,28 +95,28 @@ export async function createCoupon({
     await db
       .insert(coupons)
       .values({
-        uniqueId: coupon.unique_id,
-        createdAt: coupon.created_at,
-        deletedAt: coupon.deleted_at,
-        template: template.unique_id,
-        grantableByTenants: template.grantable_by_tenants,
-        limitPerGrantingTenant: template.limit_per_granting_tenant,
+        uniqueId: coupon.uniqueId,
+        createdAt: coupon.createdAt,
+        deletedAt: coupon.deletedAt,
+        template: template.uniqueId,
+        grantableByTenants: template.grantableByTenants,
+        limitPerGrantingTenant: template.limitPerGrantingTenant,
         name: template.name,
         description: template.description,
-        defaultAward: template.default_award,
+        defaultAward: template.defaultAward,
         // A coupon's reciprocal benefit references an individual coupon, not
         // a template, so it can't be copied -- the caller sets it per coupon.
-        reciprocalBenefitCoupon: coupon.reciprocal_benefit_coupon,
+        reciprocalBenefitCoupon: coupon.reciprocalBenefitCoupon,
       })
       .onConflictDoNothing();
     // The template's awards are already resolved (value ids), so the grants
     // copy verbatim.
-    if (template.features_granted) {
+    if (template.featuresGranted) {
       await db
         .insert(couponFeaturesGranted)
         .values(
-          template.features_granted.map((feature) => ({
-            coupon: coupon.unique_id,
+          template.featuresGranted.map((feature) => ({
+            coupon: coupon.uniqueId,
             feature: feature.feature,
             value: feature.value,
             award: feature.award,
@@ -124,12 +124,12 @@ export async function createCoupon({
         )
         .onConflictDoNothing();
     }
-    if (template.credits_granted) {
+    if (template.creditsGranted) {
       await db
         .insert(couponCreditsGranted)
         .values(
-          template.credits_granted.map((credit) => ({
-            coupon: coupon.unique_id,
+          template.creditsGranted.map((credit) => ({
+            coupon: coupon.uniqueId,
             meter: credit.meter,
             amountMicrocredits: credit.amount,
             expiration: credit.expiration,
@@ -139,31 +139,31 @@ export async function createCoupon({
         )
         .onConflictDoNothing();
     }
-    return getCoupon({ uniqueId: coupon.unique_id });
+    return getCoupon({ uniqueId: coupon.uniqueId });
   }
   await db
     .insert(coupons)
     .values({
-      uniqueId: coupon.unique_id,
-      createdAt: coupon.created_at,
-      deletedAt: coupon.deleted_at,
+      uniqueId: coupon.uniqueId,
+      createdAt: coupon.createdAt,
+      deletedAt: coupon.deletedAt,
       template: null,
-      grantableByTenants: coupon.grantable_by_tenants,
-      limitPerGrantingTenant: coupon.limit_per_granting_tenant,
+      grantableByTenants: coupon.grantableByTenants,
+      limitPerGrantingTenant: coupon.limitPerGrantingTenant,
       name: coupon.name,
       description: coupon.description,
-      defaultAward: coupon.default_award
-        ? await resolveAward(coupon.default_award)
+      defaultAward: coupon.defaultAward
+        ? await resolveAward(coupon.defaultAward)
         : null,
-      reciprocalBenefitCoupon: coupon.reciprocal_benefit_coupon,
+      reciprocalBenefitCoupon: coupon.reciprocalBenefitCoupon,
     })
     .onConflictDoNothing();
-  if (coupon.features_granted) {
-    for (const feature of coupon.features_granted) {
+  if (coupon.featuresGranted) {
+    for (const feature of coupon.featuresGranted) {
       await db
         .insert(couponFeaturesGranted)
         .values({
-          coupon: coupon.unique_id,
+          coupon: coupon.uniqueId,
           feature: feature.feature,
           value: feature.value,
           award: await resolveAward(feature.award),
@@ -171,12 +171,12 @@ export async function createCoupon({
         .onConflictDoNothing();
     }
   }
-  if (coupon.credits_granted) {
-    for (const credit of coupon.credits_granted) {
+  if (coupon.creditsGranted) {
+    for (const credit of coupon.creditsGranted) {
       await db
         .insert(couponCreditsGranted)
         .values({
-          coupon: coupon.unique_id,
+          coupon: coupon.uniqueId,
           meter: credit.meter,
           amountMicrocredits: credit.amount,
           expiration: credit.expiration,
@@ -186,7 +186,7 @@ export async function createCoupon({
         .onConflictDoNothing();
     }
   }
-  return getCoupon({ uniqueId: coupon.unique_id });
+  return getCoupon({ uniqueId: coupon.uniqueId });
 }
 
 /** Mark the coupon deleted, or return null if no such coupon exists. */

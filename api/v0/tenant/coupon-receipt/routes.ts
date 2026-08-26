@@ -19,7 +19,7 @@ import {
 } from "./service.ts";
 
 const receiptCreateSchema = z.object({
-  unique_id: couponReceiptIdSchema,
+  uniqueId: couponReceiptIdSchema,
   coupon: couponIdSchema,
   on: epochMs,
   /** The team member granting the coupon. */
@@ -45,11 +45,11 @@ export const couponReceiptApp = new Hono<{ Variables: { tenantId: string } }>()
   })
   .post(
     "/:receipt_id/use",
-    zValidator("json", z.object({ used_at: epochMs })),
+    zValidator("json", z.object({ usedAt: epochMs })),
     async (c) => {
       const receipt = await useCouponReceipt({
         receiptId: c.req.param("receipt_id"),
-        usedAt: c.req.valid("json").used_at,
+        usedAt: c.req.valid("json").usedAt,
       });
       if (!receipt) {
         return c.json({ error: "not found or already used" }, 409);
