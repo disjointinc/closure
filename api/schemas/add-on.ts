@@ -4,9 +4,9 @@ import { addOnIdSchema } from "./ids.ts";
 import { planFeatureSchema } from "./plan.ts";
 
 export const addOnSchema = z.object({
-  unique_id: addOnIdSchema,
-  created_at: epochMs,
-  deprecated_at: epochMs.nullable(),
+  uniqueId: addOnIdSchema,
+  createdAt: epochMs,
+  deprecatedAt: epochMs.nullable(),
   name: z.string().min(1),
   description: z.string().nullable(),
   prices: z.array(priceSchema),

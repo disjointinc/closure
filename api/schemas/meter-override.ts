@@ -7,7 +7,7 @@ import { checkPlanMeter, planMeterFields } from "./plan.ts";
 export const meterOverrideSchema = z
   .object({
     ...planMeterFields,
-    unique_id: meterOverrideIdSchema,
+    uniqueId: meterOverrideIdSchema,
     on: epochMs,
     by: teamMemberIdSchema,
     reason: z.string().nullable(),

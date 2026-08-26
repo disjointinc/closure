@@ -7,7 +7,7 @@ import {
 } from "./ids.ts";
 
 export const creditGrantSchema = z.object({
-  unique_id: creditGrantIdSchema,
+  uniqueId: creditGrantIdSchema,
   meter: meterIdSchema,
   on: epochMs,
   by: teamMemberIdSchema,

@@ -65,49 +65,49 @@ export const couponCreditsGrantedSchema = z
 /** Cross-field rules for a coupon (also reused by the API's create input). */
 export function checkCoupon(
   coupon: {
-    grantable_by_tenants: boolean;
-    limit_per_granting_tenant: number | null;
-    reciprocal_benefit_coupon: string | null;
+    grantableByTenants: boolean;
+    limitPerGrantingTenant: number | null;
+    reciprocalBenefitCoupon: string | null;
   },
   ctx: z.RefinementCtx,
 ): void {
-  if (coupon.grantable_by_tenants) {
+  if (coupon.grantableByTenants) {
     return;
   }
-  if (coupon.limit_per_granting_tenant !== null) {
+  if (coupon.limitPerGrantingTenant !== null) {
     ctx.addIssue({
       code: "custom",
-      path: ["limit_per_granting_tenant"],
-      message: "only settable when grantable_by_tenants",
+      path: ["limitPerGrantingTenant"],
+      message: "only settable when grantableByTenants",
     });
   }
-  if (coupon.reciprocal_benefit_coupon !== null) {
+  if (coupon.reciprocalBenefitCoupon !== null) {
     ctx.addIssue({
       code: "custom",
-      path: ["reciprocal_benefit_coupon"],
-      message: "only settable when grantable_by_tenants",
+      path: ["reciprocalBenefitCoupon"],
+      message: "only settable when grantableByTenants",
     });
   }
 }
 
 export const couponSchema = z
   .object({
-    unique_id: couponIdSchema,
-    created_at: epochMs,
+    uniqueId: couponIdSchema,
+    createdAt: epochMs,
     /** Coupons are consumables, so they're deleted, not deprecated. */
-    deleted_at: epochMs.nullable(),
+    deletedAt: epochMs.nullable(),
     /** The template this coupon's definition was copied from, if any. */
     template: couponTemplateIdSchema.nullable(),
-    grantable_by_tenants: z.boolean(),
-    /** Only settable when grantable_by_tenants. Null means no limit. */
-    limit_per_granting_tenant: z.number().int().positive().nullable(),
+    grantableByTenants: z.boolean(),
+    /** Only settable when grantableByTenants. Null means no limit. */
+    limitPerGrantingTenant: z.number().int().positive().nullable(),
     name: z.string().min(1),
     description: z.string().nullable(),
-    default_award: awardSchema.nullable(),
-    features_granted: couponFeaturesGrantedSchema,
-    credits_granted: couponCreditsGrantedSchema,
-    /** Only settable when grantable_by_tenants. */
-    reciprocal_benefit_coupon: couponIdSchema.nullable(),
+    defaultAward: awardSchema.nullable(),
+    featuresGranted: couponFeaturesGrantedSchema,
+    creditsGranted: couponCreditsGrantedSchema,
+    /** Only settable when grantableByTenants. */
+    reciprocalBenefitCoupon: couponIdSchema.nullable(),
   })
   .superRefine(checkCoupon);
 export type Coupon = z.infer<typeof couponSchema>;

@@ -10,27 +10,27 @@ import { couponTemplateIdSchema } from "./ids.ts";
 /** Cross-field rules for a coupon template (mirrors checkCoupon). */
 export function checkCouponTemplate(
   template: {
-    grantable_by_tenants: boolean;
-    limit_per_granting_tenant: number | null;
-    reciprocal_benefit_coupon_template: string | null;
+    grantableByTenants: boolean;
+    limitPerGrantingTenant: number | null;
+    reciprocalBenefitCouponTemplate: string | null;
   },
   ctx: z.RefinementCtx,
 ): void {
-  if (template.grantable_by_tenants) {
+  if (template.grantableByTenants) {
     return;
   }
-  if (template.limit_per_granting_tenant !== null) {
+  if (template.limitPerGrantingTenant !== null) {
     ctx.addIssue({
       code: "custom",
-      path: ["limit_per_granting_tenant"],
-      message: "only settable when grantable_by_tenants",
+      path: ["limitPerGrantingTenant"],
+      message: "only settable when grantableByTenants",
     });
   }
-  if (template.reciprocal_benefit_coupon_template !== null) {
+  if (template.reciprocalBenefitCouponTemplate !== null) {
     ctx.addIssue({
       code: "custom",
-      path: ["reciprocal_benefit_coupon_template"],
-      message: "only settable when grantable_by_tenants",
+      path: ["reciprocalBenefitCouponTemplate"],
+      message: "only settable when grantableByTenants",
     });
   }
 }
@@ -42,19 +42,19 @@ export function checkCouponTemplate(
  */
 export const couponTemplateSchema = z
   .object({
-    unique_id: couponTemplateIdSchema,
-    created_at: epochMs,
-    deprecated_at: epochMs.nullable(),
-    grantable_by_tenants: z.boolean(),
-    /** Only settable when grantable_by_tenants. Null means no limit. */
-    limit_per_granting_tenant: z.number().int().positive().nullable(),
+    uniqueId: couponTemplateIdSchema,
+    createdAt: epochMs,
+    deprecatedAt: epochMs.nullable(),
+    grantableByTenants: z.boolean(),
+    /** Only settable when grantableByTenants. Null means no limit. */
+    limitPerGrantingTenant: z.number().int().positive().nullable(),
     name: z.string().min(1),
     description: z.string().nullable(),
-    default_award: awardSchema.nullable(),
-    features_granted: couponFeaturesGrantedSchema,
-    credits_granted: couponCreditsGrantedSchema,
-    /** Only settable when grantable_by_tenants. */
-    reciprocal_benefit_coupon_template: couponTemplateIdSchema.nullable(),
+    defaultAward: awardSchema.nullable(),
+    featuresGranted: couponFeaturesGrantedSchema,
+    creditsGranted: couponCreditsGrantedSchema,
+    /** Only settable when grantableByTenants. */
+    reciprocalBenefitCouponTemplate: couponTemplateIdSchema.nullable(),
   })
   .superRefine(checkCouponTemplate);
 export type CouponTemplate = z.infer<typeof couponTemplateSchema>;

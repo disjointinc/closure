@@ -10,9 +10,9 @@ import { valueIdSchema } from "./ids.ts";
  */
 export const valueSchema = z
   .object({
-    unique_id: valueIdSchema,
-    created_at: epochMs,
-    deprecated_at: epochMs.nullable(),
+    uniqueId: valueIdSchema,
+    createdAt: epochMs,
+    deprecatedAt: epochMs.nullable(),
     name: z.string().min(1),
     description: z.string().nullable(),
     amounts: z

@@ -3,11 +3,11 @@ import { epochMs } from "./common.ts";
 import { refundIdSchema, teamMemberIdSchema, valueIdSchema } from "./ids.ts";
 
 export const refundSchema = z.object({
-  unique_id: refundIdSchema,
-  created_at: epochMs,
-  started_processing_at: epochMs.nullable(),
-  succeeded_at: epochMs.nullable(),
-  failed_at: epochMs.nullable(),
+  uniqueId: refundIdSchema,
+  createdAt: epochMs,
+  startedProcessingAt: epochMs.nullable(),
+  succeededAt: epochMs.nullable(),
+  failedAt: epochMs.nullable(),
   by: teamMemberIdSchema,
   value: valueIdSchema,
   reason: z.string().nullable(),

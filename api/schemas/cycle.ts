@@ -9,7 +9,7 @@ export const dunningActionSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("add_late_fee"),
-    fixed_value: valueIdSchema,
+    fixedValue: valueIdSchema,
     percentage: z.number().positive(),
   }),
 ]);
@@ -17,15 +17,15 @@ export type DunningAction = z.infer<typeof dunningActionSchema>;
 
 export const upfrontChargingSchema = z.object({
   charged: z.literal("upfront"),
-  cycle_length: z.union([durationSchema, z.literal("one-time")]),
+  cycleLength: z.union([durationSchema, z.literal("one_time")]),
 });
 
 export const arrearsChargingSchema = z.object({
   charged: z.literal("arrears"),
-  cycle_length: durationSchema,
-  credit_period: durationSchema,
-  grace_period: durationSchema.nullable(),
-  dunning_schedule: z.array(
+  cycleLength: durationSchema,
+  creditPeriod: durationSchema,
+  gracePeriod: durationSchema.nullable(),
+  dunningSchedule: z.array(
     z.object({
       /** How long after the due date these actions trigger. */
       after: durationSchema,
@@ -42,9 +42,9 @@ export const chargingSchema = z.discriminatedUnion("charged", [
 export type Charging = z.infer<typeof chargingSchema>;
 
 const cycleFields = {
-  unique_id: cycleIdSchema,
-  created_at: epochMs,
-  deprecated_at: epochMs.nullable(),
+  uniqueId: cycleIdSchema,
+  createdAt: epochMs,
+  deprecatedAt: epochMs.nullable(),
   name: z.string().min(1),
   description: z.string().nullable(),
 };

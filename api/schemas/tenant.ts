@@ -14,30 +14,30 @@ import { refundSchema } from "./refund.ts";
 
 export const tenantSchema = z
   .object({
-    unique_id: tenantIdSchema,
-    created_at: epochMs,
-    deleted_at: epochMs.nullable(),
+    uniqueId: tenantIdSchema,
+    createdAt: epochMs,
+    deletedAt: epochMs.nullable(),
     /** External systems' ids for this tenant, keyed by system name. */
-    external_ids: z.record(z.string(), z.string()),
+    externalIds: z.record(z.string(), z.string()),
     assignments: z.array(assignmentSchema),
     invoices: z.array(invoiceSchema).nullable(),
-    payment_methods: z.array(paymentMethodSchema).nullable(),
+    paymentMethods: z.array(paymentMethodSchema).nullable(),
     payments: z.array(paymentSchema).nullable(),
     refunds: z.array(refundSchema).nullable(),
-    feature_overrides: z.array(featureOverrideSchema).nullable(),
-    meter_overrides: z.array(meterOverrideSchema),
-    credit_grants: z.array(creditGrantSchema),
-    coupons_received: z.array(couponReceiptSchema),
-    coupons_granted: z.array(couponGrantSchema),
+    featureOverrides: z.array(featureOverrideSchema).nullable(),
+    meterOverrides: z.array(meterOverrideSchema),
+    creditGrants: z.array(creditGrantSchema),
+    couponsReceived: z.array(couponReceiptSchema),
+    couponsGranted: z.array(couponGrantSchema),
   })
   .superRefine((tenant, ctx) => {
-    const defaults = (tenant.payment_methods ?? []).filter(
-      (method) => method.is_default,
+    const defaults = (tenant.paymentMethods ?? []).filter(
+      (method) => method.isDefault,
     );
     if (defaults.length > 1) {
       ctx.addIssue({
         code: "custom",
-        path: ["payment_methods"],
+        path: ["paymentMethods"],
         message: "only one payment method may be default",
       });
     }

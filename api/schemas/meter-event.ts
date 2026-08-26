@@ -3,15 +3,15 @@ import { epochMs, microcredits } from "./common.ts";
 import { meterEventIdSchema, meterIdSchema, tenantIdSchema } from "./ids.ts";
 
 export const meterEventSchema = z.object({
-  unique_id: meterEventIdSchema,
+  uniqueId: meterEventIdSchema,
   /**
    * The caller's idempotency key: repeat deliveries with the same external
    * id return the original outcome without double-charging. Optional --
-   * defaults to unique_id at ingest, so callers who don't need idempotent
+   * defaults to uniqueId at ingest, so callers who don't need idempotent
    * redelivery never have to mint a second id.
    */
-  unique_external_id: z.string().min(1).optional(),
-  created_at: epochMs,
+  uniqueExternalId: z.string().min(1).optional(),
+  createdAt: epochMs,
   meter: meterIdSchema,
   tenant: tenantIdSchema,
   /**

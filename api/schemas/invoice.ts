@@ -6,12 +6,12 @@ import { itemSchema } from "./item.ts";
 import { taxationAmountSchema } from "./taxation-amount.ts";
 
 const invoiceFields = {
-  unique_id: invoiceIdSchema,
-  created_at: epochMs,
-  closed_at: epochMs.nullable(),
-  closed_reason: z.string().nullable(),
+  uniqueId: invoiceIdSchema,
+  createdAt: epochMs,
+  closedAt: epochMs.nullable(),
+  closedReason: z.string().nullable(),
   items: z.array(itemSchema),
-  taxation_amounts: z.array(taxationAmountSchema),
+  taxationAmounts: z.array(taxationAmountSchema),
 };
 
 /** An invoice carries the charging behavior of its cycle. */

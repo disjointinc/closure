@@ -17,7 +17,7 @@ import {
 /** A feature entry as embedded in a plan (or add-on, or feature override). */
 export const planFeatureSchema = z.object({
   feature: featureIdSchema,
-  set_to: featureSetTo,
+  setTo: featureSetTo,
 });
 export type PlanFeature = z.infer<typeof planFeatureSchema>;
 
@@ -27,7 +27,7 @@ const topUpTierSchema = z.object({
    * kick in. Must be unique across tiers and <= limit - default; both are
    * checked by the parent meter entry's refinement.
    */
-  starting_at: microcredits.positive(),
+  startingAt: microcredits.positive(),
   prices: z.array(priceSchema).min(1),
 });
 
@@ -65,10 +65,10 @@ export const planMeterFields = {
   /** Reset periods unused credits roll over into. Null means unlimited. */
   rollovers: z.number().int().nonnegative().nullable(),
   /** A flat per-credit value, or usage tiers with their own prices. */
-  top_up_prices_per_credit: z
+  topUpPricesPerCredit: z
     .union([valueIdSchema, z.array(topUpTierSchema).min(1)])
     .nullable(),
-  top_up_credit_pack_sizes: topUpCreditPackSizesSchema.nullable(),
+  topUpCreditPackSizes: topUpCreditPackSizesSchema.nullable(),
 };
 
 const planMeterObject = z.object(planMeterFields);
@@ -82,8 +82,8 @@ export type PlanMeter = z.infer<typeof planMeterObject>;
 export interface PlanMeterCheckInput {
   default: number;
   limit: number | null;
-  top_up_prices_per_credit: unknown;
-  top_up_credit_pack_sizes: { dynamic: { maximum: number | null } } | null;
+  topUpPricesPerCredit: unknown;
+  topUpCreditPackSizes: { dynamic: { maximum: number | null } } | null;
 }
 
 /** Cross-field rules for a plan meter entry (also reused by meter overrides). */
@@ -104,29 +104,29 @@ export function checkPlanMeter(
   const headroom =
     meter.limit === null ? undefined : meter.limit - meter.default;
 
-  const tiers = meter.top_up_prices_per_credit;
+  const tiers = meter.topUpPricesPerCredit;
   if (Array.isArray(tiers)) {
     const seen = new Set<number>();
-    (tiers as { starting_at: number }[]).forEach((tier, index) => {
-      if (seen.has(tier.starting_at)) {
+    (tiers as { startingAt: number }[]).forEach((tier, index) => {
+      if (seen.has(tier.startingAt)) {
         ctx.addIssue({
           code: "custom",
-          path: ["top_up_prices_per_credit", index, "starting_at"],
-          message: "starting_at values must be unique across tiers",
+          path: ["topUpPricesPerCredit", index, "startingAt"],
+          message: "startingAt values must be unique across tiers",
         });
       }
-      seen.add(tier.starting_at);
-      if (headroom !== undefined && tier.starting_at > headroom) {
+      seen.add(tier.startingAt);
+      if (headroom !== undefined && tier.startingAt > headroom) {
         ctx.addIssue({
           code: "custom",
-          path: ["top_up_prices_per_credit", index, "starting_at"],
-          message: "starting_at must be <= limit - default",
+          path: ["topUpPricesPerCredit", index, "startingAt"],
+          message: "startingAt must be <= limit - default",
         });
       }
     });
   }
 
-  const dynamicMaximum = meter.top_up_credit_pack_sizes?.dynamic.maximum;
+  const dynamicMaximum = meter.topUpCreditPackSizes?.dynamic.maximum;
   if (
     headroom !== undefined &&
     typeof dynamicMaximum === "number" &&
@@ -134,7 +134,7 @@ export function checkPlanMeter(
   ) {
     ctx.addIssue({
       code: "custom",
-      path: ["top_up_credit_pack_sizes", "dynamic", "maximum"],
+      path: ["topUpCreditPackSizes", "dynamic", "maximum"],
       message: "dynamic maximum must be <= limit - default",
     });
   }
@@ -143,16 +143,16 @@ export function checkPlanMeter(
 export const planMeterSchema = planMeterObject.superRefine(checkPlanMeter);
 
 export const planSchema = z.object({
-  unique_id: planIdSchema,
+  uniqueId: planIdSchema,
   /** The plan this version was derived from, if any. */
-  derived_from: planIdSchema.nullable(),
-  created_at: epochMs,
-  deprecated_at: epochMs.nullable(),
+  derivedFrom: planIdSchema.nullable(),
+  createdAt: epochMs,
+  deprecatedAt: epochMs.nullable(),
   name: z.string().min(1),
   description: z.string().nullable(),
   prices: z.array(priceSchema),
   features: z.array(planFeatureSchema).nullable(),
   meters: z.array(planMeterSchema).nullable(),
-  add_ons: z.array(addOnIdSchema).nullable(),
+  addOns: z.array(addOnIdSchema).nullable(),
 });
 export type Plan = z.infer<typeof planSchema>;

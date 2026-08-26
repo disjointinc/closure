@@ -4,11 +4,11 @@ import { couponGrantIdSchema, couponIdSchema, tenantIdSchema } from "./ids.ts";
 
 /** A coupon granted by a tenant to another tenant. */
 export const couponGrantSchema = z.object({
-  unique_id: couponGrantIdSchema,
+  uniqueId: couponGrantIdSchema,
   coupon: couponIdSchema,
   on: epochMs,
   to: tenantIdSchema,
-  used_at: epochMs.nullable(),
+  usedAt: epochMs.nullable(),
   reason: z.string().nullable(),
 });
 export type CouponGrant = z.infer<typeof couponGrantSchema>;
