@@ -14,7 +14,7 @@ import { refundSchema } from "./refund.ts";
 
 export const tenantSchema = z
   .object({
-    uniqueId: tenantIdSchema,
+    tenantId: tenantIdSchema,
     createdAt: epochMs,
     deletedAt: epochMs.nullable(),
     /** External systems' ids for this tenant, keyed by system name. */

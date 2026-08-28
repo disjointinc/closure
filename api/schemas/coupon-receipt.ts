@@ -9,29 +9,29 @@ import {
 } from "./ids.ts";
 
 const receiptFields = {
-  uniqueId: couponReceiptIdSchema,
-  coupon: couponIdSchema,
-  on: epochMs,
+  couponReceiptId: couponReceiptIdSchema,
+  couponId: couponIdSchema,
+  receivedAt: epochMs,
   usedAt: epochMs.nullable(),
   reason: z.string().nullable(),
 };
 
-/** A coupon received by a tenant. "by" depends on who granted it. */
+/** A coupon received by a tenant. grantorId depends on who granted it. */
 export const couponReceiptSchema = z.discriminatedUnion("grantorType", [
   z.object({
     ...receiptFields,
     grantorType: z.literal("team_member"),
-    by: teamMemberIdSchema,
+    grantorId: teamMemberIdSchema,
   }),
   z.object({
     ...receiptFields,
     grantorType: z.literal("tenant"),
-    by: tenantIdSchema,
+    grantorId: tenantIdSchema,
   }),
   z.object({
     ...receiptFields,
     grantorType: z.literal("reciprocal"),
-    by: couponGrantIdSchema,
+    grantorId: couponGrantIdSchema,
   }),
 ]);
 export type CouponReceipt = z.infer<typeof couponReceiptSchema>;

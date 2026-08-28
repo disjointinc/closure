@@ -7,11 +7,11 @@ import {
 } from "./ids.ts";
 
 export const creditGrantSchema = z.object({
-  uniqueId: creditGrantIdSchema,
-  meter: meterIdSchema,
-  on: epochMs,
-  by: teamMemberIdSchema,
+  creditGrantId: creditGrantIdSchema,
+  meterId: meterIdSchema,
+  grantedAt: epochMs,
+  byTeamMemberId: teamMemberIdSchema,
   reason: z.string().nullable(),
-  amount: microcredits.positive(),
+  amountMicrocredits: microcredits.positive(),
 });
 export type CreditGrant = z.infer<typeof creditGrantSchema>;

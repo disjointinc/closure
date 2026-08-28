@@ -16,15 +16,15 @@ import {
 export const awardSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("payout"),
-    value: valueIdSchema,
+    valueId: valueIdSchema,
   }),
   z.object({
     type: z.literal("flat_discount"),
-    value: valueIdSchema,
+    valueId: valueIdSchema,
   }),
   z.object({
     type: z.literal("percentage_discount"),
-    value: z.number().gt(0).lte(100),
+    percentage: z.number().gt(0).lte(100),
   }),
 ]);
 export type Award = z.infer<typeof awardSchema>;
@@ -32,7 +32,7 @@ export type Award = z.infer<typeof awardSchema>;
 /** Awards default to a full (100%) discount when unspecified. */
 export const defaultAward = {
   type: "percentage_discount",
-  value: 100,
+  percentage: 100,
 } as const;
 
 /**
@@ -42,8 +42,8 @@ export const defaultAward = {
 export const couponFeaturesGrantedSchema = z
   .array(
     z.object({
-      feature: featureIdSchema,
-      value: featureSetTo,
+      featureId: featureIdSchema,
+      setTo: featureSetTo,
       award: awardSchema.default(defaultAward),
     }),
   )
@@ -51,8 +51,8 @@ export const couponFeaturesGrantedSchema = z
 export const couponCreditsGrantedSchema = z
   .array(
     z.object({
-      meter: meterIdSchema,
-      amount: microcredits.positive(),
+      meterId: meterIdSchema,
+      amountMicrocredits: microcredits.positive(),
       /** Null means the credits never expire. */
       expiration: resetSchedule.nullable(),
       /** Null means unlimited rollovers. */
@@ -67,7 +67,7 @@ export function checkCoupon(
   coupon: {
     grantableByTenants: boolean;
     limitPerGrantingTenant: number | null;
-    reciprocalBenefitCoupon: string | null;
+    reciprocalBenefitCouponId: string | null;
   },
   ctx: z.RefinementCtx,
 ): void {
@@ -81,10 +81,10 @@ export function checkCoupon(
       message: "only settable when grantableByTenants",
     });
   }
-  if (coupon.reciprocalBenefitCoupon !== null) {
+  if (coupon.reciprocalBenefitCouponId !== null) {
     ctx.addIssue({
       code: "custom",
-      path: ["reciprocalBenefitCoupon"],
+      path: ["reciprocalBenefitCouponId"],
       message: "only settable when grantableByTenants",
     });
   }
@@ -92,12 +92,12 @@ export function checkCoupon(
 
 export const couponSchema = z
   .object({
-    uniqueId: couponIdSchema,
+    couponId: couponIdSchema,
     createdAt: epochMs,
     /** Coupons are consumables, so they're deleted, not deprecated. */
     deletedAt: epochMs.nullable(),
     /** The template this coupon's definition was copied from, if any. */
-    template: couponTemplateIdSchema.nullable(),
+    templateId: couponTemplateIdSchema.nullable(),
     grantableByTenants: z.boolean(),
     /** Only settable when grantableByTenants. Null means no limit. */
     limitPerGrantingTenant: z.number().int().positive().nullable(),
@@ -107,7 +107,7 @@ export const couponSchema = z
     featuresGranted: couponFeaturesGrantedSchema,
     creditsGranted: couponCreditsGrantedSchema,
     /** Only settable when grantableByTenants. */
-    reciprocalBenefitCoupon: couponIdSchema.nullable(),
+    reciprocalBenefitCouponId: couponIdSchema.nullable(),
   })
   .superRefine(checkCoupon);
 export type Coupon = z.infer<typeof couponSchema>;

@@ -4,7 +4,7 @@ import { addOnIdSchema } from "./ids.ts";
 import { planFeatureSchema } from "./plan.ts";
 
 export const addOnSchema = z.object({
-  uniqueId: addOnIdSchema,
+  addOnId: addOnIdSchema,
   createdAt: epochMs,
   deprecatedAt: epochMs.nullable(),
   name: z.string().min(1),

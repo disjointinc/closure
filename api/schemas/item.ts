@@ -3,8 +3,8 @@ import { itemIdSchema, valueIdSchema } from "./ids.ts";
 
 /** A line item on an invoice. */
 export const itemSchema = z.object({
-  uniqueId: itemIdSchema,
-  perUnitValue: valueIdSchema,
+  itemId: itemIdSchema,
+  perUnitValueId: valueIdSchema,
   units: z.number().nonnegative(),
   name: z.string().min(1),
   description: z.string().nullable(),

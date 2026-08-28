@@ -16,7 +16,7 @@ import {
 
 /** A feature entry as embedded in a plan (or add-on, or feature override). */
 export const planFeatureSchema = z.object({
-  feature: featureIdSchema,
+  featureId: featureIdSchema,
   setTo: featureSetTo,
 });
 export type PlanFeature = z.infer<typeof planFeatureSchema>;
@@ -24,8 +24,9 @@ export type PlanFeature = z.infer<typeof planFeatureSchema>;
 const topUpTierSchema = z.object({
   /**
    * Microcredits (past the default allocation) at which this tier's prices
-   * kick in. Must be unique across tiers and <= limit - default; both are
-   * checked by the parent meter entry's refinement.
+   * kick in. Must be unique across tiers and <= limitMicrocredits -
+   * defaultMicrocredits; both are checked by the parent meter entry's
+   * refinement.
    */
   startingAt: microcredits.positive(),
   prices: z.array(priceSchema).min(1),
@@ -54,12 +55,15 @@ const topUpCreditPackSizesSchema = z.object({
  * A meter entry as embedded in a plan (or meter override). Exported as a
  * plain fields object so related schemas (e.g. meter_override) can rebuild
  * the object with extra fields and re-apply the same refinement.
+ *
+ * The microcredits-suffixed names match the db columns: bare "default" and
+ * "limit" are reserved words in Postgres.
  */
 export const planMeterFields = {
-  meter: meterIdSchema,
-  default: microcredits.nonnegative(),
-  /** Must be >= default. Null means unlimited. */
-  limit: microcredits.positive().nullable(),
+  meterId: meterIdSchema,
+  defaultMicrocredits: microcredits.nonnegative(),
+  /** Must be >= defaultMicrocredits. Null means unlimited. */
+  limitMicrocredits: microcredits.positive().nullable(),
   /** Null means the allocation never resets. */
   reset: resetSchedule.nullable(),
   /** Reset periods unused credits roll over into. Null means unlimited. */
@@ -80,8 +84,8 @@ export type PlanMeter = z.infer<typeof planMeterObject>;
  * still be inline objects -- can reuse the same check.
  */
 export interface PlanMeterCheckInput {
-  default: number;
-  limit: number | null;
+  defaultMicrocredits: number;
+  limitMicrocredits: number | null;
   topUpPricesPerCredit: unknown;
   topUpCreditPackSizes: { dynamic: { maximum: number | null } } | null;
 }
@@ -91,18 +95,23 @@ export function checkPlanMeter(
   meter: PlanMeterCheckInput,
   ctx: z.RefinementCtx,
 ): void {
-  if (meter.limit !== null && meter.limit < meter.default) {
+  if (
+    meter.limitMicrocredits !== null &&
+    meter.limitMicrocredits < meter.defaultMicrocredits
+  ) {
     ctx.addIssue({
       code: "custom",
-      path: ["limit"],
-      message: "limit must be >= default",
+      path: ["limitMicrocredits"],
+      message: "limitMicrocredits must be >= defaultMicrocredits",
     });
   }
   // Headroom: how many microcredits above the default allocation a tenant
   // can hold. Null limit means unlimited, which permits any tier/maximum.
   // Integer arithmetic, so this difference is exact.
   const headroom =
-    meter.limit === null ? undefined : meter.limit - meter.default;
+    meter.limitMicrocredits === null
+      ? undefined
+      : meter.limitMicrocredits - meter.defaultMicrocredits;
 
   const tiers = meter.topUpPricesPerCredit;
   if (Array.isArray(tiers)) {
@@ -120,7 +129,8 @@ export function checkPlanMeter(
         ctx.addIssue({
           code: "custom",
           path: ["topUpPricesPerCredit", index, "startingAt"],
-          message: "startingAt must be <= limit - default",
+          message:
+            "startingAt must be <= limitMicrocredits - defaultMicrocredits",
         });
       }
     });
@@ -135,7 +145,8 @@ export function checkPlanMeter(
     ctx.addIssue({
       code: "custom",
       path: ["topUpCreditPackSizes", "dynamic", "maximum"],
-      message: "dynamic maximum must be <= limit - default",
+      message:
+        "dynamic maximum must be <= limitMicrocredits - defaultMicrocredits",
     });
   }
 }
@@ -143,9 +154,9 @@ export function checkPlanMeter(
 export const planMeterSchema = planMeterObject.superRefine(checkPlanMeter);
 
 export const planSchema = z.object({
-  uniqueId: planIdSchema,
+  planId: planIdSchema,
   /** The plan this version was derived from, if any. */
-  derivedFrom: planIdSchema.nullable(),
+  derivedFromPlanId: planIdSchema.nullable(),
   createdAt: epochMs,
   deprecatedAt: epochMs.nullable(),
   name: z.string().min(1),
@@ -153,6 +164,6 @@ export const planSchema = z.object({
   prices: z.array(priceSchema),
   features: z.array(planFeatureSchema).nullable(),
   meters: z.array(planMeterSchema).nullable(),
-  addOns: z.array(addOnIdSchema).nullable(),
+  addOnIds: z.array(addOnIdSchema).nullable(),
 });
 export type Plan = z.infer<typeof planSchema>;

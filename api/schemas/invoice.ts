@@ -6,7 +6,7 @@ import { itemSchema } from "./item.ts";
 import { taxationAmountSchema } from "./taxation-amount.ts";
 
 const invoiceFields = {
-  uniqueId: invoiceIdSchema,
+  invoiceId: invoiceIdSchema,
   createdAt: epochMs,
   closedAt: epochMs.nullable(),
   closedReason: z.string().nullable(),

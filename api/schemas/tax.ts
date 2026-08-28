@@ -3,10 +3,10 @@ import { epochMs } from "./common.ts";
 import { taxIdSchema, taxTypeIdSchema } from "./ids.ts";
 
 export const taxSchema = z.object({
-  uniqueId: taxIdSchema,
+  taxId: taxIdSchema,
   createdAt: epochMs,
   deprecatedAt: epochMs.nullable(),
-  taxType: taxTypeIdSchema,
+  taxTypeId: taxTypeIdSchema,
   name: z.string().min(1),
   description: z.string().nullable(),
 });

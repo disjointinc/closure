@@ -3,18 +3,18 @@ import { epochMs } from "./common.ts";
 import { experimentIdSchema, planIdSchema, tenantIdSchema } from "./ids.ts";
 
 const treatmentSchema = z.object({
-  plan: planIdSchema,
+  planId: planIdSchema,
   tenantPercentage: z.number().min(0).max(100),
-  assignedTenants: z.array(tenantIdSchema).nullable(),
+  assignedTenantIds: z.array(tenantIdSchema).nullable(),
 });
 export type Treatment = z.infer<typeof treatmentSchema>;
 
 export const experimentSchema = z
   .object({
-    uniqueId: experimentIdSchema,
+    experimentId: experimentIdSchema,
     createdAt: epochMs,
     concludedAt: epochMs.nullable(),
-    planAssignmentAtConclusion: planIdSchema.nullable(),
+    concludingPlanId: planIdSchema.nullable(),
     name: z.string().min(1),
     description: z.string().nullable(),
     treatments: z.array(treatmentSchema).min(2),

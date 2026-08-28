@@ -12,7 +12,7 @@ export function checkCouponTemplate(
   template: {
     grantableByTenants: boolean;
     limitPerGrantingTenant: number | null;
-    reciprocalBenefitCouponTemplate: string | null;
+    reciprocalBenefitCouponTemplateId: string | null;
   },
   ctx: z.RefinementCtx,
 ): void {
@@ -26,10 +26,10 @@ export function checkCouponTemplate(
       message: "only settable when grantableByTenants",
     });
   }
-  if (template.reciprocalBenefitCouponTemplate !== null) {
+  if (template.reciprocalBenefitCouponTemplateId !== null) {
     ctx.addIssue({
       code: "custom",
-      path: ["reciprocalBenefitCouponTemplate"],
+      path: ["reciprocalBenefitCouponTemplateId"],
       message: "only settable when grantableByTenants",
     });
   }
@@ -42,7 +42,7 @@ export function checkCouponTemplate(
  */
 export const couponTemplateSchema = z
   .object({
-    uniqueId: couponTemplateIdSchema,
+    couponTemplateId: couponTemplateIdSchema,
     createdAt: epochMs,
     deprecatedAt: epochMs.nullable(),
     grantableByTenants: z.boolean(),
@@ -54,7 +54,7 @@ export const couponTemplateSchema = z
     featuresGranted: couponFeaturesGrantedSchema,
     creditsGranted: couponCreditsGrantedSchema,
     /** Only settable when grantableByTenants. */
-    reciprocalBenefitCouponTemplate: couponTemplateIdSchema.nullable(),
+    reciprocalBenefitCouponTemplateId: couponTemplateIdSchema.nullable(),
   })
   .superRefine(checkCouponTemplate);
 export type CouponTemplate = z.infer<typeof couponTemplateSchema>;

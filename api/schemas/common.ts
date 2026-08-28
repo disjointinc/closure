@@ -88,8 +88,8 @@ export const featureSetTo = z.union([z.boolean(), z.array(z.string())]);
 
 /** A price: the value charged per cycle. No id of its own. */
 export const priceSchema = z.object({
-  cycle: cycleIdSchema,
-  value: valueIdSchema,
+  cycleId: cycleIdSchema,
+  valueId: valueIdSchema,
 });
 export type Price = z.infer<typeof priceSchema>;
 

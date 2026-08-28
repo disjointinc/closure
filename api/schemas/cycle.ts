@@ -9,7 +9,7 @@ export const dunningActionSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("add_late_fee"),
-    fixedValue: valueIdSchema,
+    fixedValueId: valueIdSchema,
     percentage: z.number().positive(),
   }),
 ]);
@@ -42,7 +42,7 @@ export const chargingSchema = z.discriminatedUnion("charged", [
 export type Charging = z.infer<typeof chargingSchema>;
 
 const cycleFields = {
-  uniqueId: cycleIdSchema,
+  cycleId: cycleIdSchema,
   createdAt: epochMs,
   deprecatedAt: epochMs.nullable(),
   name: z.string().min(1),

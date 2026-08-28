@@ -10,18 +10,18 @@ import {
 
 /** A tenant's assignment to a plan for a period of time. */
 export const assignmentSchema = z.object({
-  uniqueId: assignmentIdSchema,
-  plan: planIdSchema,
+  assignmentId: assignmentIdSchema,
+  planId: planIdSchema,
   /** Set when the assignment came from an experiment treatment. */
-  experiment: experimentIdSchema.nullable(),
-  cycle: cycleIdSchema,
-  start: epochMs,
-  end: epochMs.nullable(),
+  experimentId: experimentIdSchema.nullable(),
+  cycleId: cycleIdSchema,
+  startsAt: epochMs,
+  endsAt: epochMs.nullable(),
   addOns: z.array(
     z.object({
-      start: epochMs,
-      end: epochMs.nullable(),
-      addOn: addOnIdSchema,
+      startsAt: epochMs,
+      endsAt: epochMs.nullable(),
+      addOnId: addOnIdSchema,
     }),
   ),
 });
