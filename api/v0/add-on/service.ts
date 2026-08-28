@@ -1,47 +1,57 @@
 /**
- * v0/add-on/service.ts -- add-on business logic. Prices accept existing
- * cycle/value ids or inline definitions. Immutable, so deletes deprecate.
+ * v0/add-on/service.ts -- add-on business logic. Prices reference existing
+ * cycles by id and own their values (defined inline at creation, deprecated
+ * with the add-on). Immutable, so deletes deprecate.
  */
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../../db/index.ts";
-import { addOnFeatures, addOnPrices, addOns } from "../../db/schema.ts";
+import { addOnFeatures, addOnPrices, addOns, values } from "../../db/schema.ts";
 import type { AddOn } from "../../schemas/add-on.ts";
-import { resolveCycleRef } from "../cycle/service.ts";
-import { resolveValueRef } from "../value/service.ts";
 import type { AddOnCreateBody } from "./routes.ts";
 
 export async function getAddOn({
-  uniqueId,
+  addOnId,
 }: {
-  uniqueId: string;
+  addOnId: string;
 }): Promise<AddOn | null> {
   const [row] = await db
     .select()
     .from(addOns)
-    .where(eq(addOns.uniqueId, uniqueId));
+    .where(eq(addOns.addOnId, addOnId));
   if (!row) {
     return null;
   }
   const priceRows = await db
     .select()
     .from(addOnPrices)
-    .where(eq(addOnPrices.addOn, uniqueId));
+    .where(eq(addOnPrices.addOnId, addOnId));
   const featureRows = await db
     .select()
     .from(addOnFeatures)
-    .where(eq(addOnFeatures.addOn, uniqueId));
+    .where(eq(addOnFeatures.addOnId, addOnId));
+  const valueRows = await db
+    .select()
+    .from(values)
+    .where(
+      inArray(
+        values.valueId,
+        priceRows.map((price) => price.valueId),
+      ),
+    );
+  const valueById = new Map(valueRows.map((value) => [value.valueId, value]));
   return {
-    uniqueId: row.uniqueId,
+    addOnId: row.addOnId,
     createdAt: row.createdAt,
     deprecatedAt: row.deprecatedAt,
     name: row.name,
     description: row.description,
-    prices: priceRows.map((price) => ({
-      cycle: price.cycle,
-      value: price.value,
-    })),
+    prices: priceRows.map((price) => {
+      // add_on_prices.value_id FKs values, so the row always exists.
+      const value = valueById.get(price.valueId) as AddOn["prices"][0]["value"];
+      return { cycleId: price.cycleId, value };
+    }),
     features: featureRows.map((feature) => ({
-      feature: feature.feature,
+      featureId: feature.featureId,
       setTo: feature.setTo,
     })),
   };
@@ -50,7 +60,7 @@ export async function getAddOn({
 export async function listAddOns(): Promise<AddOn[]> {
   const rows = await db.select().from(addOns);
   const found = await Promise.all(
-    rows.map((row) => getAddOn({ uniqueId: row.uniqueId })),
+    rows.map((row) => getAddOn({ addOnId: row.addOnId })),
   );
   return found.filter((addOn) => addOn !== null);
 }
@@ -63,7 +73,7 @@ export async function createAddOn({
   await db
     .insert(addOns)
     .values({
-      uniqueId: addOn.uniqueId,
+      addOnId: addOn.addOnId,
       createdAt: addOn.createdAt,
       deprecatedAt: addOn.deprecatedAt,
       name: addOn.name,
@@ -71,12 +81,13 @@ export async function createAddOn({
     })
     .onConflictDoNothing();
   for (const price of addOn.prices) {
+    await db.insert(values).values(price.value).onConflictDoNothing();
     await db
       .insert(addOnPrices)
       .values({
-        addOn: addOn.uniqueId,
-        cycle: await resolveCycleRef(price.cycle),
-        value: await resolveValueRef(price.value),
+        addOnId: addOn.addOnId,
+        cycleId: price.cycleId,
+        valueId: price.value.valueId,
       })
       .onConflictDoNothing();
   }
@@ -84,28 +95,46 @@ export async function createAddOn({
     .insert(addOnFeatures)
     .values(
       addOn.features.map((feature) => ({
-        addOn: addOn.uniqueId,
-        feature: feature.feature,
+        addOnId: addOn.addOnId,
+        featureId: feature.featureId,
         setTo: feature.setTo,
       })),
     )
     .onConflictDoNothing();
-  return getAddOn({ uniqueId: addOn.uniqueId });
+  return getAddOn({ addOnId: addOn.addOnId });
 }
 
-/** Deprecate the add-on, or return null if no such add-on exists. */
+/**
+ * Deprecate the add-on and the values its prices own, or return null if no
+ * such add-on exists. Cycles are shared and outlive the add-on, so they're
+ * left alone.
+ */
 export async function deprecateAddOn({
-  uniqueId,
+  addOnId,
 }: {
-  uniqueId: string;
+  addOnId: string;
 }): Promise<AddOn | null> {
+  const deprecatedAt = Date.now();
   const updated = await db
     .update(addOns)
-    .set({ deprecatedAt: Date.now() })
-    .where(eq(addOns.uniqueId, uniqueId))
+    .set({ deprecatedAt })
+    .where(eq(addOns.addOnId, addOnId))
     .returning();
   if (updated.length === 0) {
     return null;
   }
-  return getAddOn({ uniqueId });
+  const priceRows = await db
+    .select({ valueId: addOnPrices.valueId })
+    .from(addOnPrices)
+    .where(eq(addOnPrices.addOnId, addOnId));
+  await db
+    .update(values)
+    .set({ deprecatedAt })
+    .where(
+      inArray(
+        values.valueId,
+        priceRows.map((price) => price.valueId),
+      ),
+    );
+  return getAddOn({ addOnId });
 }
