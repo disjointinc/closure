@@ -43,6 +43,20 @@
       "when": 1787660048337,
       "tag": "0005_rename_coupons_deleted_at",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787789210382,
+      "tag": "0006_rename_ids_and_fk_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787791266634,
+      "tag": "0007_rename_ids_to_entity_ids",
+      "breakpoints": true
     }
   ]
 }

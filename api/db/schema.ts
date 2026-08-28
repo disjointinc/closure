@@ -42,13 +42,10 @@ import type { PaymentMethod } from "../schemas/payment-method.ts";
 import type { PlanMeter } from "../schemas/plan.ts";
 
 /** Check constraint enforcing "<prefix>_<suffix of [a-z0-9]>" id format. */
-function idFormatCheck(prefix: IdPrefix, columns: { uniqueId: SQLWrapper }) {
+function idFormatCheck(prefix: IdPrefix, id: SQLWrapper) {
   // Inlined as a literal: check constraints can't take parameters.
   const pattern = `'^${prefix}_[a-z0-9]{${idSuffixLengths[prefix]}}$'`;
-  return check(
-    `${prefix}_id_format`,
-    sql`${columns.uniqueId} ~ ${sql.raw(pattern)}`,
-  );
+  return check(`${prefix}_id_format`, sql`${id} ~ ${sql.raw(pattern)}`);
 }
 
 /** Milliseconds since the unix epoch, as stored in the db. */
@@ -118,13 +115,13 @@ function chargingCheck(table: string) {
 export const teamMembers = pgTable(
   "team_members",
   {
-    uniqueId: text("unique_id").primaryKey(),
-    emailAddress: text("email_address").notNull().unique(),
+    teamMemberId: text("team_member_id").primaryKey(),
+    email: text("email").notNull().unique(),
     deletedAt: epochMs("deleted_at"),
     name: text("name"),
-    profilePictureLink: text("profile_picture_link"),
+    profilePictureUrl: text("profile_picture_url"),
   },
-  (t) => [idFormatCheck("team_member", t)],
+  (t) => [idFormatCheck("team_member", t.teamMemberId)],
 );
 
 // ---------------------------------------------------------------------------
@@ -134,165 +131,165 @@ export const teamMembers = pgTable(
 export const values = pgTable(
   "values",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    valueId: text("value_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     name: text("name").notNull(),
     description: text("description"),
     amounts: jsonb("amounts").$type<CurrencyAmount[]>().notNull(),
   },
-  (t) => [idFormatCheck("value", t)],
+  (t) => [idFormatCheck("value", t.valueId)],
 );
 
 export const cycles = pgTable(
   "cycles",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    cycleId: text("cycle_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     name: text("name").notNull(),
     description: text("description"),
     ...chargingColumns,
   },
-  (t) => [idFormatCheck("cycle", t), chargingCheck("cycles")],
+  (t) => [idFormatCheck("cycle", t.cycleId), chargingCheck("cycles")],
 );
 
 export const taxTypes = pgTable(
   "tax_types",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    taxTypeId: text("tax_type_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     name: text("name").notNull(),
     description: text("description"),
   },
-  (t) => [idFormatCheck("tax_type", t)],
+  (t) => [idFormatCheck("tax_type", t.taxTypeId)],
 );
 
 export const taxes = pgTable(
   "taxes",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    taxId: text("tax_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
-    taxType: text("tax_type")
+    taxTypeId: text("tax_type_id")
       .notNull()
-      .references(() => taxTypes.uniqueId),
+      .references(() => taxTypes.taxTypeId),
     name: text("name").notNull(),
     description: text("description"),
   },
-  (t) => [idFormatCheck("tax", t)],
+  (t) => [idFormatCheck("tax", t.taxId)],
 );
 
 export const features = pgTable(
   "features",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    featureId: text("feature_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     name: text("name").notNull(),
     description: text("description"),
   },
-  (t) => [idFormatCheck("feature", t)],
+  (t) => [idFormatCheck("feature", t.featureId)],
 );
 
 export const featureOptions = pgTable(
   "feature_options",
   {
-    uniqueId: text("unique_id").primaryKey(),
-    feature: text("feature")
+    featureOptionId: text("feature_option_id").primaryKey(),
+    featureId: text("feature_id")
       .notNull()
-      .references(() => features.uniqueId),
+      .references(() => features.featureId),
     name: text("name").notNull(),
     description: text("description"),
   },
-  (t) => [idFormatCheck("feature_option", t)],
+  (t) => [idFormatCheck("feature_option", t.featureOptionId)],
 );
 
-/** feature.applicable_tax_types, relational so the FK is enforced. */
+/** feature.applicable_tax_type_ids, relational so the FK is enforced. */
 export const featureTaxTypes = pgTable(
   "feature_tax_types",
   {
-    feature: text("feature")
+    featureId: text("feature_id")
       .notNull()
-      .references(() => features.uniqueId),
-    taxType: text("tax_type")
+      .references(() => features.featureId),
+    taxTypeId: text("tax_type_id")
       .notNull()
-      .references(() => taxTypes.uniqueId),
+      .references(() => taxTypes.taxTypeId),
   },
-  (t) => [primaryKey({ columns: [t.feature, t.taxType] })],
+  (t) => [primaryKey({ columns: [t.featureId, t.taxTypeId] })],
 );
 
 export const meters = pgTable(
   "meters",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    meterId: text("meter_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     name: text("name").notNull(),
     description: text("description"),
   },
-  (t) => [idFormatCheck("meter", t)],
+  (t) => [idFormatCheck("meter", t.meterId)],
 );
 
-/** meter.applicable_tax_types, relational so the FK is enforced. */
+/** meter.applicable_tax_type_ids, relational so the FK is enforced. */
 export const meterTaxTypes = pgTable(
   "meter_tax_types",
   {
-    meter: text("meter")
+    meterId: text("meter_id")
       .notNull()
-      .references(() => meters.uniqueId),
-    taxType: text("tax_type")
+      .references(() => meters.meterId),
+    taxTypeId: text("tax_type_id")
       .notNull()
-      .references(() => taxTypes.uniqueId),
+      .references(() => taxTypes.taxTypeId),
   },
-  (t) => [primaryKey({ columns: [t.meter, t.taxType] })],
+  (t) => [primaryKey({ columns: [t.meterId, t.taxTypeId] })],
 );
 
 export const plans = pgTable(
   "plans",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    planId: text("plan_id").primaryKey(),
     /** The plan this version was derived from, if any. */
-    derivedFrom: text("derived_from").references(
-      (): AnyPgColumn => plans.uniqueId,
+    derivedFromPlanId: text("derived_from_plan_id").references(
+      (): AnyPgColumn => plans.planId,
     ),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     name: text("name").notNull(),
     description: text("description"),
   },
-  (t) => [idFormatCheck("plan", t)],
+  (t) => [idFormatCheck("plan", t.planId)],
 );
 
 export const planPrices = pgTable(
   "plan_prices",
   {
-    plan: text("plan")
+    planId: text("plan_id")
       .notNull()
-      .references(() => plans.uniqueId),
-    cycle: text("cycle")
+      .references(() => plans.planId),
+    cycleId: text("cycle_id")
       .notNull()
-      .references(() => cycles.uniqueId),
-    value: text("value")
+      .references(() => cycles.cycleId),
+    valueId: text("value_id")
       .notNull()
-      .references(() => values.uniqueId),
+      .references(() => values.valueId),
   },
-  (t) => [primaryKey({ columns: [t.plan, t.cycle] })],
+  (t) => [primaryKey({ columns: [t.planId, t.cycleId] })],
 );
 
 export const planFeatures = pgTable(
   "plan_features",
   {
-    plan: text("plan")
+    planId: text("plan_id")
       .notNull()
-      .references(() => plans.uniqueId),
-    feature: text("feature")
+      .references(() => plans.planId),
+    featureId: text("feature_id")
       .notNull()
-      .references(() => features.uniqueId),
+      .references(() => features.featureId),
     setTo: featureSetTo("set_to").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.plan, t.feature] })],
+  (t) => [primaryKey({ columns: [t.planId, t.featureId] })],
 );
 
 /** The meter-entry columns shared by plan_meters and meter_overrides. */
@@ -315,16 +312,16 @@ const limitGteDefaultCheck = (table: string) =>
 export const planMeters = pgTable(
   "plan_meters",
   {
-    plan: text("plan")
+    planId: text("plan_id")
       .notNull()
-      .references(() => plans.uniqueId),
-    meter: text("meter")
+      .references(() => plans.planId),
+    meterId: text("meter_id")
       .notNull()
-      .references(() => meters.uniqueId),
+      .references(() => meters.meterId),
     ...planMeterColumns,
   },
   (t) => [
-    primaryKey({ columns: [t.plan, t.meter] }),
+    primaryKey({ columns: [t.planId, t.meterId] }),
     limitGteDefaultCheck("plan_meters"),
     check("plan_meters_default_nonnegative", sql`default_microcredits >= 0`),
     check("plan_meters_limit_positive", sql`limit_microcredits > 0`),
@@ -334,56 +331,56 @@ export const planMeters = pgTable(
 export const planAddOns = pgTable(
   "plan_add_ons",
   {
-    plan: text("plan")
+    planId: text("plan_id")
       .notNull()
-      .references(() => plans.uniqueId),
-    addOn: text("add_on")
+      .references(() => plans.planId),
+    addOnId: text("add_on_id")
       .notNull()
-      .references(() => addOns.uniqueId),
+      .references(() => addOns.addOnId),
   },
-  (t) => [primaryKey({ columns: [t.plan, t.addOn] })],
+  (t) => [primaryKey({ columns: [t.planId, t.addOnId] })],
 );
 
 export const addOns = pgTable(
   "add_ons",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    addOnId: text("add_on_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     name: text("name").notNull(),
     description: text("description"),
   },
-  (t) => [idFormatCheck("add_on", t)],
+  (t) => [idFormatCheck("add_on", t.addOnId)],
 );
 
 export const addOnPrices = pgTable(
   "add_on_prices",
   {
-    addOn: text("add_on")
+    addOnId: text("add_on_id")
       .notNull()
-      .references(() => addOns.uniqueId),
-    cycle: text("cycle")
+      .references(() => addOns.addOnId),
+    cycleId: text("cycle_id")
       .notNull()
-      .references(() => cycles.uniqueId),
-    value: text("value")
+      .references(() => cycles.cycleId),
+    valueId: text("value_id")
       .notNull()
-      .references(() => values.uniqueId),
+      .references(() => values.valueId),
   },
-  (t) => [primaryKey({ columns: [t.addOn, t.cycle] })],
+  (t) => [primaryKey({ columns: [t.addOnId, t.cycleId] })],
 );
 
 export const addOnFeatures = pgTable(
   "add_on_features",
   {
-    addOn: text("add_on")
+    addOnId: text("add_on_id")
       .notNull()
-      .references(() => addOns.uniqueId),
-    feature: text("feature")
+      .references(() => addOns.addOnId),
+    featureId: text("feature_id")
       .notNull()
-      .references(() => features.uniqueId),
+      .references(() => features.featureId),
     setTo: featureSetTo("set_to").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.addOn, t.feature] })],
+  (t) => [primaryKey({ columns: [t.addOnId, t.featureId] })],
 );
 
 /**
@@ -394,7 +391,7 @@ export const addOnFeatures = pgTable(
 export const couponTemplates = pgTable(
   "coupon_templates",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    couponTemplateId: text("coupon_template_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     grantableByTenants: boolean("grantable_by_tenants").notNull(),
@@ -404,15 +401,15 @@ export const couponTemplates = pgTable(
     description: text("description"),
     defaultAward: jsonb("default_award").$type<Award>(),
     /** Only settable when grantable_by_tenants. */
-    reciprocalBenefitCouponTemplate: text(
-      "reciprocal_benefit_coupon_template",
-    ).references((): AnyPgColumn => couponTemplates.uniqueId),
+    reciprocalBenefitCouponTemplateId: text(
+      "reciprocal_benefit_coupon_template_id",
+    ).references((): AnyPgColumn => couponTemplates.couponTemplateId),
   },
   (t) => [
-    idFormatCheck("coupon_template", t),
+    idFormatCheck("coupon_template", t.couponTemplateId),
     check(
       "coupon_templates_grantable_gating",
-      sql`grantable_by_tenants or (limit_per_granting_tenant is null and reciprocal_benefit_coupon_template is null)`,
+      sql`grantable_by_tenants or (limit_per_granting_tenant is null and reciprocal_benefit_coupon_template_id is null)`,
     ),
   ],
 );
@@ -420,27 +417,27 @@ export const couponTemplates = pgTable(
 export const couponTemplateFeaturesGranted = pgTable(
   "coupon_template_features_granted",
   {
-    couponTemplate: text("coupon_template")
+    couponTemplateId: text("coupon_template_id")
       .notNull()
-      .references(() => couponTemplates.uniqueId),
-    feature: text("feature")
+      .references(() => couponTemplates.couponTemplateId),
+    featureId: text("feature_id")
       .notNull()
-      .references(() => features.uniqueId),
-    value: featureSetTo("value").notNull(),
+      .references(() => features.featureId),
+    setTo: featureSetTo("set_to").notNull(),
     award: jsonb("award").$type<Award>().notNull(),
   },
-  (t) => [primaryKey({ columns: [t.couponTemplate, t.feature] })],
+  (t) => [primaryKey({ columns: [t.couponTemplateId, t.featureId] })],
 );
 
 export const couponTemplateCreditsGranted = pgTable(
   "coupon_template_credits_granted",
   {
-    couponTemplate: text("coupon_template")
+    couponTemplateId: text("coupon_template_id")
       .notNull()
-      .references(() => couponTemplates.uniqueId),
-    meter: text("meter")
+      .references(() => couponTemplates.couponTemplateId),
+    meterId: text("meter_id")
       .notNull()
-      .references(() => meters.uniqueId),
+      .references(() => meters.meterId),
     amountMicrocredits: microcredits("amount_microcredits").notNull(),
     /** Null means the credits never expire. */
     expiration: resetSchedule("expiration"),
@@ -449,7 +446,7 @@ export const couponTemplateCreditsGranted = pgTable(
     award: jsonb("award").$type<Award>().notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.couponTemplate, t.meter] }),
+    primaryKey({ columns: [t.couponTemplateId, t.meterId] }),
     check(
       "coupon_template_credits_amount_positive",
       sql`amount_microcredits > 0`,
@@ -460,12 +457,14 @@ export const couponTemplateCreditsGranted = pgTable(
 export const coupons = pgTable(
   "coupons",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    couponId: text("coupon_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     /** Coupons are consumables, so they're deleted, not deprecated. */
     deletedAt: epochMs("deleted_at"),
     /** The template this coupon's definition was copied from, if any. */
-    template: text("template").references(() => couponTemplates.uniqueId),
+    templateId: text("template_id").references(
+      () => couponTemplates.couponTemplateId,
+    ),
     grantableByTenants: boolean("grantable_by_tenants").notNull(),
     /** Only settable when grantable_by_tenants. Null means no limit. */
     limitPerGrantingTenant: integer("limit_per_granting_tenant"),
@@ -473,15 +472,15 @@ export const coupons = pgTable(
     description: text("description"),
     defaultAward: jsonb("default_award").$type<Award>(),
     /** Only settable when grantable_by_tenants. */
-    reciprocalBenefitCoupon: text("reciprocal_benefit_coupon").references(
-      (): AnyPgColumn => coupons.uniqueId,
+    reciprocalBenefitCouponId: text("reciprocal_benefit_coupon_id").references(
+      (): AnyPgColumn => coupons.couponId,
     ),
   },
   (t) => [
-    idFormatCheck("coupon", t),
+    idFormatCheck("coupon", t.couponId),
     check(
       "coupons_grantable_gating",
-      sql`grantable_by_tenants or (limit_per_granting_tenant is null and reciprocal_benefit_coupon is null)`,
+      sql`grantable_by_tenants or (limit_per_granting_tenant is null and reciprocal_benefit_coupon_id is null)`,
     ),
   ],
 );
@@ -489,27 +488,27 @@ export const coupons = pgTable(
 export const couponFeaturesGranted = pgTable(
   "coupon_features_granted",
   {
-    coupon: text("coupon")
+    couponId: text("coupon_id")
       .notNull()
-      .references(() => coupons.uniqueId),
-    feature: text("feature")
+      .references(() => coupons.couponId),
+    featureId: text("feature_id")
       .notNull()
-      .references(() => features.uniqueId),
-    value: featureSetTo("value").notNull(),
+      .references(() => features.featureId),
+    setTo: featureSetTo("set_to").notNull(),
     award: jsonb("award").$type<Award>().notNull(),
   },
-  (t) => [primaryKey({ columns: [t.coupon, t.feature] })],
+  (t) => [primaryKey({ columns: [t.couponId, t.featureId] })],
 );
 
 export const couponCreditsGranted = pgTable(
   "coupon_credits_granted",
   {
-    coupon: text("coupon")
+    couponId: text("coupon_id")
       .notNull()
-      .references(() => coupons.uniqueId),
-    meter: text("meter")
+      .references(() => coupons.couponId),
+    meterId: text("meter_id")
       .notNull()
-      .references(() => meters.uniqueId),
+      .references(() => meters.meterId),
     amountMicrocredits: microcredits("amount_microcredits").notNull(),
     /** Null means the credits never expire. */
     expiration: resetSchedule("expiration"),
@@ -518,7 +517,7 @@ export const couponCreditsGranted = pgTable(
     award: jsonb("award").$type<Award>().notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.coupon, t.meter] }),
+    primaryKey({ columns: [t.couponId, t.meterId] }),
     check("coupon_credits_amount_positive", sql`amount_microcredits > 0`),
   ],
 );
@@ -526,31 +525,29 @@ export const couponCreditsGranted = pgTable(
 export const experiments = pgTable(
   "experiments",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    experimentId: text("experiment_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     concludedAt: epochMs("concluded_at"),
-    planAssignmentAtConclusion: text(
-      "plan_assignment_at_conclusion",
-    ).references(() => plans.uniqueId),
+    concludingPlanId: text("concluding_plan_id").references(() => plans.planId),
     name: text("name").notNull(),
     description: text("description"),
   },
-  (t) => [idFormatCheck("experiment", t)],
+  (t) => [idFormatCheck("experiment", t.experimentId)],
 );
 
 export const experimentTreatments = pgTable(
   "experiment_treatments",
   {
-    experiment: text("experiment")
+    experimentId: text("experiment_id")
       .notNull()
-      .references(() => experiments.uniqueId),
-    plan: text("plan")
+      .references(() => experiments.experimentId),
+    planId: text("plan_id")
       .notNull()
-      .references(() => plans.uniqueId),
+      .references(() => plans.planId),
     tenantPercentage: doublePrecision("tenant_percentage").notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.experiment, t.plan] }),
+    primaryKey({ columns: [t.experimentId, t.planId] }),
     check(
       "experiment_treatments_percentage_range",
       sql`tenant_percentage >= 0 and tenant_percentage <= 100`,
@@ -559,28 +556,29 @@ export const experimentTreatments = pgTable(
 );
 
 /**
- * Treatment-level tenant assignments (treatment.assigned_tenants), relational
- * so the FK is enforced and "which treatment is this tenant in" stays fast.
+ * Treatment-level tenant assignments (treatment.assigned_tenant_ids),
+ * relational so the FK is enforced and "which treatment is this tenant in"
+ * stays fast.
  */
 export const experimentTreatmentTenants = pgTable(
   "experiment_treatment_tenants",
   {
-    experiment: text("experiment").notNull(),
-    plan: text("plan").notNull(),
-    tenant: text("tenant")
+    experimentId: text("experiment_id").notNull(),
+    planId: text("plan_id").notNull(),
+    tenantId: text("tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
+      .references(() => tenants.tenantId),
   },
   (t) => [
-    primaryKey({ columns: [t.experiment, t.tenant] }),
+    primaryKey({ columns: [t.experimentId, t.tenantId] }),
     foreignKey({
-      columns: [t.experiment, t.plan],
+      columns: [t.experimentId, t.planId],
       foreignColumns: [
-        experimentTreatments.experiment,
-        experimentTreatments.plan,
+        experimentTreatments.experimentId,
+        experimentTreatments.planId,
       ],
     }),
-    index("experiment_treatment_tenants_tenant").on(t.tenant),
+    index("experiment_treatment_tenants_tenant").on(t.tenantId),
   ],
 );
 
@@ -591,90 +589,92 @@ export const experimentTreatmentTenants = pgTable(
 export const tenants = pgTable(
   "tenants",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    tenantId: text("tenant_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     deletedAt: epochMs("deleted_at"),
     externalIds: jsonb("external_ids")
       .$type<Record<string, string>>()
       .notNull(),
   },
-  (t) => [idFormatCheck("tenant", t)],
+  (t) => [idFormatCheck("tenant", t.tenantId)],
 );
 
 export const assignments = pgTable(
   "assignments",
   {
-    uniqueId: text("unique_id").primaryKey(),
-    tenant: text("tenant")
+    assignmentId: text("assignment_id").primaryKey(),
+    tenantId: text("tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
-    plan: text("plan")
+      .references(() => tenants.tenantId),
+    planId: text("plan_id")
       .notNull()
-      .references(() => plans.uniqueId),
+      .references(() => plans.planId),
     /** Set when the assignment came from an experiment treatment. */
-    experiment: text("experiment").references(() => experiments.uniqueId),
-    cycle: text("cycle")
+    experimentId: text("experiment_id").references(
+      () => experiments.experimentId,
+    ),
+    cycleId: text("cycle_id")
       .notNull()
-      .references(() => cycles.uniqueId),
-    start: epochMs("start").notNull(),
-    end: epochMs("end"),
+      .references(() => cycles.cycleId),
+    startsAt: epochMs("starts_at").notNull(),
+    endsAt: epochMs("ends_at"),
   },
   (t) => [
-    idFormatCheck("assignment", t),
-    index("assignments_tenant").on(t.tenant),
+    idFormatCheck("assignment", t.assignmentId),
+    index("assignments_tenant").on(t.tenantId),
   ],
 );
 
 export const assignmentAddOns = pgTable(
   "assignment_add_ons",
   {
-    assignment: text("assignment")
+    assignmentId: text("assignment_id")
       .notNull()
-      .references(() => assignments.uniqueId),
-    addOn: text("add_on")
+      .references(() => assignments.assignmentId),
+    addOnId: text("add_on_id")
       .notNull()
-      .references(() => addOns.uniqueId),
-    start: epochMs("start").notNull(),
-    end: epochMs("end"),
+      .references(() => addOns.addOnId),
+    startsAt: epochMs("starts_at").notNull(),
+    endsAt: epochMs("ends_at"),
   },
-  (t) => [primaryKey({ columns: [t.assignment, t.addOn, t.start] })],
+  (t) => [primaryKey({ columns: [t.assignmentId, t.addOnId, t.startsAt] })],
 );
 
 export const invoices = pgTable(
   "invoices",
   {
-    uniqueId: text("unique_id").primaryKey(),
-    tenant: text("tenant")
+    invoiceId: text("invoice_id").primaryKey(),
+    tenantId: text("tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
+      .references(() => tenants.tenantId),
     createdAt: epochMs("created_at").notNull(),
     closedAt: epochMs("closed_at"),
     closedReason: text("closed_reason"),
     ...chargingColumns,
   },
   (t) => [
-    idFormatCheck("invoice", t),
+    idFormatCheck("invoice", t.invoiceId),
     chargingCheck("invoices"),
-    index("invoices_tenant").on(t.tenant),
+    index("invoices_tenant").on(t.tenantId),
   ],
 );
 
 export const items = pgTable(
   "items",
   {
-    uniqueId: text("unique_id").primaryKey(),
-    invoice: text("invoice")
+    itemId: text("item_id").primaryKey(),
+    invoiceId: text("invoice_id")
       .notNull()
-      .references(() => invoices.uniqueId),
-    perUnitValue: text("per_unit_value")
+      .references(() => invoices.invoiceId),
+    perUnitValueId: text("per_unit_value_id")
       .notNull()
-      .references(() => values.uniqueId),
+      .references(() => values.valueId),
     units: doublePrecision("units").notNull(),
     name: text("name").notNull(),
     description: text("description"),
   },
   (t) => [
-    idFormatCheck("item", t),
+    idFormatCheck("item", t.itemId),
     check("items_units_nonnegative", sql`units >= 0`),
   ],
 );
@@ -682,40 +682,40 @@ export const items = pgTable(
 export const taxationAmounts = pgTable(
   "taxation_amounts",
   {
-    uniqueId: text("unique_id").primaryKey(),
-    invoice: text("invoice")
+    taxationAmountId: text("taxation_amount_id").primaryKey(),
+    invoiceId: text("invoice_id")
       .notNull()
-      .references(() => invoices.uniqueId),
-    tax: text("tax")
+      .references(() => invoices.invoiceId),
+    taxId: text("tax_id")
       .notNull()
-      .references(() => taxes.uniqueId),
-    notes: text("notes"),
+      .references(() => taxes.taxId),
+    description: text("description"),
     amount: jsonb("amount").$type<CurrencyAmount>().notNull(),
   },
-  (t) => [idFormatCheck("taxation_amount", t)],
+  (t) => [idFormatCheck("taxation_amount", t.taxationAmountId)],
 );
 
-/** taxation_amount.applies_to_items, relational so the FK is enforced. */
+/** taxation_amount.applies_to_item_ids, relational so the FK is enforced. */
 export const taxationAmountItems = pgTable(
   "taxation_amount_items",
   {
-    taxationAmount: text("taxation_amount")
+    taxationAmountId: text("taxation_amount_id")
       .notNull()
-      .references(() => taxationAmounts.uniqueId),
-    item: text("item")
+      .references(() => taxationAmounts.taxationAmountId),
+    itemId: text("item_id")
       .notNull()
-      .references(() => items.uniqueId),
+      .references(() => items.itemId),
   },
-  (t) => [primaryKey({ columns: [t.taxationAmount, t.item] })],
+  (t) => [primaryKey({ columns: [t.taxationAmountId, t.itemId] })],
 );
 
 export const paymentMethods = pgTable(
   "payment_methods",
   {
-    uniqueId: text("unique_id").primaryKey(),
-    tenant: text("tenant")
+    paymentMethodId: text("payment_method_id").primaryKey(),
+    tenantId: text("tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
+      .references(() => tenants.tenantId),
     createdAt: epochMs("created_at").notNull(),
     deletedAt: epochMs("deleted_at"),
     isDefault: boolean("is_default").notNull(),
@@ -725,10 +725,10 @@ export const paymentMethods = pgTable(
       .notNull(),
   },
   (t) => [
-    idFormatCheck("payment_method", t),
+    idFormatCheck("payment_method", t.paymentMethodId),
     // At most one active default payment method per tenant.
     uniqueIndex("payment_methods_one_default")
-      .on(t.tenant)
+      .on(t.tenantId)
       .where(sql`${t.isDefault} and ${t.deletedAt} is null`),
   ],
 );
@@ -736,10 +736,10 @@ export const paymentMethods = pgTable(
 export const payments = pgTable(
   "payments",
   {
-    uniqueId: text("unique_id").primaryKey(),
-    tenant: text("tenant")
+    paymentId: text("payment_id").primaryKey(),
+    tenantId: text("tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
+      .references(() => tenants.tenantId),
     createdAt: epochMs("created_at").notNull(),
     startedProcessingAt: epochMs("started_processing_at"),
     succeededAt: epochMs("succeeded_at"),
@@ -748,83 +748,86 @@ export const payments = pgTable(
       .$type<Payment["providerInternals"]>()
       .notNull(),
   },
-  (t) => [idFormatCheck("payment", t), index("payments_tenant").on(t.tenant)],
+  (t) => [
+    idFormatCheck("payment", t.paymentId),
+    index("payments_tenant").on(t.tenantId),
+  ],
 );
 
 export const paymentInvoices = pgTable(
   "payment_invoices",
   {
-    payment: text("payment")
+    paymentId: text("payment_id")
       .notNull()
-      .references(() => payments.uniqueId),
-    invoice: text("invoice")
+      .references(() => payments.paymentId),
+    invoiceId: text("invoice_id")
       .notNull()
-      .references(() => invoices.uniqueId),
+      .references(() => invoices.invoiceId),
   },
-  (t) => [primaryKey({ columns: [t.payment, t.invoice] })],
+  (t) => [primaryKey({ columns: [t.paymentId, t.invoiceId] })],
 );
 
 export const refunds = pgTable(
   "refunds",
   {
-    uniqueId: text("unique_id").primaryKey(),
-    tenant: text("tenant")
+    refundId: text("refund_id").primaryKey(),
+    tenantId: text("tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
+      .references(() => tenants.tenantId),
     createdAt: epochMs("created_at").notNull(),
     startedProcessingAt: epochMs("started_processing_at"),
     succeededAt: epochMs("succeeded_at"),
     failedAt: epochMs("failed_at"),
-    byTeamMember: text("by_team_member")
+    byTeamMemberId: text("by_team_member_id")
       .notNull()
-      .references(() => teamMembers.uniqueId),
-    value: text("value")
+      .references(() => teamMembers.teamMemberId),
+    valueId: text("value_id")
       .notNull()
-      .references(() => values.uniqueId),
+      .references(() => values.valueId),
     reason: text("reason"),
   },
-  (t) => [idFormatCheck("refund", t)],
+  (t) => [idFormatCheck("refund", t.refundId)],
 );
 
 export const featureOverrides = pgTable(
   "feature_overrides",
   {
-    uniqueId: text("unique_id").primaryKey(),
-    tenant: text("tenant")
+    featureOverrideId: text("feature_override_id").primaryKey(),
+    tenantId: text("tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
-    feature: text("feature")
+      .references(() => tenants.tenantId),
+    featureId: text("feature_id")
       .notNull()
-      .references(() => features.uniqueId),
+      .references(() => features.featureId),
     setTo: featureSetTo("set_to").notNull(),
-    on: epochMs("on").notNull(),
-    byTeamMember: text("by_team_member")
+    createdAt: epochMs("created_at").notNull(),
+    byTeamMemberId: text("by_team_member_id")
       .notNull()
-      .references(() => teamMembers.uniqueId),
+      .references(() => teamMembers.teamMemberId),
     reason: text("reason"),
   },
-  (t) => [idFormatCheck("feature_override", t)],
+  (t) => [idFormatCheck("feature_override", t.featureOverrideId)],
 );
 
 export const meterOverrides = pgTable(
   "meter_overrides",
   {
-    uniqueId: text("unique_id").primaryKey(),
-    tenant: text("tenant")
+    meterOverrideId: text("meter_override_id").primaryKey(),
+    tenantId: text("tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
-    meter: text("meter")
+      .references(() => tenants.tenantId),
+    meterId: text("meter_id")
       .notNull()
-      .references(() => meters.uniqueId),
+      .references(() => meters.meterId),
     ...planMeterColumns,
-    on: epochMs("on").notNull(),
-    byTeamMember: text("by_team_member")
+    createdAt: epochMs("created_at").notNull(),
+    byTeamMemberId: text("by_team_member_id")
       .notNull()
-      .references(() => teamMembers.uniqueId),
+      .references(() => teamMembers.teamMemberId),
     reason: text("reason"),
   },
   (t) => [
-    idFormatCheck("meter_override", t),
+    idFormatCheck("meter_override", t.meterOverrideId),
     limitGteDefaultCheck("meter_overrides"),
     check(
       "meter_overrides_default_nonnegative",
@@ -837,30 +840,31 @@ export const meterOverrides = pgTable(
 export const creditGrants = pgTable(
   "credit_grants",
   {
-    uniqueId: text("unique_id").primaryKey(),
-    tenant: text("tenant")
+    creditGrantId: text("credit_grant_id").primaryKey(),
+    tenantId: text("tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
-    meter: text("meter")
+      .references(() => tenants.tenantId),
+    meterId: text("meter_id")
       .notNull()
-      .references(() => meters.uniqueId),
-    on: epochMs("on").notNull(),
-    byTeamMember: text("by_team_member")
+      .references(() => meters.meterId),
+    grantedAt: epochMs("granted_at").notNull(),
+    byTeamMemberId: text("by_team_member_id")
       .notNull()
-      .references(() => teamMembers.uniqueId),
+      .references(() => teamMembers.teamMemberId),
     reason: text("reason"),
     amountMicrocredits: microcredits("amount_microcredits").notNull(),
     /**
      * When the grant was applied to the Redis balance, in MICROseconds on
-     * the Redis server's clock (see meter_events.received_at). NULL means
-     * "never applied" -- the reconciler applies such grants (idempotently).
-     * Stamped at most once (UPDATE ... WHERE applied_at IS NULL) so replay
-     * never double-counts a grant already folded into a checkpoint.
+     * the Redis server's clock (see meter_events.received_at_micros). NULL
+     * means "never applied" -- the reconciler applies such grants
+     * (idempotently). Stamped at most once (UPDATE ... WHERE applied_at_micros
+     * IS NULL) so replay never double-counts a grant already folded into a
+     * checkpoint.
      */
-    appliedAt: bigint("applied_at", { mode: "number" }),
+    appliedAtMicros: bigint("applied_at_micros", { mode: "number" }),
   },
   (t) => [
-    idFormatCheck("credit_grant", t),
+    idFormatCheck("credit_grant", t.creditGrantId),
     check("credit_grants_amount_positive", sql`amount_microcredits > 0`),
   ],
 );
@@ -868,53 +872,55 @@ export const creditGrants = pgTable(
 export const couponGrants = pgTable(
   "coupon_grants",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    couponGrantId: text("coupon_grant_id").primaryKey(),
     /** The tenant doing the granting. */
-    tenant: text("tenant")
+    fromTenantId: text("from_tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
-    coupon: text("coupon")
+      .references(() => tenants.tenantId),
+    couponId: text("coupon_id")
       .notNull()
-      .references(() => coupons.uniqueId),
-    on: epochMs("on").notNull(),
-    toTenant: text("to_tenant")
+      .references(() => coupons.couponId),
+    grantedAt: epochMs("granted_at").notNull(),
+    toTenantId: text("to_tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
+      .references(() => tenants.tenantId),
     usedAt: epochMs("used_at"),
     reason: text("reason"),
   },
-  (t) => [idFormatCheck("coupon_grant", t)],
+  (t) => [idFormatCheck("coupon_grant", t.couponGrantId)],
 );
 
 export const couponReceipts = pgTable(
   "coupon_receipts",
   {
-    uniqueId: text("unique_id").primaryKey(),
+    couponReceiptId: text("coupon_receipt_id").primaryKey(),
     /** The tenant that received the coupon. */
-    tenant: text("tenant")
+    tenantId: text("tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
-    coupon: text("coupon")
+      .references(() => tenants.tenantId),
+    couponId: text("coupon_id")
       .notNull()
-      .references(() => coupons.uniqueId),
-    on: epochMs("on").notNull(),
+      .references(() => coupons.couponId),
+    receivedAt: epochMs("received_at").notNull(),
     usedAt: epochMs("used_at"),
     reason: text("reason"),
     grantorType: grantorTypeEnum("grantor_type").notNull(),
     /** Exactly one of these is set, per grantor_type (see check). */
-    byTeamMember: text("by_team_member").references(() => teamMembers.uniqueId),
-    byTenant: text("by_tenant").references(() => tenants.uniqueId),
-    byCouponGrant: text("by_coupon_grant").references(
-      () => couponGrants.uniqueId,
+    byTeamMemberId: text("by_team_member_id").references(
+      () => teamMembers.teamMemberId,
+    ),
+    byTenantId: text("by_tenant_id").references(() => tenants.tenantId),
+    byCouponGrantId: text("by_coupon_grant_id").references(
+      () => couponGrants.couponGrantId,
     ),
   },
   (t) => [
-    idFormatCheck("coupon_receipt", t),
+    idFormatCheck("coupon_receipt", t.couponReceiptId),
     check(
       "coupon_receipts_grantor_variant",
-      sql`(grantor_type = 'team_member' and by_team_member is not null and by_tenant is null and by_coupon_grant is null)
-       or (grantor_type = 'tenant' and by_team_member is null and by_tenant is not null and by_coupon_grant is null)
-       or (grantor_type = 'reciprocal' and by_team_member is null and by_tenant is null and by_coupon_grant is not null)`,
+      sql`(grantor_type = 'team_member' and by_team_member_id is not null and by_tenant_id is null and by_coupon_grant_id is null)
+       or (grantor_type = 'tenant' and by_team_member_id is null and by_tenant_id is not null and by_coupon_grant_id is null)
+       or (grantor_type = 'reciprocal' and by_team_member_id is null and by_tenant_id is null and by_coupon_grant_id is not null)`,
     ),
   ],
 );
@@ -926,40 +932,40 @@ export const couponReceipts = pgTable(
 export const meterEvents = pgTable(
   "meter_events",
   {
-    uniqueId: text("unique_id").primaryKey(),
-    /** The caller's idempotency key; defaults to unique_id at ingest. */
-    uniqueExternalId: text("unique_external_id").notNull(),
+    meterEventId: text("meter_event_id").primaryKey(),
+    /** The caller's idempotency key; defaults to id at ingest. */
+    externalId: text("external_id").notNull(),
     createdAt: epochMs("created_at").notNull(),
     /**
      * When the Redis ingest script applied the decrement, in MICROseconds
      * since the epoch on the Redis server's clock -- the same clock
      * meter_balances.updated_at uses, so rebuild replay
-     * (received_at > updated_at) orders events against checkpoints exactly.
-     * Null for events flushed before this column existed; those are already
-     * folded into checkpoints and excluded from replay.
+     * (received_at_micros > updated_at) orders events against checkpoints
+     * exactly. Null for events flushed before this column existed; those are
+     * already folded into checkpoints and excluded from replay.
      */
-    receivedAt: bigint("received_at", { mode: "number" }),
-    meter: text("meter")
+    receivedAtMicros: bigint("received_at_micros", { mode: "number" }),
+    meterId: text("meter_id")
       .notNull()
-      .references(() => meters.uniqueId),
-    tenant: text("tenant")
+      .references(() => meters.meterId),
+    tenantId: text("tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
+      .references(() => tenants.tenantId),
     amountMicrocredits: microcredits("amount_microcredits").notNull(),
     status: meterEventStatusEnum("status").notNull(),
   },
   (t) => [
-    idFormatCheck("meter_event", t),
+    idFormatCheck("meter_event", t.meterEventId),
     check("meter_events_amount_nonzero", sql`amount_microcredits != 0`),
     // Idempotency backstop: the Redis dedupe window is finite, this is not.
     uniqueIndex("meter_events_idempotency").on(
-      t.tenant,
-      t.meter,
-      t.uniqueExternalId,
+      t.tenantId,
+      t.meterId,
+      t.externalId,
     ),
     index("meter_events_tenant_meter_created").on(
-      t.tenant,
-      t.meter,
+      t.tenantId,
+      t.meterId,
       t.createdAt,
     ),
   ],
@@ -973,17 +979,17 @@ export const meterEvents = pgTable(
 export const meterBalances = pgTable(
   "meter_balances",
   {
-    tenant: text("tenant")
+    tenantId: text("tenant_id")
       .notNull()
-      .references(() => tenants.uniqueId),
-    meter: text("meter")
+      .references(() => tenants.tenantId),
+    meterId: text("meter_id")
       .notNull()
-      .references(() => meters.uniqueId),
+      .references(() => meters.meterId),
     balanceMicrocredits: microcredits("balance_microcredits").notNull(),
     updatedAt: epochMs("updated_at").notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.tenant, t.meter] }),
+    primaryKey({ columns: [t.tenantId, t.meterId] }),
     check("meter_balances_nonnegative", sql`balance_microcredits >= 0`),
   ],
 );
@@ -997,15 +1003,17 @@ export const meterBalances = pgTable(
  * row lands here may be that its tenant/meter reference is invalid.
  */
 export const meterEventsDlq = pgTable("meter_events_dlq", {
-  id: bigint("id", { mode: "number" }).generatedAlwaysAsIdentity().primaryKey(),
+  meterEventDlqId: bigint("meter_event_dlq_id", { mode: "number" })
+    .generatedAlwaysAsIdentity()
+    .primaryKey(),
   /** The raw payload JSON from the pending stream, unmodified. */
   payload: text("payload").notNull(),
   /** Columns below are extracted when the payload parses; null otherwise. */
   status: meterEventStatusEnum("status"),
-  tenant: text("tenant"),
-  meter: text("meter"),
+  tenantId: text("tenant_id"),
+  meterId: text("meter_id"),
   amountMicrocredits: microcredits("amount_microcredits"),
-  receivedAt: bigint("received_at", { mode: "number" }),
+  receivedAtMicros: bigint("received_at_micros", { mode: "number" }),
   /** Why the flush gave up (pg error code + message). */
   error: text("error").notNull(),
   failedAt: epochMs("failed_at").notNull(),
