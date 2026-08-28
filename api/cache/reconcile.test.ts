@@ -4,7 +4,7 @@
  * the negative-expectation guard.
  *
  * Shares the scratch Postgres + throwaway Redis with metering.test.ts; see
- * test_helpers.ts for setup requirements. Files run sequentially
+ * test-helpers.ts for setup requirements. Files run sequentially
  * (api/vitest.config.ts).
  */
 import { and, eq } from "drizzle-orm";
@@ -40,41 +40,41 @@ describe("reconciler", () => {
     // Two fixtures with a pg checkpoint but a missing Redis key, to exercise
     // the reconciler's rebuild path deterministically.
     for (let i = 0; i < 2; i++) {
-      const rebuildTenant = await makeTenant();
-      const rebuildMeter = await makeMeter();
+      const rebuildTenantId = await makeTenant();
+      const rebuildMeterId = await makeMeter();
       await setMeterBalance({
         balanceMicrocredits: 5_000,
-        meterId: rebuildMeter,
-        tenantId: rebuildTenant,
+        meterId: rebuildMeterId,
+        tenantId: rebuildTenantId,
       });
       await redis.del(
-        keys.meterBalance({ meterId: rebuildMeter, tenantId: rebuildTenant }),
+        keys.meterBalance({
+          meterId: rebuildMeterId,
+          tenantId: rebuildTenantId,
+        }),
       );
     }
 
-    const tenant = await makeTenant();
-    const meter = await makeMeter();
-    const by = await makeTeamMember();
+    const tenantId = await makeTenant();
+    const meterId = await makeMeter();
+    const byTeamMemberId = await makeTeamMember();
     await setMeterBalance({
       balanceMicrocredits: 1_000_000,
-      meterId: meter,
-      tenantId: tenant,
+      meterId,
+      tenantId,
     });
 
     // Drift: a decrement that never reaches pg (e.g. lost stream entry).
-    await redis.decrby(
-      keys.meterBalance({ meterId: meter, tenantId: tenant }),
-      50_000,
-    );
+    await redis.decrby(keys.meterBalance({ meterId, tenantId }), 50_000);
     // A grant recorded in pg but never applied (crash between insert and
     // INCRBY).
-    const grantId = newCreditGrantId();
+    const creditGrantId = newCreditGrantId();
     await db.insert(creditGrants).values({
-      uniqueId: grantId,
-      tenant,
-      meter,
-      on: Date.now(),
-      byTeamMember: by,
+      creditGrantId,
+      tenantId,
+      meterId,
+      grantedAt: Date.now(),
+      byTeamMemberId,
       reason: "test",
       amountMicrocredits: 100_000,
     });
@@ -86,9 +86,7 @@ describe("reconciler", () => {
     expect(first.appliedGrants).toBeGreaterThanOrEqual(1);
     expect(first.healed).toBeGreaterThanOrEqual(1);
     expect(first.rebuilt).toBeGreaterThanOrEqual(2);
-    expect(await getMeterBalance({ meterId: meter, tenantId: tenant })).toBe(
-      1_100_000,
-    );
+    expect(await getMeterBalance({ meterId, tenantId })).toBe(1_100_000);
 
     // Converged: a second pass changes nothing (grant marker dedupes, no
     // drift).
@@ -96,9 +94,7 @@ describe("reconciler", () => {
     expect(second.appliedGrants).toBe(0);
     expect(second.healed).toBe(0);
     expect(second.rebuilt).toBe(0);
-    expect(await getMeterBalance({ meterId: meter, tenantId: tenant })).toBe(
-      1_100_000,
-    );
+    expect(await getMeterBalance({ meterId, tenantId })).toBe(1_100_000);
 
     // An event still buffered on the stream (decremented in Redis, not yet
     // in pg) must not be "healed" away: the reconciler subtracts pending
@@ -106,75 +102,73 @@ describe("reconciler", () => {
     expect(
       (
         await recordMeterEvent({
-          event: makeEvent({ amount: 10_000, meter, tenant }),
+          event: makeEvent({ amountMicrocredits: 10_000, meterId, tenantId }),
         })
       ).status,
     ).toBe("succeeded");
     const third = await reconcileMeterBalances();
     expect(third.healed).toBe(0);
-    expect(await getMeterBalance({ meterId: meter, tenantId: tenant })).toBe(
-      1_090_000,
-    );
+    expect(await getMeterBalance({ meterId, tenantId })).toBe(1_090_000);
 
     // After the flush lands it in pg, still converged. (The flush also
     // drains other tests' leftovers, so assert on this tenant's row.)
     await flushPendingMeterEvents();
-    expect(await pgEventCount({ tenant })).toBe(1);
+    expect(await pgEventCount({ tenantId })).toBe(1);
     const fourth = await reconcileMeterBalances();
     expect(fourth.healed).toBe(0);
-    expect(await getMeterBalance({ meterId: meter, tenantId: tenant })).toBe(
-      1_090_000,
-    );
+    expect(await getMeterBalance({ meterId, tenantId })).toBe(1_090_000);
   });
 
   it("skips and logs a heal whose pg-derived expectation is negative", async () => {
-    const tenant = await makeTenant();
-    const meter = await makeMeter();
+    const tenantId = await makeTenant();
+    const meterId = await makeMeter();
     await setMeterBalance({
       balanceMicrocredits: 0,
-      meterId: meter,
-      tenantId: tenant,
+      meterId,
+      tenantId,
     });
 
     // A succeeded event lands in pg without ever touching Redis (e.g. a
     // flush that outlived the Redis-side decrement): the pg-derived
     // expectation is now negative, which the hot path can never produce.
-    const seeded = makeEvent({ amount: 100_000, meter, tenant });
+    const seeded = makeEvent({
+      amountMicrocredits: 100_000,
+      meterId,
+      tenantId,
+    });
     await db.insert(meterEvents).values({
-      uniqueId: seeded.uniqueId,
-      uniqueExternalId: seeded.uniqueExternalId ?? seeded.uniqueId,
+      meterEventId: seeded.meterEventId,
+      externalId: seeded.externalId ?? seeded.meterEventId,
       createdAt: seeded.createdAt,
-      receivedAt: await redisTimeMicros(),
-      meter,
-      tenant,
-      amountMicrocredits: seeded.amount,
+      receivedAtMicros: await redisTimeMicros(),
+      meterId,
+      tenantId,
+      amountMicrocredits: seeded.amountMicrocredits,
       status: "succeeded",
     });
-    await redis.set(
-      keys.meterBalance({ meterId: meter, tenantId: tenant }),
-      50_000,
-    );
+    await redis.set(keys.meterBalance({ meterId, tenantId }), 50_000);
 
     const report = await reconcileMeterBalances();
     // No heal: the guard refuses to push the balance negative.
     expect(report.healed).toBe(0);
-    expect(await getMeterBalance({ meterId: meter, tenantId: tenant })).toBe(
-      50_000,
-    );
+    expect(await getMeterBalance({ meterId, tenantId })).toBe(50_000);
 
     // Keep cross-run state clean: remove the seeded inconsistency.
     await db
       .delete(meterEvents)
-      .where(eq(meterEvents.uniqueId, seeded.uniqueId));
-    await redis.del(keys.meterBalance({ meterId: meter, tenantId: tenant }));
+      .where(eq(meterEvents.meterEventId, seeded.meterEventId));
+    await redis.del(keys.meterBalance({ meterId, tenantId }));
     await redis.srem(
       keys.trackedMeterBalances,
-      keys.meterBalance({ meterId: meter, tenantId: tenant }),
+      keys.meterBalance({ meterId, tenantId }),
     );
     await db
       .delete(meterBalances)
       .where(
-        and(eq(meterBalances.tenant, tenant), eq(meterBalances.meter, meter)),
+        and(
+          eq(meterBalances.tenantId, tenantId),
+          eq(meterBalances.meterId, meterId),
+        ),
       );
   });
 });

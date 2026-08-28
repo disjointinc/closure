@@ -34,87 +34,90 @@ export const newCreditGrantId = () => `credit_grant_${suffix({ length: 25 })}`;
 export async function makeTenant({
   tenantId,
 }: { tenantId?: string } = {}): Promise<string> {
-  const uniqueId = tenantId ?? newTenantId();
+  const resolvedTenantId = tenantId ?? newTenantId();
   await db.insert(tenants).values({
-    uniqueId,
+    tenantId: resolvedTenantId,
     createdAt: Date.now(),
     deletedAt: null,
     externalIds: {},
   });
-  return uniqueId;
+  return resolvedTenantId;
 }
 
 export async function makeMeter({
   meterId,
 }: { meterId?: string } = {}): Promise<string> {
-  const uniqueId = meterId ?? newMeterId();
+  const resolvedMeterId = meterId ?? newMeterId();
   await db.insert(meters).values({
-    uniqueId,
+    meterId: resolvedMeterId,
     createdAt: Date.now(),
     deprecatedAt: null,
     name: "Test meter",
     description: null,
   });
-  return uniqueId;
+  return resolvedMeterId;
 }
 
 export async function makeTeamMember(): Promise<string> {
-  const uniqueId = `team_member_${suffix({ length: 16 })}`;
+  const teamMemberId = `team_member_${suffix({ length: 16 })}`;
   await db.insert(teamMembers).values({
-    uniqueId,
-    emailAddress: `${uniqueId}@test.invalid`,
+    teamMemberId,
+    email: `${teamMemberId}@test.invalid`,
     name: null,
-    profilePictureLink: null,
+    profilePictureUrl: null,
   });
-  return uniqueId;
+  return teamMemberId;
 }
 
 export function makeEvent({
-  amount,
-  meter,
+  amountMicrocredits,
+  meterId,
   overrides,
-  tenant,
+  tenantId,
 }: {
-  amount: number;
-  meter: string;
+  amountMicrocredits: number;
+  meterId: string;
   overrides?: Partial<MeterEventPayload>;
-  tenant: string;
+  tenantId: string;
 }): MeterEventPayload {
   return {
-    uniqueId: newMeterEventId(),
-    uniqueExternalId: `ext-${suffix({ length: 16 })}`,
+    meterEventId: newMeterEventId(),
+    externalId: `ext-${suffix({ length: 16 })}`,
     createdAt: Date.now(),
-    meter,
-    tenant,
-    amount,
+    meterId,
+    tenantId,
+    amountMicrocredits,
     ...overrides,
   };
 }
 
 export async function pgEventCount({
-  tenant,
+  tenantId,
 }: {
-  tenant: string;
+  tenantId: string;
 }): Promise<number> {
   const rows = await db
-    .select({ uniqueId: meterEvents.uniqueId })
+    .select({ meterEventId: meterEvents.meterEventId })
     .from(meterEvents)
-    .where(eq(meterEvents.tenant, tenant));
+    .where(eq(meterEvents.tenantId, tenantId));
   return rows.length;
 }
 
 export async function pgCheckpoint({
-  meter,
-  tenant,
+  meterId,
+  tenantId,
 }: {
-  meter: string;
-  tenant: string;
+  meterId: string;
+  tenantId: string;
 }) {
   const [row] = await db
     .select()
     .from(meterBalances)
     .where(
-      and(eq(meterBalances.tenant, tenant), eq(meterBalances.meter, meter)),
+      and(
+        eq(meterBalances.tenantId, tenantId),
+        eq(meterBalances.meterId, meterId),
+      ),
     );
   return row;
 }

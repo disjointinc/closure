@@ -6,7 +6,7 @@
  * steady-state drift (crash windows between pg and Redis writes, theoretical
  * clock-boundary races). Every interval:
  *
- *   1. Apply grants that never reached Redis (applied_at IS NULL) --
+ *   1. Apply grants that never reached Redis (appliedAtMicros IS NULL) --
  *      idempotently, via the mgrant: marker.
  *   2. For every tracked or checkpointed balance key, compare the Redis
  *      value against the pg-derived expectation and heal drift with an
@@ -74,24 +74,24 @@ export async function reconcileMeterBalances(): Promise<ReconcileReport> {
   const pendingGrants = await db
     .select()
     .from(creditGrants)
-    .where(isNull(creditGrants.appliedAt))
+    .where(isNull(creditGrants.appliedAtMicros))
     .limit(PENDING_GRANT_BATCH);
   for (const grant of pendingGrants) {
     try {
       await applyCreditGrant({
         grant: {
           amount: grant.amountMicrocredits,
-          meter: grant.meter,
-          tenant: grant.tenant,
-          uniqueId: grant.uniqueId,
+          creditGrantId: grant.creditGrantId,
+          meterId: grant.meterId,
+          tenantId: grant.tenantId,
         },
       });
-      await stampGrantApplied({ grantId: grant.uniqueId });
+      await stampGrantApplied({ creditGrantId: grant.creditGrantId });
       report.appliedGrants += 1;
     } catch (error) {
       console.error("reconciler could not apply grant", {
         error,
-        grant: grant.uniqueId,
+        grant: grant.creditGrantId,
       });
     }
   }
@@ -112,19 +112,19 @@ export async function reconcileMeterBalances(): Promise<ReconcileReport> {
       continue;
     }
     const key = keys.meterBalance({
-      meterId: event.meter,
-      tenantId: event.tenant,
+      meterId: event.meterId,
+      tenantId: event.tenantId,
     });
     pendingDebitByKey.set(
       key,
-      (pendingDebitByKey.get(key) ?? 0) + event.amount,
+      (pendingDebitByKey.get(key) ?? 0) + event.amountMicrocredits,
     );
   }
 
   const checkpoints = await db.select().from(meterBalances);
   const checkpointByKey = new Map(
     checkpoints.map((row) => [
-      keys.meterBalance({ meterId: row.meter, tenantId: row.tenant }),
+      keys.meterBalance({ meterId: row.meterId, tenantId: row.tenantId }),
       row,
     ]),
   );

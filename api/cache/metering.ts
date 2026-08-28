@@ -21,8 +21,10 @@
  * Durability: every Redis balance mutation has a durable pg record stamped
  * on the Redis server's clock, in MICROseconds (one clock, so replay
  * ordering is exact):
- *   - meter events   -> meter_events.received_at   (stamped in the Lua script)
- *   - credit grants  -> credit_grants.applied_at   (NULL = never applied)
+ *   - meter events   -> meter_events.received_at_micros  (stamped in the
+ *     Lua script)
+ *   - credit grants  -> credit_grants.applied_at_micros  (NULL = never
+ *     applied)
  *   - balance sets   -> meter_balances upsert      (synchronous, so the
  *     rebuild base is never lost between a Redis write and a crash)
  *   - checkpoints    -> meter_balances, write-behind on the
@@ -30,8 +32,9 @@
  *     overwrite a newer set.
  * Rebuild of a lost balance key (rebuildMeterBalance):
  *   balance = meter_balances checkpoint
- *             - succeeded meter_events (and DLQ rows) received_at > updated_at
- *             + credit_grants applied_at > updated_at.
+ *             - succeeded meter_events (and DLQ rows)
+ *               received_at_micros > updated_at
+ *             + credit_grants applied_at_micros > updated_at.
  * Only MISSING keys are rebuilt -- never overwrite a live key -- so a
  * failover that preserves partial state cannot double-count.
  *
@@ -232,14 +235,14 @@ export async function redisTimeMicros(): Promise<number> {
 
 /** The balance key is missing and read-repair could not restore it. */
 export class MeterBalanceUnavailableError extends Error {
-  readonly tenant: string;
-  readonly meter: string;
+  readonly tenantId: string;
+  readonly meterId: string;
 
-  constructor({ meter, tenant }: { meter: string; tenant: string }) {
-    super(`meter balance unavailable for ${tenant}/${meter}`);
+  constructor({ meterId, tenantId }: { meterId: string; tenantId: string }) {
+    super(`meter balance unavailable for ${tenantId}/${meterId}`);
     this.name = "MeterBalanceUnavailableError";
-    this.tenant = tenant;
-    this.meter = meter;
+    this.tenantId = tenantId;
+    this.meterId = meterId;
   }
 }
 
@@ -278,7 +281,7 @@ function pgErrorCode({ error }: { error: unknown }): string | null {
 type PendingRow = {
   entryId: string;
   payloadJson: string;
-  receivedAt: number | null;
+  receivedAtMicros: number | null;
 } & (
   | { event: MeterEventPayload; status: MeterEventStatus }
   | { event: null; status: null }
@@ -317,7 +320,7 @@ export function parsePendingEntry({
       entryId,
       event: null,
       payloadJson: payloadJson ?? "",
-      receivedAt: null,
+      receivedAtMicros: null,
       status: null,
     };
   }
@@ -335,7 +338,7 @@ export function parsePendingEntry({
       entryId,
       event: null,
       payloadJson,
-      receivedAt: null,
+      receivedAtMicros: null,
       status: null,
     };
   }
@@ -343,7 +346,7 @@ export function parsePendingEntry({
     entryId,
     event,
     payloadJson,
-    receivedAt: receivedAtRaw === null ? null : Number(receivedAtRaw),
+    receivedAtMicros: receivedAtRaw === null ? null : Number(receivedAtRaw),
     status,
   };
 }
@@ -365,21 +368,21 @@ export async function recordMeterEvent({
   // Default the idempotency key to the event's own id so callers who don't
   // need idempotent redelivery never mint a second id. The buffered payload
   // carries the resolved value, so the flush always writes a non-null
-  // unique_external_id to pg.
-  const uniqueExternalId = event.uniqueExternalId ?? event.uniqueId;
+  // external_id to pg.
+  const externalId = event.externalId ?? event.meterEventId;
   // Ordered args: numberOfKeys: 3 on the defineCommand above splits this
   // list into KEYS (idempotency, balance, stream) and ARGV (the rest).
   const args = [
     keys.meterEventIdempotency({
-      uniqueExternalId,
-      meterId: event.meter,
-      tenantId: event.tenant,
+      externalId,
+      meterId: event.meterId,
+      tenantId: event.tenantId,
     }),
-    keys.meterBalance({ meterId: event.meter, tenantId: event.tenant }),
+    keys.meterBalance({ meterId: event.meterId, tenantId: event.tenantId }),
     keys.pendingMeterEvents,
-    event.amount,
+    event.amountMicrocredits,
     METER_EVENT_IDEMPOTENCY_TTL_MS,
-    JSON.stringify({ ...event, uniqueExternalId }),
+    JSON.stringify({ ...event, externalId }),
     keys.trackedMeterBalances,
   ] as const;
   const first = await commands.meterEventIngest(...args);
@@ -390,12 +393,15 @@ export async function recordMeterEvent({
       status,
     };
   }
-  await ensureMeterBalance({ meterId: event.meter, tenantId: event.tenant });
+  await ensureMeterBalance({
+    meterId: event.meterId,
+    tenantId: event.tenantId,
+  });
   const retry = await commands.meterEventIngest(...args);
   if (retry === "uninitialized") {
     throw new MeterBalanceUnavailableError({
-      meter: event.meter,
-      tenant: event.tenant,
+      meterId: event.meterId,
+      tenantId: event.tenantId,
     });
   }
   const [status, balance] = retry;
@@ -454,12 +460,12 @@ export async function setMeterBalance({
     .insert(meterBalances)
     .values({
       balanceMicrocredits,
-      meter: meterId,
-      tenant: tenantId,
+      meterId,
+      tenantId,
       updatedAt: at,
     })
     .onConflictDoUpdate({
-      target: [meterBalances.tenant, meterBalances.meter],
+      target: [meterBalances.tenantId, meterBalances.meterId],
       set: {
         balanceMicrocredits: sql`excluded.balance_microcredits`,
         updatedAt: sql`excluded.updated_at`,
@@ -476,9 +482,9 @@ export async function setMeterBalance({
 }
 
 export type CreditGrantApplication = {
-  uniqueId: string;
-  tenant: string;
-  meter: string;
+  creditGrantId: string;
+  tenantId: string;
+  meterId: string;
   amount: number;
 };
 
@@ -495,8 +501,8 @@ export async function applyCreditGrant({
 }): Promise<number> {
   // Ordered args: see the comment on recordMeterEvent.
   const args = [
-    keys.meterGrantMarker({ grantId: grant.uniqueId }),
-    keys.meterBalance({ meterId: grant.meter, tenantId: grant.tenant }),
+    keys.meterGrantMarker({ creditGrantId: grant.creditGrantId }),
+    keys.meterBalance({ meterId: grant.meterId, tenantId: grant.tenantId }),
     grant.amount,
     METER_MARKER_TTL_MS,
     keys.trackedMeterBalances,
@@ -505,12 +511,15 @@ export async function applyCreditGrant({
   if (first !== "uninitialized") {
     return Number(first);
   }
-  await ensureMeterBalance({ meterId: grant.meter, tenantId: grant.tenant });
+  await ensureMeterBalance({
+    meterId: grant.meterId,
+    tenantId: grant.tenantId,
+  });
   const retry = await commands.meterGrantApply(...args);
   if (retry === "uninitialized") {
     throw new MeterBalanceUnavailableError({
-      meter: grant.meter,
-      tenant: grant.tenant,
+      meterId: grant.meterId,
+      tenantId: grant.tenantId,
     });
   }
   return Number(retry);
@@ -518,20 +527,24 @@ export async function applyCreditGrant({
 
 /**
  * Record that a grant reached the Redis balance, on the Redis clock. Stamped
- * at most once (WHERE applied_at IS NULL): a later stamp could push the grant
- * past a checkpoint's updated_at and make a rebuild double-count it.
+ * at most once (WHERE applied_at_micros IS NULL): a later stamp could push
+ * the grant past a checkpoint's updated_at and make a rebuild double-count
+ * it.
  */
 export async function stampGrantApplied({
-  grantId,
+  creditGrantId,
 }: {
-  grantId: string;
+  creditGrantId: string;
 }): Promise<void> {
   const at = await redisTimeMicros();
   await db
     .update(creditGrants)
-    .set({ appliedAt: at })
+    .set({ appliedAtMicros: at })
     .where(
-      and(eq(creditGrants.uniqueId, grantId), isNull(creditGrants.appliedAt)),
+      and(
+        eq(creditGrants.creditGrantId, creditGrantId),
+        isNull(creditGrants.appliedAtMicros),
+      ),
     );
 }
 
@@ -554,7 +567,10 @@ export async function rebuildMeterBalance({
     .select()
     .from(meterBalances)
     .where(
-      and(eq(meterBalances.tenant, tenantId), eq(meterBalances.meter, meterId)),
+      and(
+        eq(meterBalances.tenantId, tenantId),
+        eq(meterBalances.meterId, meterId),
+      ),
     )
     .limit(1);
   let balance: number;
@@ -574,8 +590,8 @@ export async function rebuildMeterBalance({
         .insert(meterBalances)
         .values({
           balanceMicrocredits: 0,
-          meter: meterId,
-          tenant: tenantId,
+          meterId,
+          tenantId,
           updatedAt: await redisTimeMicros(),
         })
         .onConflictDoNothing();
@@ -622,10 +638,10 @@ export async function sumSucceededMeterEvents({
     .from(meterEvents)
     .where(
       and(
-        eq(meterEvents.tenant, tenantId),
-        eq(meterEvents.meter, meterId),
+        eq(meterEvents.tenantId, tenantId),
+        eq(meterEvents.meterId, meterId),
         eq(meterEvents.status, "succeeded"),
-        gt(meterEvents.receivedAt, since),
+        gt(meterEvents.receivedAtMicros, since),
       ),
     );
   const [dlq] = await db
@@ -635,10 +651,10 @@ export async function sumSucceededMeterEvents({
     .from(meterEventsDlq)
     .where(
       and(
-        eq(meterEventsDlq.tenant, tenantId),
-        eq(meterEventsDlq.meter, meterId),
+        eq(meterEventsDlq.tenantId, tenantId),
+        eq(meterEventsDlq.meterId, meterId),
         eq(meterEventsDlq.status, "succeeded"),
-        gt(meterEventsDlq.receivedAt, since),
+        gt(meterEventsDlq.receivedAtMicros, since),
       ),
     );
   return Number(events.total) + Number(dlq.total);
@@ -661,9 +677,9 @@ export async function sumAppliedGrants({
     .from(creditGrants)
     .where(
       and(
-        eq(creditGrants.tenant, tenantId),
-        eq(creditGrants.meter, meterId),
-        gt(creditGrants.appliedAt, since),
+        eq(creditGrants.tenantId, tenantId),
+        eq(creditGrants.meterId, meterId),
+        gt(creditGrants.appliedAtMicros, since),
       ),
     );
   return Number(grants.total);
@@ -709,8 +725,8 @@ async function ensureMeterBalance({
       }
     }
     throw new MeterBalanceUnavailableError({
-      meter: meterId,
-      tenant: tenantId,
+      meterId,
+      tenantId,
     });
   }
   try {
@@ -731,18 +747,21 @@ async function ensureMeterBalance({
  */
 export async function rebuildMissingMeterBalances(): Promise<number> {
   const rows = await db
-    .select({ tenant: meterBalances.tenant, meter: meterBalances.meter })
+    .select({
+      tenantId: meterBalances.tenantId,
+      meterId: meterBalances.meterId,
+    })
     .from(meterBalances);
   let rebuilt = 0;
   for (const row of rows) {
     if (
       await redis.exists(
-        keys.meterBalance({ meterId: row.meter, tenantId: row.tenant }),
+        keys.meterBalance({ meterId: row.meterId, tenantId: row.tenantId }),
       )
     ) {
       continue;
     }
-    await rebuildMeterBalance({ meterId: row.meter, tenantId: row.tenant });
+    await rebuildMeterBalance({ meterId: row.meterId, tenantId: row.tenantId });
     rebuilt += 1;
   }
   if (rebuilt > 0) {
@@ -762,7 +781,8 @@ const FLUSH_RETRY_BACKOFF_MS = [250, 1_000];
 
 /**
  * Drain pending meter events into pg in batches. Inserts are idempotent
- * (the (tenant, meter, external_id) unique index + ON CONFLICT DO NOTHING).
+ * (the (tenant_id, meter_id, external_id) unique index + ON CONFLICT DO
+ * NOTHING).
  *
  * A conflict with a flush-attempt marker WE set means the pg row came from a
  * different ingest of the same external id (Redis idempotency marker lost +
@@ -798,27 +818,27 @@ export async function flushPendingMeterEvents(): Promise<number> {
     ? await commands.meterFlushMark(
         METER_MARKER_TTL_MS,
         ...parseable.map((row) =>
-          keys.meterFlushMarker({ meterEventId: row.event.uniqueId }),
+          keys.meterFlushMarker({ meterEventId: row.event.meterEventId }),
         ),
       )
     : [];
   const firstAttemptById = new Map(
-    parseable.map((row, i) => [row.event.uniqueId, marks[i] === 1]),
+    parseable.map((row, i) => [row.event.meterEventId, marks[i] === 1]),
   );
 
   const state = new Map<string, "inserted" | "conflict" | "poison" | "pending">(
-    parseable.map((row) => [row.event.uniqueId, "pending"]),
+    parseable.map((row) => [row.event.meterEventId, "pending"]),
   );
   const values = parseable.map((row) => ({
-    uniqueId: row.event.uniqueId,
+    meterEventId: row.event.meterEventId,
     // Ingest resolves this before buffering; the fallback covers entries
     // buffered by other means (e.g. hand-repaired streams).
-    uniqueExternalId: row.event.uniqueExternalId ?? row.event.uniqueId,
+    externalId: row.event.externalId ?? row.event.meterEventId,
     createdAt: row.event.createdAt,
-    receivedAt: row.receivedAt,
-    meter: row.event.meter,
-    tenant: row.event.tenant,
-    amountMicrocredits: row.event.amount,
+    receivedAtMicros: row.receivedAtMicros,
+    meterId: row.event.meterId,
+    tenantId: row.event.tenantId,
+    amountMicrocredits: row.event.amountMicrocredits,
     status: row.status,
   }));
 
@@ -830,12 +850,12 @@ export async function flushPendingMeterEvents(): Promise<number> {
           .insert(meterEvents)
           .values(values)
           .onConflictDoNothing()
-          .returning({ uniqueId: meterEvents.uniqueId });
-        const insertedIds = new Set(inserted.map((row) => row.uniqueId));
+          .returning({ meterEventId: meterEvents.meterEventId });
+        const insertedIds = new Set(inserted.map((row) => row.meterEventId));
         for (const value of values) {
           state.set(
-            value.uniqueId,
-            insertedIds.has(value.uniqueId) ? "inserted" : "conflict",
+            value.meterEventId,
+            insertedIds.has(value.meterEventId) ? "inserted" : "conflict",
           );
         }
         batchFailed = false;
@@ -858,9 +878,9 @@ export async function flushPendingMeterEvents(): Promise<number> {
           .insert(meterEvents)
           .values(value)
           .onConflictDoNothing()
-          .returning({ uniqueId: meterEvents.uniqueId });
+          .returning({ meterEventId: meterEvents.meterEventId });
         state.set(
-          value.uniqueId,
+          value.meterEventId,
           inserted.length === 1 ? "inserted" : "conflict",
         );
       } catch (error) {
@@ -870,7 +890,7 @@ export async function flushPendingMeterEvents(): Promise<number> {
           console.error("meter event flush lost pg mid-batch", error);
           break;
         }
-        state.set(value.uniqueId, "poison");
+        state.set(value.meterEventId, "poison");
         poisoned.push({
           row: parseable[i],
           error: `${code}: ${error instanceof Error ? error.message : String(error)}`,
@@ -882,7 +902,7 @@ export async function flushPendingMeterEvents(): Promise<number> {
   const doneEntryIds: string[] = [];
   const compensations: ParsedRow[] = [];
   for (const row of parseable) {
-    const rowState = state.get(row.event.uniqueId);
+    const rowState = state.get(row.event.meterEventId);
     if (rowState !== "inserted" && rowState !== "conflict") {
       // "pending" rows (pg lost mid-batch) stay on the stream for next tick.
       continue;
@@ -891,33 +911,32 @@ export async function flushPendingMeterEvents(): Promise<number> {
     const isDuplicateIngest =
       rowState === "conflict" &&
       row.status === "succeeded" &&
-      firstAttemptById.get(row.event.uniqueId) === true;
+      firstAttemptById.get(row.event.meterEventId) === true;
     if (isDuplicateIngest) {
       compensations.push(row);
     }
   }
-
   for (const row of compensations) {
-    const { amount, meter, tenant } = row.event;
-    const uniqueExternalId = row.event.uniqueExternalId ?? row.event.uniqueId;
-    const balanceKey = keys.meterBalance({ meterId: meter, tenantId: tenant });
+    const { amountMicrocredits, meterId, tenantId } = row.event;
+    const externalId = row.event.externalId ?? row.event.meterEventId;
+    const balanceKey = keys.meterBalance({ meterId, tenantId });
     // Only credit back if the key still holds the duplicate charge; a key
     // lost and rebuilt since is already correct from pg.
     if (await redis.exists(balanceKey)) {
-      await redis.incrby(balanceKey, amount);
+      await redis.incrby(balanceKey, amountMicrocredits);
       console.error("compensated duplicate meter event charge", {
-        amount,
-        uniqueExternalId,
-        meter,
-        tenant,
+        amountMicrocredits,
+        externalId,
+        meterId,
+        tenantId,
       });
     }
     // Re-warm the Redis idempotency marker so later retries short-circuit.
     await redis.set(
       keys.meterEventIdempotency({
-        uniqueExternalId,
-        meterId: meter,
-        tenantId: tenant,
+        externalId,
+        meterId,
+        tenantId,
       }),
       "succeeded",
       "PX",
@@ -931,10 +950,10 @@ export async function flushPendingMeterEvents(): Promise<number> {
         poisoned.map(({ row, error }) => ({
           payload: row.payloadJson,
           status: row.status,
-          tenant: row.event?.tenant ?? null,
-          meter: row.event?.meter ?? null,
-          amountMicrocredits: row.event?.amount ?? null,
-          receivedAt: row.receivedAt,
+          tenantId: row.event?.tenantId ?? null,
+          meterId: row.event?.meterId ?? null,
+          amountMicrocredits: row.event?.amountMicrocredits ?? null,
+          receivedAtMicros: row.receivedAtMicros,
           error,
           failedAt: Date.now(),
         })),
@@ -973,8 +992,8 @@ export async function checkpointMeterBalances(): Promise<number> {
     if (raw === null) {
       return [];
     }
-    const [, tenant, meter] = key.split(":");
-    return [{ tenant, meter, balanceMicrocredits: Number(raw), updatedAt }];
+    const [, tenantId, meterId] = key.split(":");
+    return [{ tenantId, meterId, balanceMicrocredits: Number(raw), updatedAt }];
   });
   if (rows.length === 0) {
     return 0;
@@ -983,7 +1002,7 @@ export async function checkpointMeterBalances(): Promise<number> {
     .insert(meterBalances)
     .values(rows)
     .onConflictDoUpdate({
-      target: [meterBalances.tenant, meterBalances.meter],
+      target: [meterBalances.tenantId, meterBalances.meterId],
       set: {
         balanceMicrocredits: sql`excluded.balance_microcredits`,
         updatedAt: sql`excluded.updated_at`,
