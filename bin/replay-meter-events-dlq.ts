@@ -2,10 +2,10 @@
  * bin/replay-meter-events-dlq.ts -- re-drive dead-lettered meter events into
  * meter_events after the root cause (e.g. a missing meter row) is fixed.
  *
- * Rows are inserted idempotently (the (tenant, meter, external_id) unique
- * index + ON CONFLICT DO NOTHING) and deleted from the DLQ once meter_events
- * holds them. Rows whose payload never parsed (null extracted columns) are
- * left in place for manual inspection.
+ * Rows are inserted idempotently (the (tenantId, meterId, externalId)
+ * unique index + ON CONFLICT DO NOTHING) and deleted from the DLQ once
+ * meterEvents holds them. Rows whose payload never parsed (null extracted
+ * columns) are left in place for manual inspection.
  *
  * Run from the repo root: node bin/replay-meter-events-dlq.ts
  */
@@ -16,16 +16,16 @@ import { meterEvents, meterEventsDlq } from "../api/db/schema.ts";
 type DlqRow = typeof meterEventsDlq.$inferSelect;
 
 type ReplayableRow = DlqRow & {
-  tenant: string;
-  meter: string;
+  tenantId: string;
+  meterId: string;
   amountMicrocredits: number;
   status: NonNullable<DlqRow["status"]>;
 };
 
 function isReplayable(row: DlqRow): row is ReplayableRow {
   return (
-    row.tenant !== null &&
-    row.meter !== null &&
+    row.tenantId !== null &&
+    row.meterId !== null &&
     row.amountMicrocredits !== null &&
     row.status !== null
   );
@@ -36,30 +36,26 @@ const rows = await db.select().from(meterEventsDlq);
 let replayed = 0;
 for (const row of rows.filter(isReplayable)) {
   const parsed: {
-    unique_id: string;
-    created_at: number;
-    unique_external_id?: string;
-    /** Entries dead-lettered before the field was renamed carry the old name. */
-    ideally_unique_external_id?: string;
+    meterEventId: string;
+    createdAt: number;
+    externalId?: string;
   } = JSON.parse(row.payload);
-  const uniqueExternalId =
-    parsed.unique_external_id ??
-    parsed.ideally_unique_external_id ??
-    parsed.unique_id;
   await db
     .insert(meterEvents)
     .values({
-      uniqueId: parsed.unique_id,
-      uniqueExternalId,
-      createdAt: parsed.created_at,
-      receivedAt: row.receivedAt,
-      meter: row.meter,
-      tenant: row.tenant,
+      meterEventId: parsed.meterEventId,
+      externalId: parsed.externalId ?? parsed.meterEventId,
+      createdAt: parsed.createdAt,
+      receivedAtMicros: row.receivedAtMicros,
+      meterId: row.meterId,
+      tenantId: row.tenantId,
       amountMicrocredits: row.amountMicrocredits,
       status: row.status,
     })
     .onConflictDoNothing();
-  await db.delete(meterEventsDlq).where(eq(meterEventsDlq.id, row.id));
+  await db
+    .delete(meterEventsDlq)
+    .where(eq(meterEventsDlq.meterEventDlqId, row.meterEventDlqId));
   replayed += 1;
 }
 

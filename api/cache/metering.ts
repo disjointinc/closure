@@ -21,20 +21,20 @@
  * Durability: every Redis balance mutation has a durable pg record stamped
  * on the Redis server's clock, in MICROseconds (one clock, so replay
  * ordering is exact):
- *   - meter events   -> meter_events.received_at_micros  (stamped in the
+ *   - meter events   -> meterEvents.receivedAtMicros  (stamped in the
  *     Lua script)
- *   - credit grants  -> credit_grants.applied_at_micros  (NULL = never
+ *   - credit grants  -> creditGrants.appliedAtMicros  (NULL = never
  *     applied)
- *   - balance sets   -> meter_balances upsert      (synchronous, so the
+ *   - balance sets   -> meterBalances upsert      (synchronous, so the
  *     rebuild base is never lost between a Redis write and a crash)
- *   - checkpoints    -> meter_balances, write-behind on the
+ *   - checkpoints    -> meterBalances, write-behind on the
  *     CHECKPOINT_INTERVAL_MS cadence, guarded so a stale snapshot can never
  *     overwrite a newer set.
  * Rebuild of a lost balance key (rebuildMeterBalance):
- *   balance = meter_balances checkpoint
- *             - succeeded meter_events (and DLQ rows)
- *               received_at_micros > updated_at
- *             + credit_grants applied_at_micros > updated_at.
+ *   balance = meterBalances checkpoint
+ *             - succeeded meterEvents (and DLQ rows)
+ *               receivedAtMicros > updatedAt
+ *             + credit_grants appliedAtMicros > updatedAt.
  * Only MISSING keys are rebuilt -- never overwrite a live key -- so a
  * failover that preserves partial state cannot double-count.
  *
@@ -42,7 +42,7 @@
  * (ON CONFLICT DO NOTHING on the pg unique index). Flush-attempt markers
  * (mflush:) tell "crash between insert and stream-trim" (replay harmlessly)
  * apart from "duplicate ingest double-charged Redis" (credit one charge
- * back). Rows that repeatedly fail to insert move to the meter_events_dlq
+ * back). Rows that repeatedly fail to insert move to the meterEventsDlq
  * pg table so one poison row can't head-of-line block the stream.
  *
  * Accuracy notes: balance check + decrement is atomic (Lua), so concurrent
