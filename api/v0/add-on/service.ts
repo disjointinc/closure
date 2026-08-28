@@ -6,14 +6,13 @@
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import { addOnFeatures, addOnPrices, addOns, values } from "../../db/schema.ts";
-import type { AddOn } from "../../schemas/add-on.ts";
-import type { AddOnCreateBody } from "./routes.ts";
+import type { AddOnApi } from "./routes.ts";
 
 export async function getAddOn({
   addOnId,
 }: {
   addOnId: string;
-}): Promise<AddOn | null> {
+}): Promise<AddOnApi | null> {
   const [row] = await db
     .select()
     .from(addOns)
@@ -47,7 +46,9 @@ export async function getAddOn({
     description: row.description,
     prices: priceRows.map((price) => {
       // add_on_prices.value_id FKs values, so the row always exists.
-      const value = valueById.get(price.valueId) as AddOn["prices"][0]["value"];
+      const value = valueById.get(
+        price.valueId,
+      ) as AddOnApi["prices"][0]["value"];
       return { cycleId: price.cycleId, value };
     }),
     features: featureRows.map((feature) => ({
@@ -57,7 +58,7 @@ export async function getAddOn({
   };
 }
 
-export async function listAddOns(): Promise<AddOn[]> {
+export async function listAddOns(): Promise<AddOnApi[]> {
   const rows = await db.select().from(addOns);
   const found = await Promise.all(
     rows.map((row) => getAddOn({ addOnId: row.addOnId })),
@@ -68,8 +69,8 @@ export async function listAddOns(): Promise<AddOn[]> {
 export async function createAddOn({
   addOn,
 }: {
-  addOn: AddOnCreateBody;
-}): Promise<AddOn | null> {
+  addOn: AddOnApi;
+}): Promise<AddOnApi | null> {
   await db
     .insert(addOns)
     .values({
@@ -113,7 +114,7 @@ export async function deprecateAddOn({
   addOnId,
 }: {
   addOnId: string;
-}): Promise<AddOn | null> {
+}): Promise<AddOnApi | null> {
   const deprecatedAt = Date.now();
   const updated = await db
     .update(addOns)

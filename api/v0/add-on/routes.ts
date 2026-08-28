@@ -15,16 +15,17 @@ import {
   listAddOns,
 } from "./service.ts";
 
-// Prices reference existing cycles by id; values are always defined inline.
-const addOnCreateSchema = z.object({
-  ...addOnSchema.shape,
+// The call surface for prices: an existing cycle id plus the owned value
+// inline. Cycles are first-class (referenced by id); values are owned by
+// the add-on, so they're always written and read as full objects.
+const addOnApiSchema = addOnSchema.extend({
   prices: z.array(z.object({ cycleId: cycleIdSchema, value: valueSchema })),
 });
 
-export type AddOnCreateBody = z.infer<typeof addOnCreateSchema>;
+export type AddOnApi = z.infer<typeof addOnApiSchema>;
 
 export const addOnApp = new Hono()
-  .post("/", zValidator("json", addOnCreateSchema), async (c) => {
+  .post("/", zValidator("json", addOnApiSchema), async (c) => {
     const body = c.req.valid("json");
     return c.json(await createAddOn({ addOn: body }), 201);
   })
