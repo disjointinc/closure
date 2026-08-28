@@ -1,7 +1,9 @@
 /**
  * v0/coupon-template/service.ts -- coupon template business logic.
  * Templates are reusable coupon definitions (e.g. "the referral coupon")
- * that coupons mint from; they're deprecated, never deleted.
+ * that coupons mint from; they're deprecated, never deleted. Award amounts
+ * are read and written as full values; the canonical award stored in the db
+ * keeps the value id.
  */
 import { eq } from "drizzle-orm";
 import { db } from "../../db/index.ts";
@@ -10,63 +12,90 @@ import {
   couponTemplateFeaturesGranted,
   couponTemplates,
 } from "../../db/schema.ts";
+import type { Award } from "../../schemas/coupon.ts";
 import type { CouponTemplate } from "../../schemas/coupon-template.ts";
-import { resolveAward } from "../award/service.ts";
+import { type AwardApi, expandAward, resolveAward } from "../award/service.ts";
 import type { CouponTemplateCreateBody } from "./routes.ts";
 
+type WithAwardApi<T extends { award: Award }> = Omit<T, "award"> & {
+  award: AwardApi;
+};
+
+/** The call-surface template: awards carry full values, not value ids. */
+export type CouponTemplateApi = Omit<
+  CouponTemplate,
+  "defaultAward" | "featuresGranted" | "creditsGranted"
+> & {
+  defaultAward: AwardApi | null;
+  featuresGranted:
+    | WithAwardApi<NonNullable<CouponTemplate["featuresGranted"]>[number]>[]
+    | null;
+  creditsGranted:
+    | WithAwardApi<NonNullable<CouponTemplate["creditsGranted"]>[number]>[]
+    | null;
+};
+
 export async function getCouponTemplate({
-  uniqueId,
+  couponTemplateId,
 }: {
-  uniqueId: string;
-}): Promise<CouponTemplate | null> {
+  couponTemplateId: string;
+}): Promise<CouponTemplateApi | null> {
   const [row] = await db
     .select()
     .from(couponTemplates)
-    .where(eq(couponTemplates.uniqueId, uniqueId));
+    .where(eq(couponTemplates.couponTemplateId, couponTemplateId));
   if (!row) {
     return null;
   }
   const featureRows = await db
     .select()
     .from(couponTemplateFeaturesGranted)
-    .where(eq(couponTemplateFeaturesGranted.couponTemplate, uniqueId));
+    .where(
+      eq(couponTemplateFeaturesGranted.couponTemplateId, couponTemplateId),
+    );
   const creditRows = await db
     .select()
     .from(couponTemplateCreditsGranted)
-    .where(eq(couponTemplateCreditsGranted.couponTemplate, uniqueId));
+    .where(eq(couponTemplateCreditsGranted.couponTemplateId, couponTemplateId));
   return {
-    uniqueId: row.uniqueId,
+    couponTemplateId: row.couponTemplateId,
     createdAt: row.createdAt,
     deprecatedAt: row.deprecatedAt,
     grantableByTenants: row.grantableByTenants,
     limitPerGrantingTenant: row.limitPerGrantingTenant,
     name: row.name,
     description: row.description,
-    defaultAward: row.defaultAward,
+    defaultAward: row.defaultAward ? await expandAward(row.defaultAward) : null,
     featuresGranted: featureRows.length
-      ? featureRows.map((feature) => ({
-          feature: feature.feature,
-          value: feature.value,
-          award: feature.award,
-        }))
+      ? await Promise.all(
+          featureRows.map(async (feature) => ({
+            featureId: feature.featureId,
+            setTo: feature.setTo,
+            award: await expandAward(feature.award),
+          })),
+        )
       : null,
     creditsGranted: creditRows.length
-      ? creditRows.map((credit) => ({
-          meter: credit.meter,
-          amount: credit.amountMicrocredits,
-          expiration: credit.expiration,
-          rollovers: credit.rollovers,
-          award: credit.award,
-        }))
+      ? await Promise.all(
+          creditRows.map(async (credit) => ({
+            meterId: credit.meterId,
+            amountMicrocredits: credit.amountMicrocredits,
+            expiration: credit.expiration,
+            rollovers: credit.rollovers,
+            award: await expandAward(credit.award),
+          })),
+        )
       : null,
-    reciprocalBenefitCouponTemplate: row.reciprocalBenefitCouponTemplate,
+    reciprocalBenefitCouponTemplateId: row.reciprocalBenefitCouponTemplateId,
   };
 }
 
-export async function listCouponTemplates(): Promise<CouponTemplate[]> {
+export async function listCouponTemplates(): Promise<CouponTemplateApi[]> {
   const rows = await db.select().from(couponTemplates);
   const found = await Promise.all(
-    rows.map((row) => getCouponTemplate({ uniqueId: row.uniqueId })),
+    rows.map((row) =>
+      getCouponTemplate({ couponTemplateId: row.couponTemplateId }),
+    ),
   );
   return found.filter((template) => template !== null);
 }
@@ -75,11 +104,11 @@ export async function createCouponTemplate({
   template,
 }: {
   template: CouponTemplateCreateBody;
-}): Promise<CouponTemplate | null> {
+}): Promise<CouponTemplateApi | null> {
   await db
     .insert(couponTemplates)
     .values({
-      uniqueId: template.uniqueId,
+      couponTemplateId: template.couponTemplateId,
       createdAt: template.createdAt,
       deprecatedAt: template.deprecatedAt,
       grantableByTenants: template.grantableByTenants,
@@ -89,7 +118,8 @@ export async function createCouponTemplate({
       defaultAward: template.defaultAward
         ? await resolveAward(template.defaultAward)
         : null,
-      reciprocalBenefitCouponTemplate: template.reciprocalBenefitCouponTemplate,
+      reciprocalBenefitCouponTemplateId:
+        template.reciprocalBenefitCouponTemplateId,
     })
     .onConflictDoNothing();
   if (template.featuresGranted) {
@@ -97,9 +127,9 @@ export async function createCouponTemplate({
       await db
         .insert(couponTemplateFeaturesGranted)
         .values({
-          couponTemplate: template.uniqueId,
-          feature: feature.feature,
-          value: feature.value,
+          couponTemplateId: template.couponTemplateId,
+          featureId: feature.featureId,
+          setTo: feature.setTo,
           award: await resolveAward(feature.award),
         })
         .onConflictDoNothing();
@@ -110,9 +140,9 @@ export async function createCouponTemplate({
       await db
         .insert(couponTemplateCreditsGranted)
         .values({
-          couponTemplate: template.uniqueId,
-          meter: credit.meter,
-          amountMicrocredits: credit.amount,
+          couponTemplateId: template.couponTemplateId,
+          meterId: credit.meterId,
+          amountMicrocredits: credit.amountMicrocredits,
           expiration: credit.expiration,
           rollovers: credit.rollovers,
           award: await resolveAward(credit.award),
@@ -120,22 +150,22 @@ export async function createCouponTemplate({
         .onConflictDoNothing();
     }
   }
-  return getCouponTemplate({ uniqueId: template.uniqueId });
+  return getCouponTemplate({ couponTemplateId: template.couponTemplateId });
 }
 
 /** Deprecate the template, or return null if no such template exists. */
 export async function deprecateCouponTemplate({
-  uniqueId,
+  couponTemplateId,
 }: {
-  uniqueId: string;
-}): Promise<CouponTemplate | null> {
+  couponTemplateId: string;
+}): Promise<CouponTemplateApi | null> {
   const updated = await db
     .update(couponTemplates)
     .set({ deprecatedAt: Date.now() })
-    .where(eq(couponTemplates.uniqueId, uniqueId))
+    .where(eq(couponTemplates.couponTemplateId, couponTemplateId))
     .returning();
   if (updated.length === 0) {
     return null;
   }
-  return getCouponTemplate({ uniqueId });
+  return getCouponTemplate({ couponTemplateId });
 }

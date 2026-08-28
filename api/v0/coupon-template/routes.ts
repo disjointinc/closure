@@ -15,7 +15,7 @@ import {
   couponTemplateSchema,
 } from "../../schemas/coupon-template.ts";
 import { featureIdSchema, meterIdSchema } from "../../schemas/ids.ts";
-import { awardInputSchema } from "../award/service.ts";
+import { awardApiSchema } from "../award/service.ts";
 import {
   createCouponTemplate,
   deprecateCouponTemplate,
@@ -26,24 +26,24 @@ import {
 const couponTemplateCreateSchema = z
   .object({
     ...couponTemplateSchema.shape,
-    defaultAward: awardInputSchema.nullable(),
+    defaultAward: awardApiSchema.nullable(),
     featuresGranted: z
       .array(
         z.object({
-          feature: featureIdSchema,
-          value: featureSetTo,
-          award: awardInputSchema,
+          featureId: featureIdSchema,
+          setTo: featureSetTo,
+          award: awardApiSchema,
         }),
       )
       .nullable(),
     creditsGranted: z
       .array(
         z.object({
-          meter: meterIdSchema,
-          amount: microcredits.positive(),
+          meterId: meterIdSchema,
+          amountMicrocredits: microcredits.positive(),
           expiration: resetSchedule.nullable(),
           rollovers: z.number().int().nonnegative().nullable(),
-          award: awardInputSchema,
+          award: awardApiSchema,
         }),
       )
       .nullable(),
@@ -62,16 +62,18 @@ export const couponTemplateApp = new Hono()
   .get("/", async (c) => {
     return c.json(await listCouponTemplates());
   })
-  .get("/:id", async (c) => {
-    const template = await getCouponTemplate({ uniqueId: c.req.param("id") });
+  .get("/:couponTemplateId", async (c) => {
+    const template = await getCouponTemplate({
+      couponTemplateId: c.req.param("couponTemplateId"),
+    });
     if (!template) {
       return c.json({ error: "not found" }, 404);
     }
     return c.json(template);
   })
-  .delete("/:id", async (c) => {
+  .delete("/:couponTemplateId", async (c) => {
     const template = await deprecateCouponTemplate({
-      uniqueId: c.req.param("id"),
+      couponTemplateId: c.req.param("couponTemplateId"),
     });
     if (!template) {
       return c.json({ error: "not found" }, 404);
