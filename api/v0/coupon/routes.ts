@@ -18,7 +18,7 @@ import {
   featureIdSchema,
   meterIdSchema,
 } from "../../schemas/ids.ts";
-import { awardInputSchema } from "../award/service.ts";
+import { awardApiSchema } from "../award/service.ts";
 import {
   createCoupon,
   deleteCoupon,
@@ -32,39 +32,39 @@ const couponDefinitionFields = {
   limitPerGrantingTenant: z.number().int().positive().nullable(),
   name: z.string().min(1),
   description: z.string().nullable(),
-  defaultAward: awardInputSchema.nullable(),
+  defaultAward: awardApiSchema.nullable(),
   featuresGranted: z
     .array(
       z.object({
-        feature: featureIdSchema,
-        value: featureSetTo,
-        award: awardInputSchema,
+        featureId: featureIdSchema,
+        setTo: featureSetTo,
+        award: awardApiSchema,
       }),
     )
     .nullable(),
   creditsGranted: z
     .array(
       z.object({
-        meter: meterIdSchema,
-        amount: microcredits.positive(),
+        meterId: meterIdSchema,
+        amountMicrocredits: microcredits.positive(),
         expiration: resetSchedule.nullable(),
         rollovers: z.number().int().nonnegative().nullable(),
-        award: awardInputSchema,
+        award: awardApiSchema,
       }),
     )
     .nullable(),
   /** Only settable when grantableByTenants. */
-  reciprocalBenefitCoupon: couponIdSchema.nullable(),
+  reciprocalBenefitCouponId: couponIdSchema.nullable(),
 };
 
 const couponCreateSchema = z.union([
   // Inline definition.
   z
     .object({
-      uniqueId: couponIdSchema,
+      couponId: couponIdSchema,
       createdAt: epochMs,
       deletedAt: epochMs.nullable(),
-      template: z.null().optional(),
+      templateId: z.null().optional(),
       ...couponDefinitionFields,
     })
     .superRefine(checkCoupon),
@@ -73,11 +73,11 @@ const couponCreateSchema = z.union([
   // silently strip them.)
   z
     .object({
-      uniqueId: couponIdSchema,
+      couponId: couponIdSchema,
       createdAt: epochMs,
       deletedAt: epochMs.nullable(),
-      template: couponTemplateIdSchema,
-      reciprocalBenefitCoupon: couponIdSchema.nullable(),
+      templateId: couponTemplateIdSchema,
+      reciprocalBenefitCouponId: couponIdSchema.nullable(),
     })
     .strict(),
 ]);
@@ -96,15 +96,15 @@ export const couponApp = new Hono()
   .get("/", async (c) => {
     return c.json(await listCoupons());
   })
-  .get("/:id", async (c) => {
-    const coupon = await getCoupon({ uniqueId: c.req.param("id") });
+  .get("/:couponId", async (c) => {
+    const coupon = await getCoupon({ couponId: c.req.param("couponId") });
     if (!coupon) {
       return c.json({ error: "not found" }, 404);
     }
     return c.json(coupon);
   })
-  .delete("/:id", async (c) => {
-    const coupon = await deleteCoupon({ uniqueId: c.req.param("id") });
+  .delete("/:couponId", async (c) => {
+    const coupon = await deleteCoupon({ couponId: c.req.param("couponId") });
     if (!coupon) {
       return c.json({ error: "not found" }, 404);
     }
