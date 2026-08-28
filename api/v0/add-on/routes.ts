@@ -6,8 +6,8 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import { addOnSchema } from "../../schemas/add-on.ts";
-import { cycleRefSchema } from "../cycle/service.ts";
-import { valueRefSchema } from "../value/service.ts";
+import { cycleIdSchema } from "../../schemas/ids.ts";
+import { valueSchema } from "../../schemas/value.ts";
 import {
   createAddOn,
   deprecateAddOn,
@@ -15,9 +15,10 @@ import {
   listAddOns,
 } from "./service.ts";
 
+// Prices reference existing cycles by id; values are always defined inline.
 const addOnCreateSchema = z.object({
   ...addOnSchema.shape,
-  prices: z.array(z.object({ cycle: cycleRefSchema, value: valueRefSchema })),
+  prices: z.array(z.object({ cycleId: cycleIdSchema, value: valueSchema })),
 });
 
 export type AddOnCreateBody = z.infer<typeof addOnCreateSchema>;
@@ -30,15 +31,15 @@ export const addOnApp = new Hono()
   .get("/", async (c) => {
     return c.json(await listAddOns());
   })
-  .get("/:id", async (c) => {
-    const addOn = await getAddOn({ uniqueId: c.req.param("id") });
+  .get("/:addOnId", async (c) => {
+    const addOn = await getAddOn({ addOnId: c.req.param("addOnId") });
     if (!addOn) {
       return c.json({ error: "not found" }, 404);
     }
     return c.json(addOn);
   })
-  .delete("/:id", async (c) => {
-    const addOn = await deprecateAddOn({ uniqueId: c.req.param("id") });
+  .delete("/:addOnId", async (c) => {
+    const addOn = await deprecateAddOn({ addOnId: c.req.param("addOnId") });
     if (!addOn) {
       return c.json({ error: "not found" }, 404);
     }
