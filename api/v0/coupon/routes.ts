@@ -64,7 +64,7 @@ const couponCreateSchema = z.union([
       couponId: couponIdSchema,
       createdAt: epochMs,
       deletedAt: epochMs.nullable(),
-      templateId: z.null().optional(),
+      templateId: z.null(),
       ...couponDefinitionFields,
     })
     .superRefine(checkCoupon),

@@ -109,7 +109,7 @@ export async function createCoupon({
   // An explicit null check, not a truthiness check: the template branch's
   // templateId is a string, and "" is falsy, so truthiness wouldn't narrow
   // the union.
-  if (coupon.templateId !== null && coupon.templateId !== undefined) {
+  if (coupon.templateId !== null) {
     const template = await getCouponTemplate({
       couponTemplateId: coupon.templateId,
     });
