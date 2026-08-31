@@ -330,9 +330,10 @@ describe("metering durability", () => {
       tenantId,
     });
 
-    // No externalId: the caller's first-time path.
+    // Null externalId: the caller's first-time path.
     const event: MeterEventPayload = {
       meterEventId: newMeterEventId(),
+      externalId: null,
       createdAt: Date.now(),
       meterId,
       tenantId,

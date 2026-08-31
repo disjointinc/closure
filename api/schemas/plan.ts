@@ -110,7 +110,7 @@ export function checkPlanMeter(
   // Integer arithmetic, so this difference is exact.
   const headroom =
     meter.limitMicrocredits === null
-      ? undefined
+      ? null
       : meter.limitMicrocredits - meter.defaultMicrocredits;
 
   const tiers = meter.topUpPricesPerCredit;
@@ -125,7 +125,7 @@ export function checkPlanMeter(
         });
       }
       seen.add(tier.startingAt);
-      if (headroom !== undefined && tier.startingAt > headroom) {
+      if (headroom !== null && tier.startingAt > headroom) {
         ctx.addIssue({
           code: "custom",
           path: ["topUpPricesPerCredit", index, "startingAt"],
@@ -138,7 +138,7 @@ export function checkPlanMeter(
 
   const dynamicMaximum = meter.topUpCreditPackSizes?.dynamic.maximum;
   if (
-    headroom !== undefined &&
+    headroom !== null &&
     typeof dynamicMaximum === "number" &&
     dynamicMaximum > headroom
   ) {

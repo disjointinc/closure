@@ -6,11 +6,11 @@ export const meterEventSchema = z.object({
   meterEventId: meterEventIdSchema,
   /**
    * The caller's idempotency key: repeat deliveries with the same external
-   * id return the original outcome without double-charging. Optional --
-   * defaults to id at ingest, so callers who don't need idempotent
-   * redelivery never have to mint a second id.
+   * id return the original outcome without double-charging. Null means "no
+   * key" -- defaults to the meter event id at ingest, so callers who don't
+   * need idempotent redelivery never have to mint a second id.
    */
-  externalId: z.string().min(1).optional(),
+  externalId: z.string().min(1).nullable(),
   createdAt: epochMs,
   meterId: meterIdSchema,
   tenantId: tenantIdSchema,
