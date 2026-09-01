@@ -8,40 +8,40 @@ import { featureOptions, features, featureTaxTypes } from "../../db/schema.ts";
 import type { Feature } from "../../schemas/feature.ts";
 
 export async function getFeature({
-  uniqueId,
+  featureId,
 }: {
-  uniqueId: string;
+  featureId: string;
 }): Promise<Feature | null> {
   const [row] = await db
     .select()
     .from(features)
-    .where(eq(features.uniqueId, uniqueId));
+    .where(eq(features.featureId, featureId));
   if (!row) {
     return null;
   }
   const options = await db
     .select()
     .from(featureOptions)
-    .where(eq(featureOptions.feature, uniqueId));
+    .where(eq(featureOptions.featureId, featureId));
   const taxTypeRows = await db
     .select()
     .from(featureTaxTypes)
-    .where(eq(featureTaxTypes.feature, uniqueId));
+    .where(eq(featureTaxTypes.featureId, featureId));
   return {
-    uniqueId: row.uniqueId,
+    featureId: row.featureId,
     createdAt: row.createdAt,
     deprecatedAt: row.deprecatedAt,
     name: row.name,
     description: row.description,
     options: options.length
       ? options.map((option) => ({
-          uniqueId: option.uniqueId,
+          featureOptionId: option.featureOptionId,
           name: option.name,
           description: option.description,
         }))
       : null,
-    applicableTaxTypes: taxTypeRows.length
-      ? taxTypeRows.map((taxType) => taxType.taxType)
+    applicableTaxTypeIds: taxTypeRows.length
+      ? taxTypeRows.map((taxType) => taxType.taxTypeId)
       : null,
   };
 }
@@ -49,7 +49,7 @@ export async function getFeature({
 export async function listFeatures(): Promise<Feature[]> {
   const rows = await db.select().from(features);
   const found = await Promise.all(
-    rows.map((row) => getFeature({ uniqueId: row.uniqueId })),
+    rows.map((row) => getFeature({ featureId: row.featureId })),
   );
   return found.filter((feature) => feature !== null);
 }
@@ -62,7 +62,7 @@ export async function createFeature({
   await db
     .insert(features)
     .values({
-      uniqueId: feature.uniqueId,
+      featureId: feature.featureId,
       createdAt: feature.createdAt,
       deprecatedAt: feature.deprecatedAt,
       name: feature.name,
@@ -74,21 +74,21 @@ export async function createFeature({
       .insert(featureOptions)
       .values(
         feature.options.map((option) => ({
-          uniqueId: option.uniqueId,
-          feature: feature.uniqueId,
+          featureOptionId: option.featureOptionId,
+          featureId: feature.featureId,
           name: option.name,
           description: option.description,
         })),
       )
       .onConflictDoNothing();
   }
-  if (feature.applicableTaxTypes) {
+  if (feature.applicableTaxTypeIds) {
     await db
       .insert(featureTaxTypes)
       .values(
-        feature.applicableTaxTypes.map((taxType) => ({
-          feature: feature.uniqueId,
-          taxType,
+        feature.applicableTaxTypeIds.map((taxTypeId) => ({
+          featureId: feature.featureId,
+          taxTypeId,
         })),
       )
       .onConflictDoNothing();
@@ -97,17 +97,17 @@ export async function createFeature({
 
 /** Deprecate the feature, or return null if no such feature exists. */
 export async function deprecateFeature({
-  uniqueId,
+  featureId,
 }: {
-  uniqueId: string;
+  featureId: string;
 }): Promise<Feature | null> {
   const updated = await db
     .update(features)
     .set({ deprecatedAt: Date.now() })
-    .where(eq(features.uniqueId, uniqueId))
+    .where(eq(features.featureId, featureId))
     .returning();
   if (updated.length === 0) {
     return null;
   }
-  return getFeature({ uniqueId });
+  return getFeature({ featureId });
 }

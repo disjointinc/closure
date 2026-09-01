@@ -21,15 +21,17 @@ export const featureApp = new Hono()
   .get("/", async (c) => {
     return c.json(await listFeatures());
   })
-  .get("/:id", async (c) => {
-    const feature = await getFeature({ uniqueId: c.req.param("id") });
+  .get("/:featureId", async (c) => {
+    const feature = await getFeature({ featureId: c.req.param("featureId") });
     if (!feature) {
       return c.json({ error: "not found" }, 404);
     }
     return c.json(feature);
   })
-  .delete("/:id", async (c) => {
-    const feature = await deprecateFeature({ uniqueId: c.req.param("id") });
+  .delete("/:featureId", async (c) => {
+    const feature = await deprecateFeature({
+      featureId: c.req.param("featureId"),
+    });
     if (!feature) {
       return c.json({ error: "not found" }, 404);
     }
