@@ -2,7 +2,7 @@ import { z } from "zod";
 import { currencyAmountSchema, epochMs } from "./common.ts";
 import { assignmentIdSchema, loanIdSchema, tenantIdSchema } from "./ids.ts";
 
-/** A loan tied to an assignment. Purely a principal + lifecycle. */
+/** A loan tied to an assignment: the principal, the rate, and the lifecycle. */
 export const loanSchema = z.object({
   loanId: loanIdSchema,
   tenantId: tenantIdSchema,
@@ -10,5 +10,6 @@ export const loanSchema = z.object({
   createdAt: epochMs,
   closedAt: epochMs.nullable(),
   principal: currencyAmountSchema,
+  interestPercentage: z.number().positive(),
 });
 export type Loan = z.infer<typeof loanSchema>;

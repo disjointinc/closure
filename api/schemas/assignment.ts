@@ -18,11 +18,13 @@ export const assignmentSchema = z.object({
   cycleId: cycleIdSchema,
   startsAt: epochMs,
   endsAt: epochMs.nullable(),
-  /** For interest-accruing plans: the loan to auto-create, keyed by id. */
+  /** For loan plans: the loan to auto-create, keyed by id. */
   loan: z
     .object({
       loanId: loanIdSchema,
       principal: currencyAmountSchema,
+      /** Null means inherit the plan's defaultInterestPercentage. */
+      interestPercentage: z.number().positive().nullable(),
     })
     .nullable(),
   addOns: z.array(
