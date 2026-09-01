@@ -71,6 +71,13 @@
       "when": 1788245792659,
       "tag": "0009_drop_flat_top_up_shorthand",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788255054579,
+      "tag": "0010_sparkling_fat_cobra",
+      "breakpoints": true
     }
   ]
 }

@@ -257,6 +257,8 @@ export const plans = pgTable(
     ),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
+    /** Fixed term for loan-style plans; null means open-ended. */
+    duration: duration("duration"),
     name: text("name").notNull(),
     description: text("description"),
   },
@@ -272,11 +274,24 @@ export const planPrices = pgTable(
     cycleId: text("cycle_id")
       .notNull()
       .references(() => cycles.cycleId),
-    valueId: text("value_id")
-      .notNull()
-      .references(() => values.valueId),
+    /** Monetary price, when the row is a monetary variant. */
+    valueId: text("value_id").references(() => values.valueId),
+    /** Interest price, when the row is an interest variant. */
+    interestPercentage: doublePrecision("interest_percentage"),
+    minimumPaymentValueId: text("minimum_payment_value_id").references(
+      () => values.valueId,
+    ),
   },
-  (t) => [primaryKey({ columns: [t.planId, t.cycleId] })],
+  (t) => [
+    primaryKey({ columns: [t.planId, t.cycleId] }),
+    // A price is either monetary (value_id set) or interest
+    // (interest_percentage + minimum_payment_value_id set).
+    check(
+      "plan_prices_variant",
+      sql`(value_id is not null and interest_percentage is null and minimum_payment_value_id is null)
+       or (value_id is null and interest_percentage is not null and minimum_payment_value_id is not null)`,
+    ),
+  ],
 );
 
 export const planFeatures = pgTable(
@@ -639,6 +654,23 @@ export const assignmentAddOns = pgTable(
     endsAt: epochMs("ends_at"),
   },
   (t) => [primaryKey({ columns: [t.assignmentId, t.addOnId, t.startsAt] })],
+);
+
+export const loans = pgTable(
+  "loans",
+  {
+    loanId: text("loan_id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.tenantId),
+    assignmentId: text("assignment_id")
+      .notNull()
+      .references(() => assignments.assignmentId),
+    createdAt: epochMs("created_at").notNull(),
+    closedAt: epochMs("closed_at"),
+    principal: jsonb("principal").$type<CurrencyAmount>().notNull(),
+  },
+  (t) => [idFormatCheck("loan", t.loanId), index("loans_tenant").on(t.tenantId)],
 );
 
 export const invoices = pgTable(
