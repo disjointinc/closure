@@ -110,6 +110,7 @@ export async function getPlan({
     .where(eq(planAddOns.planId, planId));
   const valueIds = [
     ...priceRows.map((price) => price.valueId),
+    ...(row.minimumPaymentValueId === null ? [] : [row.minimumPaymentValueId]),
     ...meterRows.flatMap((meter) => topUpValueIds(meter.topUpPricesPerCredit)),
   ];
   const valueRows = valueIds.length
@@ -125,6 +126,10 @@ export async function getPlan({
     derivedFromPlanId: row.derivedFromPlanId,
     createdAt: row.createdAt,
     deprecatedAt: row.deprecatedAt,
+    kind: row.kind,
+    duration: row.duration,
+    defaultInterestPercentage: row.defaultInterestPercentage,
+    minimumPaymentValueId: row.minimumPaymentValueId,
     name: row.name,
     description: row.description,
     prices: priceRows.map((price) => ({
@@ -170,6 +175,10 @@ export async function createPlan({
       derivedFromPlanId: plan.derivedFromPlanId,
       createdAt: plan.createdAt,
       deprecatedAt: plan.deprecatedAt,
+      kind: plan.kind,
+      duration: plan.duration,
+      defaultInterestPercentage: plan.defaultInterestPercentage,
+      minimumPaymentValueId: plan.minimumPaymentValueId,
       name: plan.name,
       description: plan.description,
     })

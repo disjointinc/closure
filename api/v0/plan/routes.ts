@@ -8,6 +8,7 @@ import { z } from "zod";
 import { microcredits } from "../../schemas/common.ts";
 import { cycleIdSchema } from "../../schemas/ids.ts";
 import {
+  checkPlan,
   checkPlanMeter,
   planMeterFields,
   planSchema,
@@ -35,11 +36,13 @@ const planMeterInputSchema = z
   })
   .superRefine(checkPlanMeter);
 
-const planCreateSchema = z.object({
-  ...planSchema.shape,
-  prices: z.array(priceInputSchema),
-  meters: z.array(planMeterInputSchema).nullable(),
-});
+const planCreateSchema = z
+  .object({
+    ...planSchema.shape,
+    prices: z.array(priceInputSchema),
+    meters: z.array(planMeterInputSchema).nullable(),
+  })
+  .superRefine(checkPlan);
 
 export type PlanMeterInput = z.infer<typeof planMeterInputSchema>;
 export type PlanCreateBody = z.infer<typeof planCreateSchema>;
