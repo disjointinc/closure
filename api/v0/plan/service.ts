@@ -1,9 +1,10 @@
 /**
- * v0/plan/service.ts -- plan business logic. Prices (including inside meter
- * top-up tiers) accept existing cycle/value ids or inline definitions. Plans
- * are immutable and versioned (derivedFrom), so deletes deprecate.
+ * v0/plan/service.ts -- plan business logic. The call surface passes prices
+ * (including inside meter top-up tiers) as full inline values; cycles are
+ * first-class and referenced by id. Plans are immutable and versioned
+ * (derivedFromPlanId), so deletes deprecate.
  */
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import {
   planAddOns,
@@ -11,13 +12,24 @@ import {
   planMeters,
   planPrices,
   plans,
+  values,
 } from "../../db/schema.ts";
 import type { Plan, PlanMeter } from "../../schemas/plan.ts";
-import { resolveCycleRef } from "../cycle/service.ts";
-import { resolveValueRef } from "../value/service.ts";
+import { type Value } from "../../schemas/value.ts";
 import type { PlanCreateBody, PlanMeterInput } from "./routes.ts";
 
-/** Resolve inline cycle/value refs, returning the db-ready meter entry. */
+export type PlanPriceApi = { cycleId: string; value: Value };
+type TopUpTierApi = { startingAt: number; prices: PlanPriceApi[] };
+export type TopUpApi = TopUpTierApi[] | null;
+export type PlanMeterApi = Omit<PlanMeter, "topUpPricesPerCredit"> & {
+  topUpPricesPerCredit: TopUpApi;
+};
+export type PlanApi = Omit<Plan, "prices" | "meters"> & {
+  prices: PlanPriceApi[];
+  meters: PlanMeterApi[] | null;
+};
+
+/** Store the inline values, returning the db-ready meter entry. */
 async function resolveMeter({
   meter,
 }: {
@@ -27,92 +39,121 @@ async function resolveMeter({
   if (topUps === null) {
     return { ...meter, topUpPricesPerCredit: null };
   }
-  if (!Array.isArray(topUps)) {
-    return {
-      ...meter,
-      topUpPricesPerCredit: await resolveValueRef(topUps),
-    };
-  }
   return {
     ...meter,
     topUpPricesPerCredit: await Promise.all(
       topUps.map(async (tier) => ({
         startingAt: tier.startingAt,
         prices: await Promise.all(
-          tier.prices.map(async (price) => ({
-            cycle: await resolveCycleRef(price.cycle),
-            value: await resolveValueRef(price.value),
-          })),
+          tier.prices.map(async (price) => {
+            await db.insert(values).values(price.value).onConflictDoNothing();
+            return {
+              cycleId: price.cycleId,
+              valueId: price.value.valueId,
+            };
+          }),
         ),
       })),
     ),
   };
 }
 
+export function topUpValueIds(
+  topUp: PlanMeter["topUpPricesPerCredit"],
+): string[] {
+  if (topUp === null) {
+    return [];
+  }
+  return topUp.flatMap((tier) => tier.prices.map((price) => price.valueId));
+}
+
+export function expandTopUp(
+  topUp: PlanMeter["topUpPricesPerCredit"],
+  valueFor: (valueId: string) => Value,
+): TopUpApi {
+  if (topUp === null) {
+    return null;
+  }
+  return topUp.map((tier) => ({
+    startingAt: tier.startingAt,
+    prices: tier.prices.map((price) => ({
+      cycleId: price.cycleId,
+      value: valueFor(price.valueId),
+    })),
+  }));
+}
+
 export async function getPlan({
-  uniqueId,
+  planId,
 }: {
-  uniqueId: string;
-}): Promise<Plan | null> {
-  const [row] = await db
-    .select()
-    .from(plans)
-    .where(eq(plans.uniqueId, uniqueId));
+  planId: string;
+}): Promise<PlanApi | null> {
+  const [row] = await db.select().from(plans).where(eq(plans.planId, planId));
   if (!row) {
     return null;
   }
   const priceRows = await db
     .select()
     .from(planPrices)
-    .where(eq(planPrices.plan, uniqueId));
+    .where(eq(planPrices.planId, planId));
   const featureRows = await db
     .select()
     .from(planFeatures)
-    .where(eq(planFeatures.plan, uniqueId));
+    .where(eq(planFeatures.planId, planId));
   const meterRows = await db
     .select()
     .from(planMeters)
-    .where(eq(planMeters.plan, uniqueId));
+    .where(eq(planMeters.planId, planId));
   const addOnRows = await db
     .select()
     .from(planAddOns)
-    .where(eq(planAddOns.plan, uniqueId));
+    .where(eq(planAddOns.planId, planId));
+  const valueIds = [
+    ...priceRows.map((price) => price.valueId),
+    ...meterRows.flatMap((meter) => topUpValueIds(meter.topUpPricesPerCredit)),
+  ];
+  const valueRows = valueIds.length
+    ? await db.select().from(values).where(inArray(values.valueId, valueIds))
+    : [];
+  const valueById = new Map(valueRows.map((value) => [value.valueId, value]));
+  const valueFor = (valueId: string): Value =>
+    // plan_prices.value_id FKs values (and top-ups are resolved on write),
+    // so the row always exists.
+    valueById.get(valueId) as Value;
   return {
-    uniqueId: row.uniqueId,
-    derivedFrom: row.derivedFrom,
+    planId: row.planId,
+    derivedFromPlanId: row.derivedFromPlanId,
     createdAt: row.createdAt,
     deprecatedAt: row.deprecatedAt,
     name: row.name,
     description: row.description,
     prices: priceRows.map((price) => ({
-      cycle: price.cycle,
-      value: price.value,
+      cycleId: price.cycleId,
+      value: valueFor(price.valueId),
     })),
     features: featureRows.length
       ? featureRows.map((feature) => ({
-          feature: feature.feature,
+          featureId: feature.featureId,
           setTo: feature.setTo,
         }))
       : null,
     meters: meterRows.length
       ? meterRows.map((meter) => ({
-          meter: meter.meter,
-          default: meter.defaultMicrocredits,
-          limit: meter.limitMicrocredits,
-          reset: meter.reset,
-          rollovers: meter.rollovers,
-          topUpPricesPerCredit: meter.topUpPricesPerCredit,
-          topUpCreditPackSizes: meter.topUpCreditPackSizes,
+          ...meter,
+          topUpPricesPerCredit: expandTopUp(
+            meter.topUpPricesPerCredit,
+            valueFor,
+          ),
         }))
       : null,
-    addOns: addOnRows.length ? addOnRows.map((addOn) => addOn.addOn) : null,
+    addOnIds: addOnRows.length ? addOnRows.map((addOn) => addOn.addOnId) : null,
   };
 }
 
-export async function listPlans(): Promise<Plan[]> {
+export async function listPlans(): Promise<PlanApi[]> {
   const rows = await db.select().from(plans);
   const found = await Promise.all(
-    rows.map((row) => getPlan({ uniqueId: row.uniqueId })),
+    rows.map((row) => getPlan({ planId: row.planId })),
   );
   return found.filter((plan) => plan !== null);
 }
@@ -121,12 +162,12 @@ export async function createPlan({
   plan,
 }: {
   plan: PlanCreateBody;
-}): Promise<Plan | null> {
+}): Promise<PlanApi | null> {
   await db
     .insert(plans)
     .values({
-      uniqueId: plan.uniqueId,
-      derivedFrom: plan.derivedFrom,
+      planId: plan.planId,
+      derivedFromPlanId: plan.derivedFromPlanId,
       createdAt: plan.createdAt,
       deprecatedAt: plan.deprecatedAt,
       name: plan.name,
@@ -134,12 +175,13 @@ export async function createPlan({
     })
     .onConflictDoNothing();
   for (const price of plan.prices) {
+    await db.insert(values).values(price.value).onConflictDoNothing();
     await db
       .insert(planPrices)
       .values({
-        plan: plan.uniqueId,
-        cycle: await resolveCycleRef(price.cycle),
-        value: await resolveValueRef(price.value),
+        planId: plan.planId,
+        cycleId: price.cycleId,
+        valueId: price.value.valueId,
       })
       .onConflictDoNothing();
   }
@@ -148,8 +190,8 @@ export async function createPlan({
       .insert(planFeatures)
       .values(
         plan.features.map((feature) => ({
-          plan: plan.uniqueId,
-          feature: feature.feature,
+          planId: plan.planId,
+          featureId: feature.featureId,
           setTo: feature.setTo,
         })),
       )
@@ -161,10 +203,10 @@ export async function createPlan({
       await db
         .insert(planMeters)
         .values({
-          plan: plan.uniqueId,
-          meter: resolved.meter,
-          defaultMicrocredits: resolved.default,
-          limitMicrocredits: resolved.limit,
+          planId: plan.planId,
+          meterId: resolved.meterId,
+          defaultMicrocredits: resolved.defaultMicrocredits,
+          limitMicrocredits: resolved.limitMicrocredits,
           reset: resolved.reset,
           rollovers: resolved.rollovers,
           topUpPricesPerCredit: resolved.topUpPricesPerCredit,
@@ -173,28 +215,30 @@ export async function createPlan({
         .onConflictDoNothing();
     }
   }
-  if (plan.addOns) {
+  if (plan.addOnIds) {
     await db
       .insert(planAddOns)
-      .values(plan.addOns.map((addOn) => ({ plan: plan.uniqueId, addOn })))
+      .values(
+        plan.addOnIds.map((addOnId) => ({ planId: plan.planId, addOnId })),
+      )
       .onConflictDoNothing();
   }
-  return getPlan({ uniqueId: plan.uniqueId });
+  return getPlan({ planId: plan.planId });
 }
 
 /** Deprecate the plan, or return null if no such plan exists. */
 export async function deprecatePlan({
-  uniqueId,
+  planId,
 }: {
-  uniqueId: string;
-}): Promise<Plan | null> {
+  planId: string;
+}): Promise<PlanApi | null> {
   const updated = await db
     .update(plans)
     .set({ deprecatedAt: Date.now() })
-    .where(eq(plans.uniqueId, uniqueId))
+    .where(eq(plans.planId, planId))
     .returning();
   if (updated.length === 0) {
     return null;
   }
-  return getPlan({ uniqueId });
+  return getPlan({ planId });
 }
