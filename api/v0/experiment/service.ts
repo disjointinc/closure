@@ -13,43 +13,43 @@ import type { Experiment } from "../../schemas/experiment.ts";
 import type { ConcludeExperimentBody } from "./routes.ts";
 
 export async function getExperiment({
-  uniqueId,
+  experimentId,
 }: {
-  uniqueId: string;
+  experimentId: string;
 }): Promise<Experiment | null> {
   const [row] = await db
     .select()
     .from(experiments)
-    .where(eq(experiments.uniqueId, uniqueId));
+    .where(eq(experiments.experimentId, experimentId));
   if (!row) {
     return null;
   }
   const treatmentRows = await db
     .select()
     .from(experimentTreatments)
-    .where(eq(experimentTreatments.experiment, uniqueId));
+    .where(eq(experimentTreatments.experimentId, experimentId));
   const tenantRows = await db
     .select()
     .from(experimentTreatmentTenants)
-    .where(eq(experimentTreatmentTenants.experiment, uniqueId));
+    .where(eq(experimentTreatmentTenants.experimentId, experimentId));
   return {
-    uniqueId: row.uniqueId,
+    experimentId: row.experimentId,
     createdAt: row.createdAt,
     concludedAt: row.concludedAt,
-    planAssignmentAtConclusion: row.planAssignmentAtConclusion,
+    concludingPlanId: row.concludingPlanId,
     name: row.name,
     description: row.description,
     treatments: treatmentRows.map((treatment) => {
       const assigned = tenantRows.filter(
         (tenant) =>
-          tenant.experiment === treatment.experiment &&
-          tenant.plan === treatment.plan,
+          tenant.experimentId === treatment.experimentId &&
+          tenant.planId === treatment.planId,
       );
       return {
-        plan: treatment.plan,
+        planId: treatment.planId,
         tenantPercentage: treatment.tenantPercentage,
-        assignedTenants: assigned.length
-          ? assigned.map((tenant) => tenant.tenant)
+        assignedTenantIds: assigned.length
+          ? assigned.map((tenant) => tenant.tenantId)
           : null,
       };
     }),
@@ -59,7 +59,7 @@ export async function getExperiment({
 export async function listExperiments(): Promise<Experiment[]> {
   const rows = await db.select().from(experiments);
   const found = await Promise.all(
-    rows.map((row) => getExperiment({ uniqueId: row.uniqueId })),
+    rows.map((row) => getExperiment({ experimentId: row.experimentId })),
   );
   return found.filter((experiment) => experiment !== null);
 }
@@ -72,10 +72,10 @@ export async function createExperiment({
   await db
     .insert(experiments)
     .values({
-      uniqueId: experiment.uniqueId,
+      experimentId: experiment.experimentId,
       createdAt: experiment.createdAt,
       concludedAt: experiment.concludedAt,
-      planAssignmentAtConclusion: experiment.planAssignmentAtConclusion,
+      concludingPlanId: experiment.concludingPlanId,
       name: experiment.name,
       description: experiment.description,
     })
@@ -84,45 +84,45 @@ export async function createExperiment({
     await db
       .insert(experimentTreatments)
       .values({
-        experiment: experiment.uniqueId,
-        plan: treatment.plan,
+        experimentId: experiment.experimentId,
+        planId: treatment.planId,
         tenantPercentage: treatment.tenantPercentage,
       })
       .onConflictDoNothing();
-    if (treatment.assignedTenants) {
+    if (treatment.assignedTenantIds) {
       await db
         .insert(experimentTreatmentTenants)
         .values(
-          treatment.assignedTenants.map((tenant) => ({
-            experiment: experiment.uniqueId,
-            plan: treatment.plan,
-            tenant,
+          treatment.assignedTenantIds.map((tenantId) => ({
+            experimentId: experiment.experimentId,
+            planId: treatment.planId,
+            tenantId,
           })),
         )
         .onConflictDoNothing();
     }
   }
-  return getExperiment({ uniqueId: experiment.uniqueId });
+  return getExperiment({ experimentId: experiment.experimentId });
 }
 
 /** Conclude the experiment, or return null if no such experiment exists. */
 export async function concludeExperiment({
   body,
-  uniqueId,
+  experimentId,
 }: {
   body: ConcludeExperimentBody;
-  uniqueId: string;
+  experimentId: string;
 }): Promise<Experiment | null> {
   const updated = await db
     .update(experiments)
     .set({
       concludedAt: body.concludedAt,
-      planAssignmentAtConclusion: body.planAssignmentAtConclusion,
+      concludingPlanId: body.concludingPlanId,
     })
-    .where(eq(experiments.uniqueId, uniqueId))
+    .where(eq(experiments.experimentId, experimentId))
     .returning();
   if (updated.length === 0) {
     return null;
   }
-  return getExperiment({ uniqueId });
+  return getExperiment({ experimentId });
 }
