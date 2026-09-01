@@ -1,5 +1,5 @@
 /**
- * v0/tax/service.ts -- tax business logic. taxType may be an existing id
+ * v0/tax/service.ts -- tax business logic. taxTypeId may be an existing id
  * or an inline tax type. Immutable, so deletes deprecate.
  */
 import { eq } from "drizzle-orm";
@@ -17,7 +17,7 @@ import type { TaxCreateBody } from "./routes.ts";
  */
 export const taxRefSchema = z.union([
   taxIdSchema,
-  z.object({ ...taxSchema.shape, taxType: taxTypeRefSchema }),
+  z.object({ ...taxSchema.shape, taxTypeId: taxTypeRefSchema }),
 ]);
 
 /** Resolve a tax reference to an id, upserting inline definitions. */
@@ -27,23 +27,20 @@ export async function resolveTaxRef(
   if (typeof ref === "string") {
     return ref;
   }
-  const taxTypeId = await resolveTaxTypeRef(ref.taxType);
+  const taxTypeId = await resolveTaxTypeRef(ref.taxTypeId);
   await db
     .insert(taxes)
-    .values({ ...ref, taxType: taxTypeId })
+    .values({ ...ref, taxTypeId })
     .onConflictDoNothing();
-  return ref.uniqueId;
+  return ref.taxId;
 }
 
 export async function getTax({
-  uniqueId,
+  taxId,
 }: {
-  uniqueId: string;
+  taxId: string;
 }): Promise<Tax | null> {
-  const [row] = await db
-    .select()
-    .from(taxes)
-    .where(eq(taxes.uniqueId, uniqueId));
+  const [row] = await db.select().from(taxes).where(eq(taxes.taxId, taxId));
   return row ?? null;
 }
 
@@ -52,27 +49,27 @@ export async function listTaxes(): Promise<Tax[]> {
 }
 
 export async function createTax({ tax }: { tax: TaxCreateBody }): Promise<Tax> {
-  const taxTypeId = await resolveTaxTypeRef(tax.taxType);
+  const taxTypeId = await resolveTaxTypeRef(tax.taxTypeId);
   await db
     .insert(taxes)
-    .values({ ...tax, taxType: taxTypeId })
+    .values({ ...tax, taxTypeId })
     .onConflictDoNothing();
-  return { ...tax, taxType: taxTypeId };
+  return { ...tax, taxTypeId };
 }
 
 /** Deprecate the tax, or return null if no such tax exists. */
 export async function deprecateTax({
-  uniqueId,
+  taxId,
 }: {
-  uniqueId: string;
+  taxId: string;
 }): Promise<Tax | null> {
   const updated = await db
     .update(taxes)
     .set({ deprecatedAt: Date.now() })
-    .where(eq(taxes.uniqueId, uniqueId))
+    .where(eq(taxes.taxId, taxId))
     .returning();
   if (updated.length === 0) {
     return null;
   }
-  return getTax({ uniqueId });
+  return getTax({ taxId });
 }

@@ -11,7 +11,7 @@ import { createTax, deprecateTax, getTax, listTaxes } from "./service.ts";
 
 const taxCreateSchema = z.object({
   ...taxSchema.shape,
-  taxType: taxTypeRefSchema,
+  taxTypeId: taxTypeRefSchema,
 });
 
 export type TaxCreateBody = z.infer<typeof taxCreateSchema>;
@@ -24,15 +24,15 @@ export const taxApp = new Hono()
   .get("/", async (c) => {
     return c.json(await listTaxes());
   })
-  .get("/:id", async (c) => {
-    const tax = await getTax({ uniqueId: c.req.param("id") });
+  .get("/:taxId", async (c) => {
+    const tax = await getTax({ taxId: c.req.param("taxId") });
     if (!tax) {
       return c.json({ error: "not found" }, 404);
     }
     return c.json(tax);
   })
-  .delete("/:id", async (c) => {
-    const tax = await deprecateTax({ uniqueId: c.req.param("id") });
+  .delete("/:taxId", async (c) => {
+    const tax = await deprecateTax({ taxId: c.req.param("taxId") });
     if (!tax) {
       return c.json({ error: "not found" }, 404);
     }
