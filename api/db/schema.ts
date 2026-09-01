@@ -72,6 +72,7 @@ const topUpCreditPackSizes = (name: string) =>
   jsonb(name).$type<PlanMeter["topUpCreditPackSizes"]>();
 
 export const chargedEnum = pgEnum("charged", ["upfront", "arrears"]);
+export const planKindEnum = pgEnum("plan_kind", ["standard", "loan"]);
 export const meterEventStatusEnum = pgEnum("meter_event_status", [
   "succeeded",
   "insufficient_balance",
@@ -257,12 +258,27 @@ export const plans = pgTable(
     ),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
-    /** Fixed term for loan-style plans; null means open-ended. */
+    kind: planKindEnum("kind").notNull().default("standard"),
+    /** Fixed term for loan plans; null on standard plans. */
     duration: duration("duration"),
+    /** Rate loans on this plan inherit when the assignment omits one. */
+    defaultInterestPercentage: doublePrecision("default_interest_percentage"),
+    /** The minimum payment due each cycle on loan plans. */
+    minimumPaymentValueId: text("minimum_payment_value_id").references(
+      () => values.valueId,
+    ),
     name: text("name").notNull(),
     description: text("description"),
   },
-  (t) => [idFormatCheck("plan", t.planId)],
+  (t) => [
+    idFormatCheck("plan", t.planId),
+    // Standard plans carry no loan terms; loan plans require them.
+    check(
+      "plans_kind_variant",
+      sql`(kind = 'standard' and duration is null and default_interest_percentage is null and minimum_payment_value_id is null)
+       or (kind = 'loan' and duration is not null and minimum_payment_value_id is not null)`,
+    ),
+  ],
 );
 
 export const planPrices = pgTable(
@@ -274,24 +290,11 @@ export const planPrices = pgTable(
     cycleId: text("cycle_id")
       .notNull()
       .references(() => cycles.cycleId),
-    /** Monetary price, when the row is a monetary variant. */
-    valueId: text("value_id").references(() => values.valueId),
-    /** Interest price, when the row is an interest variant. */
-    interestPercentage: doublePrecision("interest_percentage"),
-    minimumPaymentValueId: text("minimum_payment_value_id").references(
-      () => values.valueId,
-    ),
+    valueId: text("value_id")
+      .notNull()
+      .references(() => values.valueId),
   },
-  (t) => [
-    primaryKey({ columns: [t.planId, t.cycleId] }),
-    // A price is either monetary (value_id set) or interest
-    // (interest_percentage + minimum_payment_value_id set).
-    check(
-      "plan_prices_variant",
-      sql`(value_id is not null and interest_percentage is null and minimum_payment_value_id is null)
-       or (value_id is null and interest_percentage is not null and minimum_payment_value_id is not null)`,
-    ),
-  ],
+  (t) => [primaryKey({ columns: [t.planId, t.cycleId] })],
 );
 
 export const planFeatures = pgTable(
@@ -669,6 +672,7 @@ export const loans = pgTable(
     createdAt: epochMs("created_at").notNull(),
     closedAt: epochMs("closed_at"),
     principal: jsonb("principal").$type<CurrencyAmount>().notNull(),
+    interestPercentage: doublePrecision("interest_percentage").notNull(),
   },
   (t) => [
     idFormatCheck("loan", t.loanId),

@@ -78,6 +78,13 @@
       "when": 1788255054579,
       "tag": "0010_sparkling_fat_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788262256194,
+      "tag": "0011_lazy_power_man",
+      "breakpoints": true
     }
   ]
 }
