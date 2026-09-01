@@ -1,11 +1,38 @@
 /**
- * v0/tax-type/routes.ts -- HTTP for /v0/tax-type: listing, so pickers can
- * enumerate existing tax types. Everything else composes tax types inline
- * into taxes (see service.ts).
+ * v0/tax-type/routes.ts -- HTTP for /v0/tax-type: creation, listing, get,
+ * and deprecate. Business logic lives in service.ts.
  */
+import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
-import { listTaxTypes } from "./service.ts";
+import { taxTypeSchema } from "../../schemas/tax-type.ts";
+import {
+  createTaxType,
+  deprecateTaxType,
+  getTaxType,
+  listTaxTypes,
+} from "./service.ts";
 
-export const taxTypeApp = new Hono().get("/", async (c) => {
-  return c.json(await listTaxTypes());
-});
+export const taxTypeApp = new Hono()
+  .post("/", zValidator("json", taxTypeSchema), async (c) => {
+    const body = c.req.valid("json");
+    return c.json(await createTaxType({ taxType: body }), 201);
+  })
+  .get("/", async (c) => {
+    return c.json(await listTaxTypes());
+  })
+  .get("/:taxTypeId", async (c) => {
+    const taxType = await getTaxType({ taxTypeId: c.req.param("taxTypeId") });
+    if (!taxType) {
+      return c.json({ error: "not found" }, 404);
+    }
+    return c.json(taxType);
+  })
+  .delete("/:taxTypeId", async (c) => {
+    const taxType = await deprecateTaxType({
+      taxTypeId: c.req.param("taxTypeId"),
+    });
+    if (!taxType) {
+      return c.json({ error: "not found" }, 404);
+    }
+    return c.json(taxType);
+  });
