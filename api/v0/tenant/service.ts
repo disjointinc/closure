@@ -18,11 +18,11 @@ import {
 } from "../../db/schema.ts";
 import type { TenantCreateBody, TenantPatchBody } from "./routes.ts";
 
-export async function getTenant({ uniqueId }: { uniqueId: string }) {
+export async function getTenant({ tenantId }: { tenantId: string }) {
   const [row] = await db
     .select()
     .from(tenants)
-    .where(eq(tenants.uniqueId, uniqueId));
+    .where(eq(tenants.tenantId, tenantId));
   return row ?? null;
 }
 
@@ -34,7 +34,7 @@ export async function createTenant({ tenant }: { tenant: TenantCreateBody }) {
   await db
     .insert(tenants)
     .values({
-      uniqueId: tenant.uniqueId,
+      tenantId: tenant.tenantId,
       createdAt: tenant.createdAt,
       deletedAt: null,
       externalIds: tenant.externalIds,
@@ -46,15 +46,15 @@ export async function createTenant({ tenant }: { tenant: TenantCreateBody }) {
 /** Patch the tenant, or return null if no such tenant exists. */
 export async function patchTenant({
   patch,
-  uniqueId,
+  tenantId,
 }: {
   patch: TenantPatchBody;
-  uniqueId: string;
+  tenantId: string;
 }) {
   const updated = await db
     .update(tenants)
     .set({ externalIds: patch.externalIds })
-    .where(eq(tenants.uniqueId, uniqueId))
+    .where(eq(tenants.tenantId, tenantId))
     .returning();
   if (updated.length === 0) {
     return null;
@@ -63,11 +63,11 @@ export async function patchTenant({
 }
 
 /** Soft-delete the tenant, or return null if no such tenant exists. */
-export async function deleteTenant({ uniqueId }: { uniqueId: string }) {
+export async function deleteTenant({ tenantId }: { tenantId: string }) {
   const updated = await db
     .update(tenants)
     .set({ deletedAt: Date.now() })
-    .where(eq(tenants.uniqueId, uniqueId))
+    .where(eq(tenants.tenantId, tenantId))
     .returning();
   if (updated.length === 0) {
     return null;
@@ -85,11 +85,11 @@ export async function getEntitlements({ tenantId }: { tenantId: string }) {
   const [assignment] = await db
     .select()
     .from(assignments)
-    .where(and(eq(assignments.tenant, tenantId), isNull(assignments.end)))
-    .orderBy(desc(assignments.start))
+    .where(and(eq(assignments.tenantId, tenantId), isNull(assignments.endsAt)))
+    .orderBy(desc(assignments.startsAt))
     .limit(1);
   if (!assignment) {
-    return { tenant: tenantId, assignment: null, features: [], meters: [] };
+    return { tenantId, assignmentId: null, features: [], meters: [] };
   }
 
   const now = Date.now();
@@ -97,86 +97,93 @@ export async function getEntitlements({ tenantId }: { tenantId: string }) {
   const planFeatureRows = await db
     .select()
     .from(planFeatures)
-    .where(eq(planFeatures.plan, assignment.plan));
+    .where(eq(planFeatures.planId, assignment.planId));
   const assignmentAddOnRows = await db
     .select()
     .from(assignmentAddOns)
-    .where(eq(assignmentAddOns.assignment, assignment.uniqueId));
+    .where(eq(assignmentAddOns.assignmentId, assignment.assignmentId));
   const activeAddOnIds = assignmentAddOnRows
     .filter(
-      (addOn) => addOn.start <= now && (addOn.end === null || addOn.end > now),
+      (addOn) =>
+        addOn.startsAt <= now && (addOn.endsAt === null || addOn.endsAt > now),
     )
-    .map((addOn) => addOn.addOn);
+    .map((addOn) => addOn.addOnId);
   const addOnFeatureRows = (
     await Promise.all(
-      activeAddOnIds.map((addOn) =>
-        db.select().from(addOnFeatures).where(eq(addOnFeatures.addOn, addOn)),
+      activeAddOnIds.map((addOnId) =>
+        db
+          .select()
+          .from(addOnFeatures)
+          .where(eq(addOnFeatures.addOnId, addOnId)),
       ),
     )
   ).flat();
   const featureOverrideRows = await db
     .select()
     .from(featureOverrides)
-    .where(eq(featureOverrides.tenant, tenantId))
-    .orderBy(desc(featureOverrides.on));
+    .where(eq(featureOverrides.tenantId, tenantId))
+    .orderBy(desc(featureOverrides.createdAt));
 
   const featureMap = new Map<string, boolean | string[]>();
   for (const row of planFeatureRows) {
-    featureMap.set(row.feature, row.setTo);
+    featureMap.set(row.featureId, row.setTo);
   }
   for (const row of addOnFeatureRows) {
-    featureMap.set(row.feature, row.setTo);
+    featureMap.set(row.featureId, row.setTo);
   }
   const seenFeatures = new Set<string>();
   for (const row of featureOverrideRows) {
-    if (!seenFeatures.has(row.feature)) {
-      seenFeatures.add(row.feature);
-      featureMap.set(row.feature, row.setTo);
+    if (!seenFeatures.has(row.featureId)) {
+      seenFeatures.add(row.featureId);
+      featureMap.set(row.featureId, row.setTo);
     }
   }
 
   const planMeterRows = await db
     .select()
     .from(planMeters)
-    .where(eq(planMeters.plan, assignment.plan));
+    .where(eq(planMeters.planId, assignment.planId));
   const meterOverrideRows = await db
     .select()
     .from(meterOverrides)
-    .where(eq(meterOverrides.tenant, tenantId))
-    .orderBy(desc(meterOverrides.on));
+    .where(eq(meterOverrides.tenantId, tenantId))
+    .orderBy(desc(meterOverrides.createdAt));
 
-  const meterMap = new Map<string, { default: number; limit: number | null }>();
+  const meterMap = new Map<
+    string,
+    { defaultMicrocredits: number; limitMicrocredits: number | null }
+  >();
   for (const row of planMeterRows) {
-    meterMap.set(row.meter, {
-      default: row.defaultMicrocredits,
-      limit: row.limitMicrocredits,
+    meterMap.set(row.meterId, {
+      defaultMicrocredits: row.defaultMicrocredits,
+      limitMicrocredits: row.limitMicrocredits,
     });
   }
   const seenMeters = new Set<string>();
   for (const row of meterOverrideRows) {
-    if (!seenMeters.has(row.meter)) {
-      seenMeters.add(row.meter);
-      meterMap.set(row.meter, {
-        default: row.defaultMicrocredits,
-        limit: row.limitMicrocredits,
+    if (!seenMeters.has(row.meterId)) {
+      seenMeters.add(row.meterId);
+      meterMap.set(row.meterId, {
+        defaultMicrocredits: row.defaultMicrocredits,
+        limitMicrocredits: row.limitMicrocredits,
       });
     }
   }
 
   return {
-    tenant: tenantId,
-    assignment: assignment.uniqueId,
-    features: [...featureMap.entries()].map(([feature, setTo]) => ({
-      feature,
+    tenantId,
+    assignmentId: assignment.assignmentId,
+    features: [...featureMap.entries()].map(([featureId, setTo]) => ({
+      featureId,
       setTo,
     })),
     meters: await Promise.all(
-      [...meterMap.entries()].map(async ([meter, config]) => ({
-        meter,
-        defaultMicrocredits: config.default,
-        limitMicrocredits: config.limit,
+      [...meterMap.entries()].map(async ([meterId, config]) => ({
+        meterId,
+        defaultMicrocredits: config.defaultMicrocredits,
+        limitMicrocredits: config.limitMicrocredits,
         balanceMicrocredits: await getMeterBalance({
-          meterId: meter,
+          meterId,
           tenantId,
         }),
       })),
