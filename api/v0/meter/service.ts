@@ -8,29 +8,29 @@ import { meters, meterTaxTypes } from "../../db/schema.ts";
 import type { Meter } from "../../schemas/meter.ts";
 
 export async function getMeter({
-  uniqueId,
+  meterId,
 }: {
-  uniqueId: string;
+  meterId: string;
 }): Promise<Meter | null> {
   const [row] = await db
     .select()
     .from(meters)
-    .where(eq(meters.uniqueId, uniqueId));
+    .where(eq(meters.meterId, meterId));
   if (!row) {
     return null;
   }
   const taxTypeRows = await db
     .select()
     .from(meterTaxTypes)
-    .where(eq(meterTaxTypes.meter, uniqueId));
+    .where(eq(meterTaxTypes.meterId, meterId));
   return {
-    uniqueId: row.uniqueId,
+    meterId: row.meterId,
     createdAt: row.createdAt,
     deprecatedAt: row.deprecatedAt,
     name: row.name,
     description: row.description,
-    applicableTaxTypes: taxTypeRows.length
-      ? taxTypeRows.map((taxType) => taxType.taxType)
+    applicableTaxTypeIds: taxTypeRows.length
+      ? taxTypeRows.map((taxType) => taxType.taxTypeId)
       : null,
   };
 }
@@ -38,7 +38,7 @@ export async function getMeter({
 export async function listMeters(): Promise<Meter[]> {
   const rows = await db.select().from(meters);
   const found = await Promise.all(
-    rows.map((row) => getMeter({ uniqueId: row.uniqueId })),
+    rows.map((row) => getMeter({ meterId: row.meterId })),
   );
   return found.filter((meter) => meter !== null);
 }
@@ -47,20 +47,20 @@ export async function createMeter({ meter }: { meter: Meter }): Promise<void> {
   await db
     .insert(meters)
     .values({
-      uniqueId: meter.uniqueId,
+      meterId: meter.meterId,
       createdAt: meter.createdAt,
       deprecatedAt: meter.deprecatedAt,
       name: meter.name,
       description: meter.description,
     })
     .onConflictDoNothing();
-  if (meter.applicableTaxTypes) {
+  if (meter.applicableTaxTypeIds) {
     await db
       .insert(meterTaxTypes)
       .values(
-        meter.applicableTaxTypes.map((taxType) => ({
-          meter: meter.uniqueId,
-          taxType,
+        meter.applicableTaxTypeIds.map((taxTypeId) => ({
+          meterId: meter.meterId,
+          taxTypeId,
         })),
       )
       .onConflictDoNothing();
@@ -69,17 +69,17 @@ export async function createMeter({ meter }: { meter: Meter }): Promise<void> {
 
 /** Deprecate the meter, or return null if no such meter exists. */
 export async function deprecateMeter({
-  uniqueId,
+  meterId,
 }: {
-  uniqueId: string;
+  meterId: string;
 }): Promise<Meter | null> {
   const updated = await db
     .update(meters)
     .set({ deprecatedAt: Date.now() })
-    .where(eq(meters.uniqueId, uniqueId))
+    .where(eq(meters.meterId, meterId))
     .returning();
   if (updated.length === 0) {
     return null;
   }
-  return getMeter({ uniqueId });
+  return getMeter({ meterId });
 }

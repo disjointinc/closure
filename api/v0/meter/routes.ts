@@ -21,15 +21,15 @@ export const meterApp = new Hono()
   .get("/", async (c) => {
     return c.json(await listMeters());
   })
-  .get("/:id", async (c) => {
-    const meter = await getMeter({ uniqueId: c.req.param("id") });
+  .get("/:meterId", async (c) => {
+    const meter = await getMeter({ meterId: c.req.param("meterId") });
     if (!meter) {
       return c.json({ error: "not found" }, 404);
     }
     return c.json(meter);
   })
-  .delete("/:id", async (c) => {
-    const meter = await deprecateMeter({ uniqueId: c.req.param("id") });
+  .delete("/:meterId", async (c) => {
+    const meter = await deprecateMeter({ meterId: c.req.param("meterId") });
     if (!meter) {
       return c.json({ error: "not found" }, 404);
     }
