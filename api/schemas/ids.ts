@@ -31,6 +31,7 @@ export const idSuffixLengths = {
   // tenant-scoped, ~1e2 per tenant -> ~1e14
   assignment: 24,
   feature_override: 24,
+  loan: 24,
   meter_override: 24,
   // tenant-scoped, ~1e3 per tenant -> ~1e15
   credit_grant: 25,
@@ -80,6 +81,7 @@ export const featureOptionIdSchema = prefixedId("feature_option");
 export const featureOverrideIdSchema = prefixedId("feature_override");
 export const invoiceIdSchema = prefixedId("invoice");
 export const itemIdSchema = prefixedId("item");
+export const loanIdSchema = prefixedId("loan");
 export const meterIdSchema = prefixedId("meter");
 export const meterEventIdSchema = prefixedId("meter_event");
 export const meterOverrideIdSchema = prefixedId("meter_override");

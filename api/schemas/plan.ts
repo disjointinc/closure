@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  durationSchema,
   epochMs,
   featureSetTo,
   microcredits,
@@ -8,9 +9,11 @@ import {
 } from "./common.ts";
 import {
   addOnIdSchema,
+  cycleIdSchema,
   featureIdSchema,
   meterIdSchema,
   planIdSchema,
+  valueIdSchema,
 } from "./ids.ts";
 
 /** A feature entry as embedded in a plan (or add-on, or feature override). */
@@ -19,6 +22,15 @@ export const planFeatureSchema = z.object({
   setTo: featureSetTo,
 });
 export type PlanFeature = z.infer<typeof planFeatureSchema>;
+
+/** An interest-accruing price: the rate and the minimum payment per cycle. */
+export const interestPriceSchema = z.object({
+  cycleId: cycleIdSchema,
+  interestPercentage: z.number().positive(),
+  /** The minimum payment due each cycle, referencing a value by id. */
+  minimumPaymentValueId: valueIdSchema,
+});
+export type InterestPrice = z.infer<typeof interestPriceSchema>;
 
 const topUpTierSchema = z.object({
   /**
@@ -156,9 +168,11 @@ export const planSchema = z.object({
   derivedFromPlanId: planIdSchema.nullable(),
   createdAt: epochMs,
   deprecatedAt: epochMs.nullable(),
+  /** Fixed term for loan-style plans; null means open-ended. */
+  duration: durationSchema.nullable(),
   name: z.string().min(1),
   description: z.string().nullable(),
-  prices: z.array(priceSchema),
+  prices: z.array(z.union([priceSchema, interestPriceSchema])),
   features: z.array(planFeatureSchema).nullable(),
   meters: z.array(planMeterSchema).nullable(),
   addOnIds: z.array(addOnIdSchema).nullable(),
