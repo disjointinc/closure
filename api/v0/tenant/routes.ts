@@ -99,6 +99,6 @@ export const tenantApp = new Hono<{ Variables: { tenantId: string } }>()
   .route("/:tenantId/meter-balance", meterBalanceApp)
   .route("/:tenantId/meter-event", meterEventApp)
   .route("/:tenantId/meter-override", meterOverrideApp)
-  .route("/:tenantId/payment-method", paymentMethodApp)
   .route("/:tenantId/payment", paymentApp)
+  .route("/:tenantId/payment-method", paymentMethodApp)
   .route("/:tenantId/refund", refundApp);
