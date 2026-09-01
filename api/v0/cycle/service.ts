@@ -66,6 +66,7 @@ const cycleFields = {
   cycleId: cycleIdSchema,
   createdAt: epochMs,
   deprecatedAt: epochMs.nullable(),
+  defaultDiscountPercentage: z.number().nullable(),
   name: z.string().min(1),
   description: z.string().nullable(),
 };
@@ -149,6 +150,7 @@ function cycleToRow(cycle: Cycle) {
     cycleId: cycle.cycleId,
     createdAt: cycle.createdAt,
     deprecatedAt: cycle.deprecatedAt,
+    defaultDiscountPercentage: cycle.defaultDiscountPercentage,
     name: cycle.name,
     description: cycle.description,
     charged: cycle.charged,
@@ -175,6 +177,7 @@ function rowToCycle(row: typeof cycles.$inferSelect): Cycle {
     cycleId: row.cycleId,
     createdAt: row.createdAt,
     deprecatedAt: row.deprecatedAt,
+    defaultDiscountPercentage: row.defaultDiscountPercentage,
     name: row.name,
     description: row.description,
   };
