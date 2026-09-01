@@ -18,6 +18,7 @@ import { couponReceiptApp } from "./coupon-receipt/routes.ts";
 import { creditGrantApp } from "./credit-grant/routes.ts";
 import { featureOverrideApp } from "./feature-override/routes.ts";
 import { invoiceApp } from "./invoice/routes.ts";
+import { loanApp } from "./loan/routes.ts";
 import { meterBalanceApp } from "./meter-balance/routes.ts";
 import { meterEventApp } from "./meter-event/routes.ts";
 import { meterOverrideApp } from "./meter-override/routes.ts";
@@ -96,6 +97,7 @@ export const tenantApp = new Hono<{ Variables: { tenantId: string } }>()
   .route("/:tenantId/credit-grant", creditGrantApp)
   .route("/:tenantId/feature-override", featureOverrideApp)
   .route("/:tenantId/invoice", invoiceApp)
+  .route("/:tenantId/loan", loanApp)
   .route("/:tenantId/meter-balance", meterBalanceApp)
   .route("/:tenantId/meter-event", meterEventApp)
   .route("/:tenantId/meter-override", meterOverrideApp)
