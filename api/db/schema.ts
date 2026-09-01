@@ -670,7 +670,10 @@ export const loans = pgTable(
     closedAt: epochMs("closed_at"),
     principal: jsonb("principal").$type<CurrencyAmount>().notNull(),
   },
-  (t) => [idFormatCheck("loan", t.loanId), index("loans_tenant").on(t.tenantId)],
+  (t) => [
+    idFormatCheck("loan", t.loanId),
+    index("loans_tenant").on(t.tenantId),
+  ],
 );
 
 export const invoices = pgTable(
