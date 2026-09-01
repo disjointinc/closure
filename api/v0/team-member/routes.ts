@@ -17,7 +17,7 @@ import {
 const teamMemberPatchSchema = z
   .object({
     name: z.string().min(1).nullable(),
-    profilePictureLink: z.url().nullable(),
+    profilePictureUrl: z.url().nullable(),
   })
   .partial();
 
@@ -32,26 +32,32 @@ export const teamMemberApp = new Hono()
   .get("/", async (c) => {
     return c.json(await listTeamMembers());
   })
-  .get("/:id", async (c) => {
-    const teamMember = await getTeamMember({ uniqueId: c.req.param("id") });
-    if (!teamMember) {
-      return c.json({ error: "not found" }, 404);
-    }
-    return c.json(teamMember);
-  })
-  .patch("/:id", zValidator("json", teamMemberPatchSchema), async (c) => {
-    const teamMember = await patchTeamMember({
-      patch: c.req.valid("json"),
-      uniqueId: c.req.param("id"),
+  .get("/:teamMemberId", async (c) => {
+    const teamMember = await getTeamMember({
+      teamMemberId: c.req.param("teamMemberId"),
     });
     if (!teamMember) {
       return c.json({ error: "not found" }, 404);
     }
     return c.json(teamMember);
   })
-  .delete("/:id", async (c) => {
+  .patch(
+    "/:teamMemberId",
+    zValidator("json", teamMemberPatchSchema),
+    async (c) => {
+      const teamMember = await patchTeamMember({
+        patch: c.req.valid("json"),
+        teamMemberId: c.req.param("teamMemberId"),
+      });
+      if (!teamMember) {
+        return c.json({ error: "not found" }, 404);
+      }
+      return c.json(teamMember);
+    },
+  )
+  .delete("/:teamMemberId", async (c) => {
     const teamMember = await deleteTeamMember({
-      uniqueId: c.req.param("id"),
+      teamMemberId: c.req.param("teamMemberId"),
     });
     if (!teamMember) {
       return c.json({ error: "not found" }, 404);

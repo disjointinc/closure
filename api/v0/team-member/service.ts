@@ -9,14 +9,14 @@ import type { TeamMember } from "../../schemas/team-member.ts";
 import type { TeamMemberPatchBody } from "./routes.ts";
 
 export async function getTeamMember({
-  uniqueId,
+  teamMemberId,
 }: {
-  uniqueId: string;
+  teamMemberId: string;
 }): Promise<TeamMember | null> {
   const [row] = await db
     .select()
     .from(teamMembers)
-    .where(eq(teamMembers.uniqueId, uniqueId));
+    .where(eq(teamMembers.teamMemberId, teamMemberId));
   return row ?? null;
 }
 
@@ -34,35 +34,35 @@ export async function createTeamMember({
 
 /** Soft-delete the team member, or return null if no such member exists. */
 export async function deleteTeamMember({
-  uniqueId,
+  teamMemberId,
 }: {
-  uniqueId: string;
+  teamMemberId: string;
 }): Promise<TeamMember | null> {
   const updated = await db
     .update(teamMembers)
     .set({ deletedAt: Date.now() })
-    .where(eq(teamMembers.uniqueId, uniqueId))
+    .where(eq(teamMembers.teamMemberId, teamMemberId))
     .returning();
   return updated[0] ?? null;
 }
 
-/** Patch the team member, or return null if no such team member exists. */
+/** Patch the team member, or return null if no such member exists. */
 export async function patchTeamMember({
   patch,
-  uniqueId,
+  teamMemberId,
 }: {
   patch: TeamMemberPatchBody;
-  uniqueId: string;
+  teamMemberId: string;
 }): Promise<TeamMember | null> {
   const updated = await db
     .update(teamMembers)
     .set({
       ...(patch.name !== undefined ? { name: patch.name } : {}),
-      ...(patch.profilePictureLink !== undefined
-        ? { profilePictureLink: patch.profilePictureLink }
+      ...(patch.profilePictureUrl !== undefined
+        ? { profilePictureUrl: patch.profilePictureUrl }
         : {}),
     })
-    .where(eq(teamMembers.uniqueId, uniqueId))
+    .where(eq(teamMembers.teamMemberId, teamMemberId))
     .returning();
   return updated[0] ?? null;
 }
