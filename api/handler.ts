@@ -31,7 +31,6 @@ import { taxApp } from "./v0/tax/routes.ts";
 import { taxTypeApp } from "./v0/tax-type/routes.ts";
 import { teamMemberApp } from "./v0/team-member/routes.ts";
 import { tenantApp } from "./v0/tenant/routes.ts";
-import { valueApp } from "./v0/value/routes.ts";
 
 const app = new Hono()
   // Browser calls from the web console are cross-origin in the dev stack.
@@ -57,7 +56,6 @@ const app = new Hono()
   .route("/v0/tax-type", taxTypeApp)
   .route("/v0/team-member", teamMemberApp)
   .route("/v0/tenant", tenantApp)
-  .route("/v0/value", valueApp)
   .notFound((c) => c.json({ error: "not found" }, 404));
 
 export type AppType = typeof app;
