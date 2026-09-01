@@ -17,7 +17,7 @@ import {
 
 const concludeSchema = z.object({
   concludedAt: epochMs,
-  planAssignmentAtConclusion: planIdSchema.nullable(),
+  concludingPlanId: planIdSchema.nullable(),
 });
 
 export type ConcludeExperimentBody = z.infer<typeof concludeSchema>;
@@ -30,20 +30,26 @@ export const experimentApp = new Hono()
   .get("/", async (c) => {
     return c.json(await listExperiments());
   })
-  .get("/:id", async (c) => {
-    const experiment = await getExperiment({ uniqueId: c.req.param("id") });
-    if (!experiment) {
-      return c.json({ error: "not found" }, 404);
-    }
-    return c.json(experiment);
-  })
-  .post("/:id/conclude", zValidator("json", concludeSchema), async (c) => {
-    const experiment = await concludeExperiment({
-      body: c.req.valid("json"),
-      uniqueId: c.req.param("id"),
+  .get("/:experimentId", async (c) => {
+    const experiment = await getExperiment({
+      experimentId: c.req.param("experimentId"),
     });
     if (!experiment) {
       return c.json({ error: "not found" }, 404);
     }
     return c.json(experiment);
-  });
+  })
+  .post(
+    "/:experimentId/conclude",
+    zValidator("json", concludeSchema),
+    async (c) => {
+      const experiment = await concludeExperiment({
+        body: c.req.valid("json"),
+        experimentId: c.req.param("experimentId"),
+      });
+      if (!experiment) {
+        return c.json({ error: "not found" }, 404);
+      }
+      return c.json(experiment);
+    },
+  );
