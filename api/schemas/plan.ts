@@ -11,7 +11,6 @@ import {
   featureIdSchema,
   meterIdSchema,
   planIdSchema,
-  valueIdSchema,
 } from "./ids.ts";
 
 /** A feature entry as embedded in a plan (or add-on, or feature override). */
@@ -68,10 +67,8 @@ export const planMeterFields = {
   reset: resetSchedule.nullable(),
   /** Reset periods unused credits roll over into. Null means unlimited. */
   rollovers: z.number().int().nonnegative().nullable(),
-  /** A flat per-credit value, or usage tiers with their own prices. */
-  topUpPricesPerCredit: z
-    .union([valueIdSchema, z.array(topUpTierSchema).min(1)])
-    .nullable(),
+  /** Usage tiers with their own prices. */
+  topUpPricesPerCredit: z.array(topUpTierSchema).min(1).nullable(),
   topUpCreditPackSizes: topUpCreditPackSizesSchema.nullable(),
 };
 

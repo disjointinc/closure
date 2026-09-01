@@ -64,6 +64,13 @@
       "when": 1788204672892,
       "tag": "0008_lame_richard_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788245792659,
+      "tag": "0009_drop_flat_top_up_shorthand",
+      "breakpoints": true
     }
   ]
 }
