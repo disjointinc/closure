@@ -1,0 +1,1 @@
+ALTER TABLE "cycles" ADD COLUMN "default_discount_percentage" double precision;

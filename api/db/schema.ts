@@ -147,6 +147,7 @@ export const cycles = pgTable(
     cycleId: text("cycle_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
+    defaultDiscountPercentage: doublePrecision("default_discount_percentage"),
     name: text("name").notNull(),
     description: text("description"),
     ...chargingColumns,

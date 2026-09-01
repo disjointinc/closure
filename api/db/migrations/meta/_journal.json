@@ -57,6 +57,13 @@
       "when": 1787791266634,
       "tag": "0007_rename_ids_to_entity_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788204672892,
+      "tag": "0008_lame_richard_fisk",
+      "breakpoints": true
     }
   ]
 }

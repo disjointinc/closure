@@ -55,6 +55,7 @@ const cycleFields = {
   cycleId: cycleIdSchema,
   createdAt: epochMs,
   deprecatedAt: epochMs.nullable(),
+  defaultDiscountPercentage: z.number().nullable(),
   name: z.string().min(1),
   description: z.string().nullable(),
 };
