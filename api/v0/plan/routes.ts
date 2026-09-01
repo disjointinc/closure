@@ -6,36 +6,32 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import { microcredits } from "../../schemas/common.ts";
+import { cycleIdSchema } from "../../schemas/ids.ts";
 import {
   checkPlanMeter,
   planMeterFields,
   planSchema,
 } from "../../schemas/plan.ts";
-import { cycleRefSchema } from "../cycle/service.ts";
-import { valueRefSchema } from "../value/service.ts";
+import { valueSchema } from "../../schemas/value.ts";
 import { createPlan, deprecatePlan, getPlan, listPlans } from "./service.ts";
 
+// Prices reference first-class cycles by id but own their values, which are
+// always passed as full objects.
 const priceInputSchema = z.object({
-  cycle: cycleRefSchema,
-  value: valueRefSchema,
+  cycleId: cycleIdSchema,
+  value: valueSchema,
+});
+
+/** A top-up usage tier as passed on the wire: its prices own their values. */
+export const topUpTierInputSchema = z.object({
+  startingAt: microcredits.positive(),
+  prices: z.array(priceInputSchema).min(1),
 });
 
 const planMeterInputSchema = z
   .object({
     ...planMeterFields,
-    topUpPricesPerCredit: z
-      .union([
-        valueRefSchema,
-        z
-          .array(
-            z.object({
-              startingAt: microcredits.positive(),
-              prices: z.array(priceInputSchema).min(1),
-            }),
-          )
-          .min(1),
-      ])
-      .nullable(),
+    topUpPricesPerCredit: z.array(topUpTierInputSchema).min(1).nullable(),
   })
   .superRefine(checkPlanMeter);
 
@@ -56,15 +52,15 @@ export const planApp = new Hono()
   .get("/", async (c) => {
     return c.json(await listPlans());
   })
-  .get("/:id", async (c) => {
-    const plan = await getPlan({ uniqueId: c.req.param("id") });
+  .get("/:planId", async (c) => {
+    const plan = await getPlan({ planId: c.req.param("planId") });
     if (!plan) {
       return c.json({ error: "not found" }, 404);
     }
     return c.json(plan);
   })
-  .delete("/:id", async (c) => {
-    const plan = await deprecatePlan({ uniqueId: c.req.param("id") });
+  .delete("/:planId", async (c) => {
+    const plan = await deprecatePlan({ planId: c.req.param("planId") });
     if (!plan) {
       return c.json({ error: "not found" }, 404);
     }
