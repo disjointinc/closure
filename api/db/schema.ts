@@ -655,6 +655,8 @@ export const assignmentAddOns = pgTable(
       .references(() => addOns.addOnId),
     startsAt: epochMs("starts_at").notNull(),
     endsAt: epochMs("ends_at"),
+    /** Manually deleted ahead of the end, whether or not one is set. */
+    deletedAt: epochMs("deleted_at"),
   },
   (t) => [primaryKey({ columns: [t.assignmentId, t.addOnId, t.startsAt] })],
 );

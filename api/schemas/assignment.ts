@@ -31,6 +31,8 @@ export const assignmentSchema = z.object({
     z.object({
       startsAt: epochMs,
       endsAt: epochMs.nullable(),
+      /** Manually deleted ahead of the end, whether or not one is set. */
+      deletedAt: epochMs.nullable(),
       addOnId: addOnIdSchema,
     }),
   ),

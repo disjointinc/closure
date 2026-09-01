@@ -1,0 +1,1 @@
+ALTER TABLE "assignment_add_ons" ADD COLUMN "deleted_at" bigint;
