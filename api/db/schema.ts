@@ -261,7 +261,7 @@ export const plans = pgTable(
     kind: planKindEnum("kind").notNull().default("standard"),
     /** Fixed term for loan plans; null on standard plans. */
     duration: duration("duration"),
-    /** Rate loans on this plan inherit when the assignment omits one. */
+    /** Suggested rate for loans on this plan; assignments set theirs explicitly. */
     defaultInterestPercentage: doublePrecision("default_interest_percentage"),
     /** The minimum payment due each cycle on loan plans. */
     minimumPaymentValueId: text("minimum_payment_value_id").references(

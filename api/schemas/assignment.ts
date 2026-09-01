@@ -23,8 +23,8 @@ export const assignmentSchema = z.object({
     .object({
       loanId: loanIdSchema,
       principal: currencyAmountSchema,
-      /** Null means inherit the plan's defaultInterestPercentage. */
-      interestPercentage: z.number().positive().nullable(),
+      /** Always explicit, even when copying the plan's default rate. */
+      interestPercentage: z.number().positive(),
     })
     .nullable(),
   addOns: z.array(

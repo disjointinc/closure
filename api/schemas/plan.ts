@@ -227,7 +227,7 @@ export const planSchema = z
     kind: planKindSchema,
     /** Fixed term for loan plans; null on standard plans. */
     duration: durationSchema.nullable(),
-    /** Rate loans on this plan inherit when the assignment omits one. */
+    /** Suggested rate for loans on this plan; assignments set theirs explicitly. */
     defaultInterestPercentage: z.number().positive().nullable(),
     /** The minimum payment due each cycle on loan plans. */
     minimumPaymentValueId: valueIdSchema.nullable(),
