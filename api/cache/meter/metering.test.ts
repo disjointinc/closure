@@ -10,11 +10,11 @@
  */
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { db } from "../db/index.ts";
-import { creditGrants, meterEvents, meterEventsDlq } from "../db/schema.ts";
-import { meterEventSchema } from "../schemas/meter-event.ts";
-import { redis } from "./index.ts";
-import { keys } from "./keys.ts";
+import { db } from "../../db/index.ts";
+import { creditGrants, meterEvents, meterEventsDlq } from "../../db/schema.ts";
+import { meterEventSchema } from "../../schemas/meter-event.ts";
+import { redis } from "../index.ts";
+import { keys } from "../keys.ts";
 import {
   applyCreditGrant,
   checkpointMeterBalances,
@@ -41,7 +41,7 @@ import {
   pgEventCount,
   resetTestState,
   suffix,
-} from "./test-helpers.ts";
+} from "../test-helpers.ts";
 
 beforeAll(resetTestState);
 afterAll(closeTestState);

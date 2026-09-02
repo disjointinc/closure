@@ -1,5 +1,5 @@
 /**
- * cache/metering.ts -- the Redis side of metering.
+ * cache/meter/metering.ts -- the Redis side of metering.
  *
  * Design: Redis is the hot path so a high volume of concurrent meter events
  * and balance checks never touch Postgres per-event, while pg stays the
@@ -49,23 +49,23 @@
  * events can never overdraw. Ordering between checkpoints and event replay
  * relies on microsecond-resolution Redis TIME; identical-microsecond
  * interleavings are theoretically possible on coarse clocks. The periodic
- * reconciler (cache/reconcile.ts) heals any residual drift.
+ * reconciler (cache/meter/reconcile.ts) heals any residual drift.
  */
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
-import { db } from "../db/index.ts";
+import { db } from "../../db/index.ts";
 import {
   creditGrants,
   meterBalances,
   meterEvents,
   meterEventsDlq,
-} from "../db/schema.ts";
-import type { MeterEvent } from "../schemas/meter-event.ts";
-import { redis } from "./index.ts";
+} from "../../db/schema.ts";
+import type { MeterEvent } from "../../schemas/meter-event.ts";
+import { redis } from "../index.ts";
 import {
   keys,
   METER_EVENT_IDEMPOTENCY_TTL_MS,
   METER_MARKER_TTL_MS,
-} from "./keys.ts";
+} from "../keys.ts";
 
 type MeterEventStatus = MeterEvent["status"];
 

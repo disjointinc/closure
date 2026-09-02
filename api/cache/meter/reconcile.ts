@@ -1,7 +1,7 @@
 /**
- * cache/reconcile.ts -- periodic drift detection and auto-heal.
+ * cache/meter/reconcile.ts -- periodic drift detection and auto-heal.
  *
- * The checkpoint + read-repair machinery in cache/metering.ts makes balances
+ * The checkpoint + read-repair machinery in cache/meter/metering.ts makes balances
  * exactly recoverable after Redis loss; this loop is the safety net for
  * steady-state drift (crash windows between pg and Redis writes, theoretical
  * clock-boundary races). Every interval:
@@ -19,10 +19,10 @@
  * Missing keys are rebuilt from pg (see metering.ts).
  */
 import { isNull } from "drizzle-orm";
-import { db } from "../db/index.ts";
-import { creditGrants, meterBalances } from "../db/schema.ts";
-import { redis } from "./index.ts";
-import { keys } from "./keys.ts";
+import { db } from "../../db/index.ts";
+import { creditGrants, meterBalances } from "../../db/schema.ts";
+import { redis } from "../index.ts";
+import { keys } from "../keys.ts";
 import {
   adjustMeterBalance,
   applyCreditGrant,
