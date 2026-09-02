@@ -15,6 +15,8 @@
  *                                      from "duplicate ingest double-charge"
  * mblock:{tenantId}:{meterId}  string  rebuild lock held while a missing
  *                                      balance key is rebuilt from pg
+ * rwatch:{tenantId}:{meterId}  string  cached rule watch set for the
+ *                                      tenant+meter (scope-resolved thresholds)
  */
 export const keys = {
   meterBalance: ({
@@ -46,6 +48,13 @@ export const keys = {
     meterId: string;
     tenantId: string;
   }) => `mblock:${tenantId}:${meterId}`,
+  ruleWatchSet: ({
+    meterId,
+    tenantId,
+  }: {
+    meterId: string;
+    tenantId: string;
+  }) => `rwatch:${tenantId}:${meterId}`,
 } as const;
 
 /**
