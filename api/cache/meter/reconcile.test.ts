@@ -19,7 +19,7 @@ import {
   recordMeterEvent,
   redisTimeMicros,
   setMeterBalance,
-} from "./metering.ts";
+} from "./index.ts";
 import { reconcileMeterBalances } from "./reconcile.ts";
 import {
   closeTestState,

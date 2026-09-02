@@ -31,7 +31,7 @@ import {
   stampGrantApplied,
   sumAppliedGrants,
   sumSucceededMeterEvents,
-} from "./metering.ts";
+} from "./index.ts";
 
 /**
  * Pending-stream depth at which the reconciler skips its heal pass. The

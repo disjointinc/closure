@@ -18,7 +18,7 @@ import {
 } from "../db/schema.ts";
 import type { Rule } from "../schemas/rule.ts";
 import { redis } from "./index.ts";
-import type { MeterEventPayload } from "./meter/metering.ts";
+import type { MeterEventPayload } from "./meter/index.ts";
 
 export function suffix({ length }: { length: number }): string {
   const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
