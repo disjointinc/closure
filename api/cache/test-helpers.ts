@@ -12,11 +12,13 @@ import {
   meterBalances,
   meterEvents,
   meters,
+  rules,
   teamMembers,
   tenants,
 } from "../db/schema.ts";
+import type { Rule } from "../schemas/rule.ts";
 import { redis } from "./index.ts";
-import type { MeterEventPayload } from "./metering.ts";
+import type { MeterEventPayload } from "./meter/metering.ts";
 
 export function suffix({ length }: { length: number }): string {
   const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -30,6 +32,8 @@ export const newTenantId = () => `tenant_${suffix({ length: 22 })}`;
 export const newMeterId = () => `meter_${suffix({ length: 20 })}`;
 export const newMeterEventId = () => `meter_event_${suffix({ length: 37 })}`;
 export const newCreditGrantId = () => `credit_grant_${suffix({ length: 25 })}`;
+export const newRuleId = () => `rule_${suffix({ length: 20 })}`;
+export const newTaskTypeId = () => `task_type_${suffix({ length: 20 })}`;
 
 export async function makeTenant({
   tenantId,
@@ -67,6 +71,28 @@ export async function makeTeamMember(): Promise<string> {
     profilePictureUrl: null,
   });
   return teamMemberId;
+}
+
+/** Insert a rule directly (bypassing the API) for evaluation tests. */
+export async function makeRule({
+  rule,
+}: {
+  rule: Omit<Rule, "ruleId" | "createdAt" | "deprecatedAt"> &
+    Partial<Pick<Rule, "ruleId" | "createdAt" | "deprecatedAt">>;
+}): Promise<string> {
+  const ruleId = rule.ruleId ?? newRuleId();
+  await db.insert(rules).values({
+    ruleId,
+    createdAt: rule.createdAt ?? Date.now(),
+    deprecatedAt: rule.deprecatedAt ?? null,
+    scope: rule.scope,
+    trigger: rule.trigger,
+    recurrence: rule.recurrence,
+    actions: rule.actions,
+    name: rule.name,
+    description: rule.description,
+  });
+  return ruleId;
 }
 
 export function makeEvent({
