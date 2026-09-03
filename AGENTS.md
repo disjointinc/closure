@@ -49,3 +49,5 @@ Write code defensively. That is, include default guards on switch statements, ev
 Log all errors, even if they should never occur in a try-catch block. Log anything that might be an interesting metric or provide important signals. If in doubt - log it.
 
 Don't use magic numbers. Use constants.
+
+The DB is a strict dependency of the cache. The cache and DB are strict dependencies of API routes. The API routes are strict dependencies of clients, such as the web client.
