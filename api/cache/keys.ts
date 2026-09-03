@@ -62,13 +62,8 @@ export const keys = {
     meterId: string;
     tenantId: string;
   }) => `rwatch:${tenantId}:${meterId}`,
-  meterSpend: ({
-    meterId,
-    tenantId,
-  }: {
-    meterId: string;
-    tenantId: string;
-  }) => `mspend:${tenantId}:${meterId}`,
+  meterSpend: ({ meterId, tenantId }: { meterId: string; tenantId: string }) =>
+    `mspend:${tenantId}:${meterId}`,
   ruleFiringQuota: ({
     ruleId,
     tenantId,
