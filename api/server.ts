@@ -10,13 +10,17 @@ import { config } from "../config.ts";
 import {
   rebuildMissingMeterBalances,
   startMeteringFlushLoop,
-} from "./cache/metering.ts";
-import { startMeteringReconcileLoop } from "./cache/reconcile.ts";
+} from "./cache/meter/index.ts";
+import { startMeteringReconcileLoop } from "./cache/meter/reconcile.ts";
+import { startRuleExecutorLoop } from "./cache/rule/execute.ts";
+import { startRuleSchedulerLoop } from "./cache/rule/schedule.ts";
 import app from "./handler.ts";
 
 await rebuildMissingMeterBalances();
 startMeteringFlushLoop();
 startMeteringReconcileLoop();
+startRuleSchedulerLoop();
+startRuleExecutorLoop();
 
 serve(
   {
