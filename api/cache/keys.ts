@@ -17,6 +17,13 @@
  *                                      balance key is rebuilt from pg
  * rwatch:{tenantId}:{meterId}  string  cached rule watch set for the
  *                                      tenant+meter (scope-resolved thresholds)
+ * mspend:{tenantId}:{meterId}  string  running spend since a base checkpoint,
+ *                                      in microcredits; INCRBY'd atomically
+ *                                      with the balance on ingest
+ * rquota:{ruleId}:{tenantId}:{windowStart}
+ *                              string  firing count this window for a capped
+ *                                      rule; cached from rule_runs, TTL'd to
+ *                                      the window so keys die with it
  */
 export const keys = {
   meterBalance: ({
@@ -55,6 +62,22 @@ export const keys = {
     meterId: string;
     tenantId: string;
   }) => `rwatch:${tenantId}:${meterId}`,
+  meterSpend: ({
+    meterId,
+    tenantId,
+  }: {
+    meterId: string;
+    tenantId: string;
+  }) => `mspend:${tenantId}:${meterId}`,
+  ruleFiringQuota: ({
+    ruleId,
+    tenantId,
+    windowStart,
+  }: {
+    ruleId: string;
+    tenantId: string;
+    windowStart: number;
+  }) => `rquota:${ruleId}:${tenantId}:${windowStart}`,
 } as const;
 
 /**
