@@ -10,6 +10,7 @@
  *      original outcome without double-charging),
  *   2. check and decrement the balance (exact integer arithmetic; amounts
  *      are signed -- a negative amount is a refund and always succeeds),
+ *      INCRBYing the mspend: spend counter in the same atomic step,
  *   3. buffer the event on a stream for batched flush to pg, stamped with
  *      received_at on the Redis server's clock,
  *   4. mark the balance key as tracked for checkpointing.
@@ -38,6 +39,18 @@
  * Only MISSING keys are rebuilt -- never overwrite a live key -- so a
  * failover that preserves partial state cannot double-count.
  *
+ * The mspend: counter powers microcredits_spent rules off the pg event scan:
+ * a flat Redis INCRBY on ingest, made a since-checkpoint DELTA by
+ * checkpointMeterBalances (accumulated into meter_spends and reset), so
+ * spend reads are a durable pg base + a Redis GET with no per-event pg scan.
+ * The pre-window gap (a cycle start after the last checkpoint) is a bounded
+ * pg read. Rebuild of a lost spend key (rebuildMeterSpend) restores just the
+ * post-checkpoint delta; the durable base itself lives in meter_spends.
+ * Unlike balances, a missing spend key never read-repairs (the ingest INCRBY
+ * would silently restart it at 0), so recovery is the startup scan
+ * (rebuildMissingMeterBalances) plus the periodic reconciler
+ * (cache/meter/reconcile.ts) -- both cover meter_spends alongside balances.
+ *
  * Flush path (flushPendingMeterEvents): batched, idempotent inserts
  * (ON CONFLICT DO NOTHING on the pg unique index). Flush-attempt markers
  * (mflush:) tell "crash between insert and stream-trim" (replay harmlessly)
@@ -51,13 +64,14 @@
  * interleavings are theoretically possible on coarse clocks. The periodic
  * reconciler (cache/meter/reconcile.ts) heals any residual drift.
  */
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, lte, sql } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import {
   creditGrants,
   meterBalances,
   meterEvents,
   meterEventsDlq,
+  meterSpends,
 } from "../../db/schema.ts";
 import type { MeterEvent } from "../../schemas/meter-event.ts";
 import { redis } from "../index.ts";
@@ -103,6 +117,7 @@ const commands = redis as unknown as {
     idempotencyKey: string,
     balanceKey: string,
     pendingStream: string,
+    spendKey: string,
     amountMicrocredits: number,
     idempotencyTtlMs: number,
     payloadJson: string,
@@ -130,7 +145,7 @@ const commands = redis as unknown as {
 };
 
 redis.defineCommand("meterEventIngest", {
-  numberOfKeys: 3,
+  numberOfKeys: 4,
   lua: `
     local existing = redis.call("GET", KEYS[1])
     if existing then
@@ -148,6 +163,9 @@ redis.defineCommand("meterEventIngest", {
     else
       balance = redis.call("DECRBY", KEYS[2], amount)
       redis.call("SADD", ARGV[4], KEYS[2])
+      if amount > 0 then
+        redis.call("INCRBY", KEYS[4], amount)
+      end
       status = "succeeded"
     end
     redis.call("SET", KEYS[1], status, "PX", ARGV[2])
@@ -370,8 +388,8 @@ export async function recordMeterEvent({
   // carries the resolved value, so the flush always writes a non-null
   // external_id to pg.
   const externalId = event.externalId ?? event.meterEventId;
-  // Ordered args: numberOfKeys: 3 on the defineCommand above splits this
-  // list into KEYS (idempotency, balance, stream) and ARGV (the rest).
+  // Ordered args: numberOfKeys: 4 on the defineCommand above splits this
+  // list into KEYS (idempotency, balance, stream, spend) and ARGV (the rest).
   const args = [
     keys.meterEventIdempotency({
       externalId,
@@ -380,6 +398,7 @@ export async function recordMeterEvent({
     }),
     keys.meterBalance({ meterId: event.meterId, tenantId: event.tenantId }),
     keys.pendingMeterEvents,
+    keys.meterSpend({ meterId: event.meterId, tenantId: event.tenantId }),
     event.amountMicrocredits,
     METER_EVENT_IDEMPOTENCY_TTL_MS,
     JSON.stringify({ ...event, externalId }),
@@ -621,6 +640,110 @@ export async function rebuildMeterBalance({
   return balance;
 }
 
+/**
+ * Cumulative succeeded spend for one tenant+meter since `sinceMicros` (µs),
+ * for microcredits_spent rules. Durable base (meter_spends checkpoint) plus
+ * the pg sum of events received after it -- the flush-lag delta. Caller
+ * clamps `sinceMicros` to the cycle start, so this is exactly "spend this
+ * cycle" without any cycle anchor on the ingest hot path: the Redis counter
+ * is flat, and the checkpoint keeps the pg sum bounded to one flush interval.
+ */
+export async function spendSince({
+  meterId,
+  sinceMicros,
+  tenantId,
+}: {
+  meterId: string;
+  sinceMicros: number;
+  tenantId: string;
+}): Promise<number> {
+  const [checkpoint] = await db
+    .select()
+    .from(meterSpends)
+    .where(
+      and(eq(meterSpends.tenantId, tenantId), eq(meterSpends.meterId, meterId)),
+    )
+    .limit(1);
+  const counterDelta = Number(
+    (await redis.get(keys.meterSpend({ meterId, tenantId }))) ?? 0,
+  );
+  if (!checkpoint) {
+    // No checkpoint yet: the counter delta is the whole history.
+    return counterDelta;
+  }
+  // Spend earned after the checkpoint but at or before the window start is a
+  // pre-window gap that must not be counted; it's always bounded to one
+  // checkpoint interval, so this pg read stays cheap and only runs when the
+  // window opened after the checkpoint.
+  let preWindowGap = 0;
+  if (sinceMicros > checkpoint.updatedAt) {
+    preWindowGap = await sumSucceededMeterEventsBetween({
+      fromMicros: checkpoint.updatedAt,
+      meterId,
+      tenantId,
+      toMicros: sinceMicros,
+    });
+  }
+  // Result = durable in-window base + in-window post-checkpoint delta.
+  // delta covers all post-checkpoint spend; subtract the pre-window part.
+  return checkpoint.spendMicrocredits + counterDelta - preWindowGap;
+}
+
+/**
+ * Rebuild a lost spend key from pg: the checkpoint plus succeeded events
+ * received after it (including the DLQ). Only call for a key MISSING from
+ * Redis -- overwriting a live key could double-count.
+ */
+export async function rebuildMeterSpend({
+  meterId,
+  tenantId,
+}: {
+  meterId: string;
+  tenantId: string;
+}): Promise<number> {
+  const [checkpoint] = await db
+    .select()
+    .from(meterSpends)
+    .where(
+      and(eq(meterSpends.tenantId, tenantId), eq(meterSpends.meterId, meterId)),
+    )
+    .limit(1);
+  // The Redis counter is a DELTA since the last checkpoint (checkpoint()
+  // accumulates it into the pg base and resets it). A lost key therefore
+  // rebuilds to just the post-checkpoint pg sum; the durable base itself
+  // stays in pg. Rebuild the counter to that delta, not the absolute total.
+  let spend: number;
+  if (checkpoint) {
+    spend = await sumSucceededMeterEvents({
+      meterId,
+      since: checkpoint.updatedAt,
+      tenantId,
+    });
+  } else {
+    spend = 0;
+    try {
+      await db
+        .insert(meterSpends)
+        .values({
+          meterId,
+          spendMicrocredits: 0,
+          tenantId,
+          updatedAt: await redisTimeMicros(),
+        })
+        .onConflictDoNothing();
+    } catch (error) {
+      console.error("could not persist base spend checkpoint row", {
+        error,
+        meterId,
+        tenantId,
+      });
+    }
+  }
+  await redis.set(keys.meterSpend({ meterId, tenantId }), spend);
+  console.log("rebuilt meter spend", { meterId, spend, tenantId });
+  return spend;
+}
+
 /** Succeeded meter-event debits after `since` (µs), including the DLQ. */
 export async function sumSucceededMeterEvents({
   meterId,
@@ -655,6 +778,53 @@ export async function sumSucceededMeterEvents({
         eq(meterEventsDlq.meterId, meterId),
         eq(meterEventsDlq.status, "succeeded"),
         gt(meterEventsDlq.receivedAtMicros, since),
+      ),
+    );
+  return Number(events.total) + Number(dlq.total);
+}
+
+/**
+ * Succeeded meter-event debits in the half-open range (fromMicros, toMicros]
+ * (µs), including the DLQ. Used to measure the pre-window gap between a spend
+ * checkpoint and a later cycle start.
+ */
+export async function sumSucceededMeterEventsBetween({
+  fromMicros,
+  meterId,
+  tenantId,
+  toMicros,
+}: {
+  fromMicros: number;
+  meterId: string;
+  tenantId: string;
+  toMicros: number;
+}): Promise<number> {
+  const [events] = await db
+    .select({
+      total: sql<string>`coalesce(sum(${meterEvents.amountMicrocredits}), 0)::bigint`,
+    })
+    .from(meterEvents)
+    .where(
+      and(
+        eq(meterEvents.tenantId, tenantId),
+        eq(meterEvents.meterId, meterId),
+        eq(meterEvents.status, "succeeded"),
+        gt(meterEvents.receivedAtMicros, fromMicros),
+        lte(meterEvents.receivedAtMicros, toMicros),
+      ),
+    );
+  const [dlq] = await db
+    .select({
+      total: sql<string>`coalesce(sum(${meterEventsDlq.amountMicrocredits}), 0)::bigint`,
+    })
+    .from(meterEventsDlq)
+    .where(
+      and(
+        eq(meterEventsDlq.tenantId, tenantId),
+        eq(meterEventsDlq.meterId, meterId),
+        eq(meterEventsDlq.status, "succeeded"),
+        gt(meterEventsDlq.receivedAtMicros, fromMicros),
+        lte(meterEventsDlq.receivedAtMicros, toMicros),
       ),
     );
   return Number(events.total) + Number(dlq.total);
@@ -741,19 +911,21 @@ async function ensureMeterBalance({
 }
 
 /**
- * Startup reconciliation: rebuild every pg-checkpointed balance whose Redis
- * key is missing. Covers whole-fleet Redis loss (flush, failover without
- * state) without waiting for per-key read repair.
+ * Startup reconciliation: rebuild every pg-checkpointed balance or spend
+ * counter whose Redis key is missing. Covers whole-fleet Redis loss (flush,
+ * failover without state) without waiting for per-key read repair -- which
+ * spend counters never get, since their ingest INCRBY succeeds on a missing
+ * key and would otherwise silently restart the delta at 0.
  */
 export async function rebuildMissingMeterBalances(): Promise<number> {
-  const rows = await db
+  const balanceRows = await db
     .select({
       tenantId: meterBalances.tenantId,
       meterId: meterBalances.meterId,
     })
     .from(meterBalances);
   let rebuilt = 0;
-  for (const row of rows) {
+  for (const row of balanceRows) {
     if (
       await redis.exists(
         keys.meterBalance({ meterId: row.meterId, tenantId: row.tenantId }),
@@ -767,7 +939,28 @@ export async function rebuildMissingMeterBalances(): Promise<number> {
   if (rebuilt > 0) {
     console.log(`rebuilt ${rebuilt} missing meter balance(s)`);
   }
-  return rebuilt;
+  const spendRows = await db
+    .select({
+      tenantId: meterSpends.tenantId,
+      meterId: meterSpends.meterId,
+    })
+    .from(meterSpends);
+  let spendsRebuilt = 0;
+  for (const row of spendRows) {
+    if (
+      await redis.exists(
+        keys.meterSpend({ meterId: row.meterId, tenantId: row.tenantId }),
+      )
+    ) {
+      continue;
+    }
+    await rebuildMeterSpend({ meterId: row.meterId, tenantId: row.tenantId });
+    spendsRebuilt += 1;
+  }
+  if (spendsRebuilt > 0) {
+    console.log(`rebuilt ${spendsRebuilt} missing meter spend(s)`);
+  }
+  return rebuilt + spendsRebuilt;
 }
 
 /**
@@ -924,6 +1117,10 @@ export async function flushPendingMeterEvents(): Promise<number> {
     // lost and rebuilt since is already correct from pg.
     if (await redis.exists(balanceKey)) {
       await redis.incrby(balanceKey, amountMicrocredits);
+      await redis.incrby(
+        keys.meterSpend({ meterId, tenantId }),
+        -amountMicrocredits,
+      );
       console.error("compensated duplicate meter event charge", {
         amountMicrocredits,
         externalId,
@@ -985,8 +1182,19 @@ export async function checkpointMeterBalances(): Promise<number> {
   if (tracked.length === 0) {
     return 0;
   }
+  // Balances come from one snapshot (clock + every balance in the same
+  // instant). Spend deltas are captured with GETSET (atomic read-and-zero),
+  // so an INCRBY can never land between a snapshot and a reset and be
+  // swallowed from the delta.
+  const spendKeys = tracked.map((key) => {
+    const [, tenantId, meterId] = key.split(":");
+    return keys.meterSpend({ meterId, tenantId });
+  });
   const snapshot = await commands.meterCheckpointSnapshot(...tracked);
   const updatedAt = Number(snapshot[0]) * 1_000_000 + Number(snapshot[1]);
+  const spendDeltas = await Promise.all(
+    spendKeys.map((key) => redis.getset(key, 0)),
+  );
   const rows = tracked.flatMap((key, i) => {
     const raw = snapshot[i + 2];
     if (raw === null) {
@@ -994,6 +1202,14 @@ export async function checkpointMeterBalances(): Promise<number> {
     }
     const [, tenantId, meterId] = key.split(":");
     return [{ tenantId, meterId, balanceMicrocredits: Number(raw), updatedAt }];
+  });
+  const spendRows = spendKeys.flatMap((key, i) => {
+    const raw = spendDeltas[i];
+    if (raw === null) {
+      return [];
+    }
+    const [, tenantId, meterId] = key.split(":");
+    return [{ tenantId, meterId, spendMicrocredits: Number(raw), updatedAt }];
   });
   if (rows.length === 0) {
     return 0;
@@ -1009,6 +1225,21 @@ export async function checkpointMeterBalances(): Promise<number> {
       },
       setWhere: sql`${meterBalances.updatedAt} <= excluded.updated_at`,
     });
+  if (spendRows.length > 0) {
+    await db
+      .insert(meterSpends)
+      .values(spendRows)
+      .onConflictDoUpdate({
+        target: [meterSpends.tenantId, meterSpends.meterId],
+        set: {
+          // Accumulate: the snapshotted counter is a delta since the last
+          // checkpoint, so the new base is old base + delta.
+          spendMicrocredits: sql`${meterSpends.spendMicrocredits} + excluded.spend_microcredits`,
+          updatedAt: sql`excluded.updated_at`,
+        },
+        setWhere: sql`${meterSpends.updatedAt} <= excluded.updated_at`,
+      });
+  }
   return rows.length;
 }
 
