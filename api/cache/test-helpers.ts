@@ -9,9 +9,12 @@ import { and, eq, sql } from "drizzle-orm";
 import { config } from "../../config.ts";
 import { db } from "../db/index.ts";
 import {
+  assignments,
+  cycles,
   meterBalances,
   meterEvents,
   meters,
+  plans,
   rules,
   teamMembers,
   tenants,
@@ -34,6 +37,9 @@ export const newMeterEventId = () => `meter_event_${suffix({ length: 37 })}`;
 export const newCreditGrantId = () => `credit_grant_${suffix({ length: 25 })}`;
 export const newRuleId = () => `rule_${suffix({ length: 20 })}`;
 export const newTaskTypeId = () => `task_type_${suffix({ length: 20 })}`;
+export const newCycleId = () => `cycle_${suffix({ length: 20 })}`;
+export const newPlanId = () => `plan_${suffix({ length: 20 })}`;
+export const newAssignmentId = () => `assignment_${suffix({ length: 24 })}`;
 
 export async function makeTenant({
   tenantId,
@@ -60,6 +66,62 @@ export async function makeMeter({
     description: null,
   });
   return resolvedMeterId;
+}
+
+export async function makeCycle(): Promise<string> {
+  const cycleId = newCycleId();
+  await db.insert(cycles).values({
+    cycleId,
+    createdAt: Date.now(),
+    deprecatedAt: null,
+    defaultDiscountPercentage: null,
+    name: "Test cycle",
+    description: null,
+    charged: "upfront",
+    cycleLength: { days: 30, months: null },
+    creditPeriod: null,
+    gracePeriod: null,
+  });
+  return cycleId;
+}
+
+export async function makePlan(): Promise<string> {
+  const planId = newPlanId();
+  await db.insert(plans).values({
+    planId,
+    derivedFromPlanId: null,
+    createdAt: Date.now(),
+    deprecatedAt: null,
+    kind: "standard",
+    duration: null,
+    defaultInterestPercentage: null,
+    minimumPaymentValueId: null,
+    name: "Test plan",
+    description: null,
+  });
+  return planId;
+}
+
+/** Assign a tenant to a plan on a fresh cycle. Returns the assignmentId. */
+export async function makeAssignment({
+  planId,
+  tenantId,
+}: {
+  planId: string;
+  tenantId: string;
+}): Promise<string> {
+  const assignmentId = newAssignmentId();
+  const cycleId = await makeCycle();
+  await db.insert(assignments).values({
+    assignmentId,
+    tenantId,
+    planId,
+    experimentId: null,
+    cycleId,
+    startsAt: Date.now(),
+    endsAt: null,
+  });
+  return assignmentId;
 }
 
 export async function makeTeamMember(): Promise<string> {
