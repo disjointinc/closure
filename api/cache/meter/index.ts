@@ -910,6 +910,12 @@ async function ensureMeterBalance({
   }
 }
 
+/** Per-kind counts from the startup missing-key rebuild. */
+export type RebuildMissingReport = {
+  balancesRebuilt: number;
+  spendsRebuilt: number;
+};
+
 /**
  * Startup reconciliation: rebuild every pg-checkpointed balance or spend
  * counter whose Redis key is missing. Covers whole-fleet Redis loss (flush,
@@ -917,14 +923,14 @@ async function ensureMeterBalance({
  * spend counters never get, since their ingest INCRBY succeeds on a missing
  * key and would otherwise silently restart the delta at 0.
  */
-export async function rebuildMissingMeterBalances(): Promise<number> {
+export async function rebuildMissingMeterBalances(): Promise<RebuildMissingReport> {
   const balanceRows = await db
     .select({
       tenantId: meterBalances.tenantId,
       meterId: meterBalances.meterId,
     })
     .from(meterBalances);
-  let rebuilt = 0;
+  let balancesRebuilt = 0;
   for (const row of balanceRows) {
     if (
       await redis.exists(
@@ -934,10 +940,10 @@ export async function rebuildMissingMeterBalances(): Promise<number> {
       continue;
     }
     await rebuildMeterBalance({ meterId: row.meterId, tenantId: row.tenantId });
-    rebuilt += 1;
+    balancesRebuilt += 1;
   }
-  if (rebuilt > 0) {
-    console.log(`rebuilt ${rebuilt} missing meter balance(s)`);
+  if (balancesRebuilt > 0) {
+    console.log(`rebuilt ${balancesRebuilt} missing meter balance(s)`);
   }
   const spendRows = await db
     .select({
@@ -960,7 +966,7 @@ export async function rebuildMissingMeterBalances(): Promise<number> {
   if (spendsRebuilt > 0) {
     console.log(`rebuilt ${spendsRebuilt} missing meter spend(s)`);
   }
-  return rebuilt + spendsRebuilt;
+  return { balancesRebuilt, spendsRebuilt };
 }
 
 /**
