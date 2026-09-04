@@ -2,6 +2,8 @@ import { z } from "zod";
 import { epochMs } from "./common.ts";
 import { teamMemberIdSchema, taskTypeIdSchema } from "./ids.ts";
 
+export const integrationSystemSchema = z.enum(["slack", "linear", "jira"]);
+
 /**
  * An external system a task type routes its tasks to. Configuration lives on
  * the type (not per-task) so every instance of the same fundamental task
@@ -10,15 +12,15 @@ import { teamMemberIdSchema, taskTypeIdSchema } from "./ids.ts";
  */
 export const integrationTargetSchema = z.discriminatedUnion("system", [
   z.object({
-    system: z.literal("slack"),
+    system: z.literal(integrationSystemSchema.enum.slack),
     channel: z.string().min(1),
   }),
   z.object({
-    system: z.literal("linear"),
+    system: z.literal(integrationSystemSchema.enum.linear),
     teamKey: z.string().min(1),
   }),
   z.object({
-    system: z.literal("jira"),
+    system: z.literal(integrationSystemSchema.enum.jira),
     projectKey: z.string().min(1),
   }),
 ]);

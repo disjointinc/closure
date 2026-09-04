@@ -7,6 +7,7 @@ import {
   teamMemberIdSchema,
   tenantIdSchema,
 } from "./ids.ts";
+import { integrationSystemSchema } from "./task-type.ts";
 
 /**
  * A handle to a task's counterpart in an external tracking system (Linear,
@@ -14,7 +15,7 @@ import {
  * caller.
  */
 export const externalRefSchema = z.object({
-  system: z.string().min(1),
+  system: integrationSystemSchema,
   externalId: z.string().min(1),
 });
 export type ExternalRef = z.infer<typeof externalRefSchema>;
