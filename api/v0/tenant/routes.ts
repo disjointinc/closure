@@ -12,6 +12,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { epochMs } from "../../schemas/common.ts";
 import { tenantIdSchema } from "../../schemas/ids.ts";
+import { addOnApp } from "./add-on/routes.ts";
 import { assignmentApp } from "./assignment/routes.ts";
 import { couponGrantApp } from "./coupon-grant/routes.ts";
 import { couponReceiptApp } from "./coupon-receipt/routes.ts";
@@ -92,6 +93,7 @@ export const tenantApp = new Hono<{ Variables: { tenantId: string } }>()
     }
     return c.json(await getEntitlements({ tenantId }));
   })
+  .route("/:tenantId/add-on", addOnApp)
   .route("/:tenantId/assignment", assignmentApp)
   .route("/:tenantId/coupon-grant", couponGrantApp)
   .route("/:tenantId/coupon-receipt", couponReceiptApp)
