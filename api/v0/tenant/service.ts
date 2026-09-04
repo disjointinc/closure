@@ -7,7 +7,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { getMeterBalance } from "../../cache/meter/index.ts";
 import { db } from "../../db/index.ts";
 import {
-  addOnFeatures,
+  addOnTypeFeatures,
   assignmentAddOns,
   assignments,
   featureOverrides,
@@ -100,21 +100,21 @@ export async function getEntitlements({ tenantId }: { tenantId: string }) {
     .select()
     .from(assignmentAddOns)
     .where(eq(assignmentAddOns.assignmentId, assignment.assignmentId));
-  const activeAddOnIds = assignmentAddOnRows
+  const activeAddOnTypeIds = assignmentAddOnRows
     .filter(
       (addOn) =>
         addOn.deletedAt === null &&
         addOn.startsAt <= now &&
         (addOn.endsAt === null || addOn.endsAt > now),
     )
-    .map((addOn) => addOn.addOnId);
+    .map((addOn) => addOn.addOnTypeId);
   const addOnFeatureRows = (
     await Promise.all(
-      activeAddOnIds.map((addOnId) =>
+      activeAddOnTypeIds.map((addOnTypeId) =>
         db
           .select()
-          .from(addOnFeatures)
-          .where(eq(addOnFeatures.addOnId, addOnId)),
+          .from(addOnTypeFeatures)
+          .where(eq(addOnTypeFeatures.addOnTypeId, addOnTypeId)),
       ),
     )
   ).flat();
