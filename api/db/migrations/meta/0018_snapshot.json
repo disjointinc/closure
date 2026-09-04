@@ -1,0 +1,4233 @@
+{
+  "id": "a91e2a77-0e2a-413c-9e01-67a7032a5b2e",
+  "prevId": "66833dc0-34e5-4a83-aba9-b4cbc7e71d9e",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.add_on_features": {
+      "name": "add_on_features",
+      "schema": "",
+      "columns": {
+        "add_on_id": {
+          "name": "add_on_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "feature_id": {
+          "name": "feature_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "set_to": {
+          "name": "set_to",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "add_on_features_add_on_id_add_ons_add_on_id_fk": {
+          "name": "add_on_features_add_on_id_add_ons_add_on_id_fk",
+          "tableFrom": "add_on_features",
+          "tableTo": "add_ons",
+          "columnsFrom": ["add_on_id"],
+          "columnsTo": ["add_on_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "add_on_features_feature_id_features_feature_id_fk": {
+          "name": "add_on_features_feature_id_features_feature_id_fk",
+          "tableFrom": "add_on_features",
+          "tableTo": "features",
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "add_on_features_add_on_id_feature_id_pk": {
+          "name": "add_on_features_add_on_id_feature_id_pk",
+          "columns": ["add_on_id", "feature_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.add_on_prices": {
+      "name": "add_on_prices",
+      "schema": "",
+      "columns": {
+        "add_on_id": {
+          "name": "add_on_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cycle_id": {
+          "name": "cycle_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value_id": {
+          "name": "value_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "add_on_prices_add_on_id_add_ons_add_on_id_fk": {
+          "name": "add_on_prices_add_on_id_add_ons_add_on_id_fk",
+          "tableFrom": "add_on_prices",
+          "tableTo": "add_ons",
+          "columnsFrom": ["add_on_id"],
+          "columnsTo": ["add_on_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "add_on_prices_cycle_id_cycles_cycle_id_fk": {
+          "name": "add_on_prices_cycle_id_cycles_cycle_id_fk",
+          "tableFrom": "add_on_prices",
+          "tableTo": "cycles",
+          "columnsFrom": ["cycle_id"],
+          "columnsTo": ["cycle_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "add_on_prices_value_id_values_value_id_fk": {
+          "name": "add_on_prices_value_id_values_value_id_fk",
+          "tableFrom": "add_on_prices",
+          "tableTo": "values",
+          "columnsFrom": ["value_id"],
+          "columnsTo": ["value_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "add_on_prices_add_on_id_cycle_id_pk": {
+          "name": "add_on_prices_add_on_id_cycle_id_pk",
+          "columns": ["add_on_id", "cycle_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.add_ons": {
+      "name": "add_ons",
+      "schema": "",
+      "columns": {
+        "add_on_id": {
+          "name": "add_on_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deprecated_at": {
+          "name": "deprecated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "add_on_id_format": {
+          "name": "add_on_id_format",
+          "value": "\"add_ons\".\"add_on_id\" ~ '^add_on_[a-z0-9]{20}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.assignment_add_ons": {
+      "name": "assignment_add_ons",
+      "schema": "",
+      "columns": {
+        "assignment_id": {
+          "name": "assignment_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "add_on_id": {
+          "name": "add_on_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "assignment_add_ons_assignment_id_assignments_assignment_id_fk": {
+          "name": "assignment_add_ons_assignment_id_assignments_assignment_id_fk",
+          "tableFrom": "assignment_add_ons",
+          "tableTo": "assignments",
+          "columnsFrom": ["assignment_id"],
+          "columnsTo": ["assignment_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assignment_add_ons_add_on_id_add_ons_add_on_id_fk": {
+          "name": "assignment_add_ons_add_on_id_add_ons_add_on_id_fk",
+          "tableFrom": "assignment_add_ons",
+          "tableTo": "add_ons",
+          "columnsFrom": ["add_on_id"],
+          "columnsTo": ["add_on_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "assignment_add_ons_assignment_id_add_on_id_starts_at_pk": {
+          "name": "assignment_add_ons_assignment_id_add_on_id_starts_at_pk",
+          "columns": ["assignment_id", "add_on_id", "starts_at"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.assignments": {
+      "name": "assignments",
+      "schema": "",
+      "columns": {
+        "assignment_id": {
+          "name": "assignment_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "plan_id": {
+          "name": "plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "experiment_id": {
+          "name": "experiment_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cycle_id": {
+          "name": "cycle_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "assignments_tenant": {
+          "name": "assignments_tenant",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "assignments_one_open": {
+          "name": "assignments_one_open",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"assignments\".\"ends_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "assignments_tenant_id_tenants_tenant_id_fk": {
+          "name": "assignments_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "assignments",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assignments_plan_id_plans_plan_id_fk": {
+          "name": "assignments_plan_id_plans_plan_id_fk",
+          "tableFrom": "assignments",
+          "tableTo": "plans",
+          "columnsFrom": ["plan_id"],
+          "columnsTo": ["plan_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assignments_experiment_id_experiments_experiment_id_fk": {
+          "name": "assignments_experiment_id_experiments_experiment_id_fk",
+          "tableFrom": "assignments",
+          "tableTo": "experiments",
+          "columnsFrom": ["experiment_id"],
+          "columnsTo": ["experiment_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "assignments_cycle_id_cycles_cycle_id_fk": {
+          "name": "assignments_cycle_id_cycles_cycle_id_fk",
+          "tableFrom": "assignments",
+          "tableTo": "cycles",
+          "columnsFrom": ["cycle_id"],
+          "columnsTo": ["cycle_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "assignment_id_format": {
+          "name": "assignment_id_format",
+          "value": "\"assignments\".\"assignment_id\" ~ '^assignment_[a-z0-9]{24}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.coupon_credits_granted": {
+      "name": "coupon_credits_granted",
+      "schema": "",
+      "columns": {
+        "coupon_id": {
+          "name": "coupon_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "meter_id": {
+          "name": "meter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_microcredits": {
+          "name": "amount_microcredits",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiration": {
+          "name": "expiration",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rollovers": {
+          "name": "rollovers",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "award": {
+          "name": "award",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "coupon_credits_granted_coupon_id_coupons_coupon_id_fk": {
+          "name": "coupon_credits_granted_coupon_id_coupons_coupon_id_fk",
+          "tableFrom": "coupon_credits_granted",
+          "tableTo": "coupons",
+          "columnsFrom": ["coupon_id"],
+          "columnsTo": ["coupon_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coupon_credits_granted_meter_id_meters_meter_id_fk": {
+          "name": "coupon_credits_granted_meter_id_meters_meter_id_fk",
+          "tableFrom": "coupon_credits_granted",
+          "tableTo": "meters",
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "coupon_credits_granted_coupon_id_meter_id_pk": {
+          "name": "coupon_credits_granted_coupon_id_meter_id_pk",
+          "columns": ["coupon_id", "meter_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "coupon_credits_amount_positive": {
+          "name": "coupon_credits_amount_positive",
+          "value": "amount_microcredits > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.coupon_features_granted": {
+      "name": "coupon_features_granted",
+      "schema": "",
+      "columns": {
+        "coupon_id": {
+          "name": "coupon_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "feature_id": {
+          "name": "feature_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "set_to": {
+          "name": "set_to",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "award": {
+          "name": "award",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "coupon_features_granted_coupon_id_coupons_coupon_id_fk": {
+          "name": "coupon_features_granted_coupon_id_coupons_coupon_id_fk",
+          "tableFrom": "coupon_features_granted",
+          "tableTo": "coupons",
+          "columnsFrom": ["coupon_id"],
+          "columnsTo": ["coupon_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coupon_features_granted_feature_id_features_feature_id_fk": {
+          "name": "coupon_features_granted_feature_id_features_feature_id_fk",
+          "tableFrom": "coupon_features_granted",
+          "tableTo": "features",
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "coupon_features_granted_coupon_id_feature_id_pk": {
+          "name": "coupon_features_granted_coupon_id_feature_id_pk",
+          "columns": ["coupon_id", "feature_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.coupon_grants": {
+      "name": "coupon_grants",
+      "schema": "",
+      "columns": {
+        "coupon_grant_id": {
+          "name": "coupon_grant_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "from_tenant_id": {
+          "name": "from_tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "coupon_id": {
+          "name": "coupon_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "granted_at": {
+          "name": "granted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_tenant_id": {
+          "name": "to_tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "coupon_grants_from_tenant_id_tenants_tenant_id_fk": {
+          "name": "coupon_grants_from_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "coupon_grants",
+          "tableTo": "tenants",
+          "columnsFrom": ["from_tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coupon_grants_coupon_id_coupons_coupon_id_fk": {
+          "name": "coupon_grants_coupon_id_coupons_coupon_id_fk",
+          "tableFrom": "coupon_grants",
+          "tableTo": "coupons",
+          "columnsFrom": ["coupon_id"],
+          "columnsTo": ["coupon_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coupon_grants_to_tenant_id_tenants_tenant_id_fk": {
+          "name": "coupon_grants_to_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "coupon_grants",
+          "tableTo": "tenants",
+          "columnsFrom": ["to_tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "coupon_grant_id_format": {
+          "name": "coupon_grant_id_format",
+          "value": "\"coupon_grants\".\"coupon_grant_id\" ~ '^coupon_grant_[a-z0-9]{27}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.coupon_receipts": {
+      "name": "coupon_receipts",
+      "schema": "",
+      "columns": {
+        "coupon_receipt_id": {
+          "name": "coupon_receipt_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "coupon_id": {
+          "name": "coupon_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "grantor_type": {
+          "name": "grantor_type",
+          "type": "grantor_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "by_team_member_id": {
+          "name": "by_team_member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "by_tenant_id": {
+          "name": "by_tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "by_coupon_grant_id": {
+          "name": "by_coupon_grant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "coupon_receipts_tenant_id_tenants_tenant_id_fk": {
+          "name": "coupon_receipts_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "coupon_receipts",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coupon_receipts_coupon_id_coupons_coupon_id_fk": {
+          "name": "coupon_receipts_coupon_id_coupons_coupon_id_fk",
+          "tableFrom": "coupon_receipts",
+          "tableTo": "coupons",
+          "columnsFrom": ["coupon_id"],
+          "columnsTo": ["coupon_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coupon_receipts_by_team_member_id_team_members_team_member_id_fk": {
+          "name": "coupon_receipts_by_team_member_id_team_members_team_member_id_fk",
+          "tableFrom": "coupon_receipts",
+          "tableTo": "team_members",
+          "columnsFrom": ["by_team_member_id"],
+          "columnsTo": ["team_member_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coupon_receipts_by_tenant_id_tenants_tenant_id_fk": {
+          "name": "coupon_receipts_by_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "coupon_receipts",
+          "tableTo": "tenants",
+          "columnsFrom": ["by_tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coupon_receipts_by_coupon_grant_id_coupon_grants_coupon_grant_id_fk": {
+          "name": "coupon_receipts_by_coupon_grant_id_coupon_grants_coupon_grant_id_fk",
+          "tableFrom": "coupon_receipts",
+          "tableTo": "coupon_grants",
+          "columnsFrom": ["by_coupon_grant_id"],
+          "columnsTo": ["coupon_grant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "coupon_receipt_id_format": {
+          "name": "coupon_receipt_id_format",
+          "value": "\"coupon_receipts\".\"coupon_receipt_id\" ~ '^coupon_receipt_[a-z0-9]{27}$'"
+        },
+        "coupon_receipts_grantor_variant": {
+          "name": "coupon_receipts_grantor_variant",
+          "value": "(grantor_type = 'team_member' and by_team_member_id is not null and by_tenant_id is null and by_coupon_grant_id is null)\n       or (grantor_type = 'tenant' and by_team_member_id is null and by_tenant_id is not null and by_coupon_grant_id is null)\n       or (grantor_type = 'reciprocal' and by_team_member_id is null and by_tenant_id is null and by_coupon_grant_id is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.coupon_template_credits_granted": {
+      "name": "coupon_template_credits_granted",
+      "schema": "",
+      "columns": {
+        "coupon_template_id": {
+          "name": "coupon_template_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "meter_id": {
+          "name": "meter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_microcredits": {
+          "name": "amount_microcredits",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiration": {
+          "name": "expiration",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rollovers": {
+          "name": "rollovers",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "award": {
+          "name": "award",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "coupon_template_credits_granted_coupon_template_id_coupon_templates_coupon_template_id_fk": {
+          "name": "coupon_template_credits_granted_coupon_template_id_coupon_templates_coupon_template_id_fk",
+          "tableFrom": "coupon_template_credits_granted",
+          "tableTo": "coupon_templates",
+          "columnsFrom": ["coupon_template_id"],
+          "columnsTo": ["coupon_template_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coupon_template_credits_granted_meter_id_meters_meter_id_fk": {
+          "name": "coupon_template_credits_granted_meter_id_meters_meter_id_fk",
+          "tableFrom": "coupon_template_credits_granted",
+          "tableTo": "meters",
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "coupon_template_credits_granted_coupon_template_id_meter_id_pk": {
+          "name": "coupon_template_credits_granted_coupon_template_id_meter_id_pk",
+          "columns": ["coupon_template_id", "meter_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "coupon_template_credits_amount_positive": {
+          "name": "coupon_template_credits_amount_positive",
+          "value": "amount_microcredits > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.coupon_template_features_granted": {
+      "name": "coupon_template_features_granted",
+      "schema": "",
+      "columns": {
+        "coupon_template_id": {
+          "name": "coupon_template_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "feature_id": {
+          "name": "feature_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "set_to": {
+          "name": "set_to",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "award": {
+          "name": "award",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "coupon_template_features_granted_coupon_template_id_coupon_templates_coupon_template_id_fk": {
+          "name": "coupon_template_features_granted_coupon_template_id_coupon_templates_coupon_template_id_fk",
+          "tableFrom": "coupon_template_features_granted",
+          "tableTo": "coupon_templates",
+          "columnsFrom": ["coupon_template_id"],
+          "columnsTo": ["coupon_template_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coupon_template_features_granted_feature_id_features_feature_id_fk": {
+          "name": "coupon_template_features_granted_feature_id_features_feature_id_fk",
+          "tableFrom": "coupon_template_features_granted",
+          "tableTo": "features",
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "coupon_template_features_granted_coupon_template_id_feature_id_pk": {
+          "name": "coupon_template_features_granted_coupon_template_id_feature_id_pk",
+          "columns": ["coupon_template_id", "feature_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.coupon_templates": {
+      "name": "coupon_templates",
+      "schema": "",
+      "columns": {
+        "coupon_template_id": {
+          "name": "coupon_template_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deprecated_at": {
+          "name": "deprecated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "grantable_by_tenants": {
+          "name": "grantable_by_tenants",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "limit_per_granting_tenant": {
+          "name": "limit_per_granting_tenant",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_award": {
+          "name": "default_award",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reciprocal_benefit_coupon_template_id": {
+          "name": "reciprocal_benefit_coupon_template_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "coupon_templates_reciprocal_benefit_coupon_template_id_coupon_templates_coupon_template_id_fk": {
+          "name": "coupon_templates_reciprocal_benefit_coupon_template_id_coupon_templates_coupon_template_id_fk",
+          "tableFrom": "coupon_templates",
+          "tableTo": "coupon_templates",
+          "columnsFrom": ["reciprocal_benefit_coupon_template_id"],
+          "columnsTo": ["coupon_template_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "coupon_template_id_format": {
+          "name": "coupon_template_id_format",
+          "value": "\"coupon_templates\".\"coupon_template_id\" ~ '^coupon_template_[a-z0-9]{20}$'"
+        },
+        "coupon_templates_grantable_gating": {
+          "name": "coupon_templates_grantable_gating",
+          "value": "grantable_by_tenants or (limit_per_granting_tenant is null and reciprocal_benefit_coupon_template_id is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.coupons": {
+      "name": "coupons",
+      "schema": "",
+      "columns": {
+        "coupon_id": {
+          "name": "coupon_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "template_id": {
+          "name": "template_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "grantable_by_tenants": {
+          "name": "grantable_by_tenants",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "limit_per_granting_tenant": {
+          "name": "limit_per_granting_tenant",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_award": {
+          "name": "default_award",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reciprocal_benefit_coupon_id": {
+          "name": "reciprocal_benefit_coupon_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "coupons_template_id_coupon_templates_coupon_template_id_fk": {
+          "name": "coupons_template_id_coupon_templates_coupon_template_id_fk",
+          "tableFrom": "coupons",
+          "tableTo": "coupon_templates",
+          "columnsFrom": ["template_id"],
+          "columnsTo": ["coupon_template_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "coupons_reciprocal_benefit_coupon_id_coupons_coupon_id_fk": {
+          "name": "coupons_reciprocal_benefit_coupon_id_coupons_coupon_id_fk",
+          "tableFrom": "coupons",
+          "tableTo": "coupons",
+          "columnsFrom": ["reciprocal_benefit_coupon_id"],
+          "columnsTo": ["coupon_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "coupon_id_format": {
+          "name": "coupon_id_format",
+          "value": "\"coupons\".\"coupon_id\" ~ '^coupon_[a-z0-9]{20}$'"
+        },
+        "coupons_grantable_gating": {
+          "name": "coupons_grantable_gating",
+          "value": "grantable_by_tenants or (limit_per_granting_tenant is null and reciprocal_benefit_coupon_id is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.credit_grants": {
+      "name": "credit_grants",
+      "schema": "",
+      "columns": {
+        "credit_grant_id": {
+          "name": "credit_grant_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "meter_id": {
+          "name": "meter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "granted_at": {
+          "name": "granted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "by_team_member_id": {
+          "name": "by_team_member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amount_microcredits": {
+          "name": "amount_microcredits",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "applied_at_micros": {
+          "name": "applied_at_micros",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "credit_grants_tenant_id_tenants_tenant_id_fk": {
+          "name": "credit_grants_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "credit_grants",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "credit_grants_meter_id_meters_meter_id_fk": {
+          "name": "credit_grants_meter_id_meters_meter_id_fk",
+          "tableFrom": "credit_grants",
+          "tableTo": "meters",
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "credit_grants_by_team_member_id_team_members_team_member_id_fk": {
+          "name": "credit_grants_by_team_member_id_team_members_team_member_id_fk",
+          "tableFrom": "credit_grants",
+          "tableTo": "team_members",
+          "columnsFrom": ["by_team_member_id"],
+          "columnsTo": ["team_member_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "credit_grant_id_format": {
+          "name": "credit_grant_id_format",
+          "value": "\"credit_grants\".\"credit_grant_id\" ~ '^credit_grant_[a-z0-9]{25}$'"
+        },
+        "credit_grants_amount_positive": {
+          "name": "credit_grants_amount_positive",
+          "value": "amount_microcredits > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.cycles": {
+      "name": "cycles",
+      "schema": "",
+      "columns": {
+        "cycle_id": {
+          "name": "cycle_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deprecated_at": {
+          "name": "deprecated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_discount_percentage": {
+          "name": "default_discount_percentage",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "charged": {
+          "name": "charged",
+          "type": "charged",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cycle_length": {
+          "name": "cycle_length",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "credit_period": {
+          "name": "credit_period",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "grace_period": {
+          "name": "grace_period",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cycle_id_format": {
+          "name": "cycle_id_format",
+          "value": "\"cycles\".\"cycle_id\" ~ '^cycle_[a-z0-9]{20}$'"
+        },
+        "cycles_charging_variant": {
+          "name": "cycles_charging_variant",
+          "value": "(charged = 'upfront' and credit_period is null and grace_period is null)\n     or (charged = 'arrears' and credit_period is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.experiment_treatment_tenants": {
+      "name": "experiment_treatment_tenants",
+      "schema": "",
+      "columns": {
+        "experiment_id": {
+          "name": "experiment_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "plan_id": {
+          "name": "plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "experiment_treatment_tenants_tenant": {
+          "name": "experiment_treatment_tenants_tenant",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "experiment_treatment_tenants_tenant_id_tenants_tenant_id_fk": {
+          "name": "experiment_treatment_tenants_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "experiment_treatment_tenants",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "experiment_treatment_tenants_experiment_id_plan_id_experiment_treatments_experiment_id_plan_id_fk": {
+          "name": "experiment_treatment_tenants_experiment_id_plan_id_experiment_treatments_experiment_id_plan_id_fk",
+          "tableFrom": "experiment_treatment_tenants",
+          "tableTo": "experiment_treatments",
+          "columnsFrom": ["experiment_id", "plan_id"],
+          "columnsTo": ["experiment_id", "plan_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "experiment_treatment_tenants_experiment_id_tenant_id_pk": {
+          "name": "experiment_treatment_tenants_experiment_id_tenant_id_pk",
+          "columns": ["experiment_id", "tenant_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.experiment_treatments": {
+      "name": "experiment_treatments",
+      "schema": "",
+      "columns": {
+        "experiment_id": {
+          "name": "experiment_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "plan_id": {
+          "name": "plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_percentage": {
+          "name": "tenant_percentage",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "experiment_treatments_experiment_id_experiments_experiment_id_fk": {
+          "name": "experiment_treatments_experiment_id_experiments_experiment_id_fk",
+          "tableFrom": "experiment_treatments",
+          "tableTo": "experiments",
+          "columnsFrom": ["experiment_id"],
+          "columnsTo": ["experiment_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "experiment_treatments_plan_id_plans_plan_id_fk": {
+          "name": "experiment_treatments_plan_id_plans_plan_id_fk",
+          "tableFrom": "experiment_treatments",
+          "tableTo": "plans",
+          "columnsFrom": ["plan_id"],
+          "columnsTo": ["plan_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "experiment_treatments_experiment_id_plan_id_pk": {
+          "name": "experiment_treatments_experiment_id_plan_id_pk",
+          "columns": ["experiment_id", "plan_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "experiment_treatments_percentage_range": {
+          "name": "experiment_treatments_percentage_range",
+          "value": "tenant_percentage >= 0 and tenant_percentage <= 100"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.experiments": {
+      "name": "experiments",
+      "schema": "",
+      "columns": {
+        "experiment_id": {
+          "name": "experiment_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "concluded_at": {
+          "name": "concluded_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "concluding_plan_id": {
+          "name": "concluding_plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "experiments_concluding_plan_id_plans_plan_id_fk": {
+          "name": "experiments_concluding_plan_id_plans_plan_id_fk",
+          "tableFrom": "experiments",
+          "tableTo": "plans",
+          "columnsFrom": ["concluding_plan_id"],
+          "columnsTo": ["plan_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "experiment_id_format": {
+          "name": "experiment_id_format",
+          "value": "\"experiments\".\"experiment_id\" ~ '^experiment_[a-z0-9]{20}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.feature_options": {
+      "name": "feature_options",
+      "schema": "",
+      "columns": {
+        "feature_option_id": {
+          "name": "feature_option_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "feature_id": {
+          "name": "feature_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "feature_options_feature_id_features_feature_id_fk": {
+          "name": "feature_options_feature_id_features_feature_id_fk",
+          "tableFrom": "feature_options",
+          "tableTo": "features",
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "feature_option_id_format": {
+          "name": "feature_option_id_format",
+          "value": "\"feature_options\".\"feature_option_id\" ~ '^feature_option_[a-z0-9]{20}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.feature_overrides": {
+      "name": "feature_overrides",
+      "schema": "",
+      "columns": {
+        "feature_override_id": {
+          "name": "feature_override_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "feature_id": {
+          "name": "feature_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "set_to": {
+          "name": "set_to",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "by_team_member_id": {
+          "name": "by_team_member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "feature_overrides_tenant_id_tenants_tenant_id_fk": {
+          "name": "feature_overrides_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "feature_overrides",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "feature_overrides_feature_id_features_feature_id_fk": {
+          "name": "feature_overrides_feature_id_features_feature_id_fk",
+          "tableFrom": "feature_overrides",
+          "tableTo": "features",
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "feature_overrides_by_team_member_id_team_members_team_member_id_fk": {
+          "name": "feature_overrides_by_team_member_id_team_members_team_member_id_fk",
+          "tableFrom": "feature_overrides",
+          "tableTo": "team_members",
+          "columnsFrom": ["by_team_member_id"],
+          "columnsTo": ["team_member_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "feature_override_id_format": {
+          "name": "feature_override_id_format",
+          "value": "\"feature_overrides\".\"feature_override_id\" ~ '^feature_override_[a-z0-9]{24}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.feature_tax_types": {
+      "name": "feature_tax_types",
+      "schema": "",
+      "columns": {
+        "feature_id": {
+          "name": "feature_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tax_type_id": {
+          "name": "tax_type_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "feature_tax_types_feature_id_features_feature_id_fk": {
+          "name": "feature_tax_types_feature_id_features_feature_id_fk",
+          "tableFrom": "feature_tax_types",
+          "tableTo": "features",
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "feature_tax_types_tax_type_id_tax_types_tax_type_id_fk": {
+          "name": "feature_tax_types_tax_type_id_tax_types_tax_type_id_fk",
+          "tableFrom": "feature_tax_types",
+          "tableTo": "tax_types",
+          "columnsFrom": ["tax_type_id"],
+          "columnsTo": ["tax_type_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "feature_tax_types_feature_id_tax_type_id_pk": {
+          "name": "feature_tax_types_feature_id_tax_type_id_pk",
+          "columns": ["feature_id", "tax_type_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.features": {
+      "name": "features",
+      "schema": "",
+      "columns": {
+        "feature_id": {
+          "name": "feature_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deprecated_at": {
+          "name": "deprecated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "feature_id_format": {
+          "name": "feature_id_format",
+          "value": "\"features\".\"feature_id\" ~ '^feature_[a-z0-9]{20}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.invoices": {
+      "name": "invoices",
+      "schema": "",
+      "columns": {
+        "invoice_id": {
+          "name": "invoice_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closed_reason": {
+          "name": "closed_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "charged": {
+          "name": "charged",
+          "type": "charged",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cycle_length": {
+          "name": "cycle_length",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "credit_period": {
+          "name": "credit_period",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "grace_period": {
+          "name": "grace_period",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "invoices_tenant": {
+          "name": "invoices_tenant",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "invoices_closed": {
+          "name": "invoices_closed",
+          "columns": [
+            {
+              "expression": "closed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"invoices\".\"closed_at\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "invoices_tenant_id_tenants_tenant_id_fk": {
+          "name": "invoices_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "invoices",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "invoice_id_format": {
+          "name": "invoice_id_format",
+          "value": "\"invoices\".\"invoice_id\" ~ '^invoice_[a-z0-9]{25}$'"
+        },
+        "invoices_charging_variant": {
+          "name": "invoices_charging_variant",
+          "value": "(charged = 'upfront' and credit_period is null and grace_period is null)\n     or (charged = 'arrears' and credit_period is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.items": {
+      "name": "items",
+      "schema": "",
+      "columns": {
+        "item_id": {
+          "name": "item_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "invoice_id": {
+          "name": "invoice_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "per_unit_value_id": {
+          "name": "per_unit_value_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "units": {
+          "name": "units",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "items_invoice_id_invoices_invoice_id_fk": {
+          "name": "items_invoice_id_invoices_invoice_id_fk",
+          "tableFrom": "items",
+          "tableTo": "invoices",
+          "columnsFrom": ["invoice_id"],
+          "columnsTo": ["invoice_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "items_per_unit_value_id_values_value_id_fk": {
+          "name": "items_per_unit_value_id_values_value_id_fk",
+          "tableFrom": "items",
+          "tableTo": "values",
+          "columnsFrom": ["per_unit_value_id"],
+          "columnsTo": ["value_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "item_id_format": {
+          "name": "item_id_format",
+          "value": "\"items\".\"item_id\" ~ '^item_[a-z0-9]{27}$'"
+        },
+        "items_units_nonnegative": {
+          "name": "items_units_nonnegative",
+          "value": "units >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.loans": {
+      "name": "loans",
+      "schema": "",
+      "columns": {
+        "loan_id": {
+          "name": "loan_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assignment_id": {
+          "name": "assignment_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "principal": {
+          "name": "principal",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "interest_percentage": {
+          "name": "interest_percentage",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "loans_tenant": {
+          "name": "loans_tenant",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "loans_tenant_id_tenants_tenant_id_fk": {
+          "name": "loans_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "loans",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "loans_assignment_id_assignments_assignment_id_fk": {
+          "name": "loans_assignment_id_assignments_assignment_id_fk",
+          "tableFrom": "loans",
+          "tableTo": "assignments",
+          "columnsFrom": ["assignment_id"],
+          "columnsTo": ["assignment_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "loan_id_format": {
+          "name": "loan_id_format",
+          "value": "\"loans\".\"loan_id\" ~ '^loan_[a-z0-9]{24}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.meter_balances": {
+      "name": "meter_balances",
+      "schema": "",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "meter_id": {
+          "name": "meter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "balance_microcredits": {
+          "name": "balance_microcredits",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "meter_balances_tenant_id_tenants_tenant_id_fk": {
+          "name": "meter_balances_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "meter_balances",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "meter_balances_meter_id_meters_meter_id_fk": {
+          "name": "meter_balances_meter_id_meters_meter_id_fk",
+          "tableFrom": "meter_balances",
+          "tableTo": "meters",
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "meter_balances_tenant_id_meter_id_pk": {
+          "name": "meter_balances_tenant_id_meter_id_pk",
+          "columns": ["tenant_id", "meter_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "meter_balances_nonnegative": {
+          "name": "meter_balances_nonnegative",
+          "value": "balance_microcredits >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.meter_events": {
+      "name": "meter_events",
+      "schema": "",
+      "columns": {
+        "meter_event_id": {
+          "name": "meter_event_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "external_id": {
+          "name": "external_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "received_at_micros": {
+          "name": "received_at_micros",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "meter_id": {
+          "name": "meter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_microcredits": {
+          "name": "amount_microcredits",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "meter_event_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "meter_events_idempotency": {
+          "name": "meter_events_idempotency",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "meter_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "external_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "meter_events_tenant_meter_created": {
+          "name": "meter_events_tenant_meter_created",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "meter_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "meter_events_meter_received": {
+          "name": "meter_events_meter_received",
+          "columns": [
+            {
+              "expression": "meter_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "received_at_micros",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "meter_events_meter_id_meters_meter_id_fk": {
+          "name": "meter_events_meter_id_meters_meter_id_fk",
+          "tableFrom": "meter_events",
+          "tableTo": "meters",
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "meter_events_tenant_id_tenants_tenant_id_fk": {
+          "name": "meter_events_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "meter_events",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "meter_event_id_format": {
+          "name": "meter_event_id_format",
+          "value": "\"meter_events\".\"meter_event_id\" ~ '^meter_event_[a-z0-9]{37}$'"
+        },
+        "meter_events_amount_nonzero": {
+          "name": "meter_events_amount_nonzero",
+          "value": "amount_microcredits != 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.meter_events_dlq": {
+      "name": "meter_events_dlq",
+      "schema": "",
+      "columns": {
+        "meter_event_dlq_id": {
+          "name": "meter_event_dlq_id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "meter_events_dlq_meter_event_dlq_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "payload": {
+          "name": "payload",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "meter_event_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "meter_id": {
+          "name": "meter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amount_microcredits": {
+          "name": "amount_microcredits",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "received_at_micros": {
+          "name": "received_at_micros",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "failed_at": {
+          "name": "failed_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.meter_overrides": {
+      "name": "meter_overrides",
+      "schema": "",
+      "columns": {
+        "meter_override_id": {
+          "name": "meter_override_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "meter_id": {
+          "name": "meter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "default_microcredits": {
+          "name": "default_microcredits",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "limit_microcredits": {
+          "name": "limit_microcredits",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reset": {
+          "name": "reset",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rollovers": {
+          "name": "rollovers",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "top_up_prices_per_credit": {
+          "name": "top_up_prices_per_credit",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "top_up_credit_pack_sizes": {
+          "name": "top_up_credit_pack_sizes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "by_team_member_id": {
+          "name": "by_team_member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "meter_overrides_tenant_id_tenants_tenant_id_fk": {
+          "name": "meter_overrides_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "meter_overrides",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "meter_overrides_meter_id_meters_meter_id_fk": {
+          "name": "meter_overrides_meter_id_meters_meter_id_fk",
+          "tableFrom": "meter_overrides",
+          "tableTo": "meters",
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "meter_overrides_by_team_member_id_team_members_team_member_id_fk": {
+          "name": "meter_overrides_by_team_member_id_team_members_team_member_id_fk",
+          "tableFrom": "meter_overrides",
+          "tableTo": "team_members",
+          "columnsFrom": ["by_team_member_id"],
+          "columnsTo": ["team_member_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "meter_override_id_format": {
+          "name": "meter_override_id_format",
+          "value": "\"meter_overrides\".\"meter_override_id\" ~ '^meter_override_[a-z0-9]{24}$'"
+        },
+        "meter_overrides_limit_gte_default": {
+          "name": "meter_overrides_limit_gte_default",
+          "value": "limit_microcredits is null or limit_microcredits >= default_microcredits"
+        },
+        "meter_overrides_default_nonnegative": {
+          "name": "meter_overrides_default_nonnegative",
+          "value": "default_microcredits >= 0"
+        },
+        "meter_overrides_limit_positive": {
+          "name": "meter_overrides_limit_positive",
+          "value": "limit_microcredits > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.meter_spends": {
+      "name": "meter_spends",
+      "schema": "",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "meter_id": {
+          "name": "meter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "spend_microcredits": {
+          "name": "spend_microcredits",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "meter_spends_tenant_id_tenants_tenant_id_fk": {
+          "name": "meter_spends_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "meter_spends",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "meter_spends_meter_id_meters_meter_id_fk": {
+          "name": "meter_spends_meter_id_meters_meter_id_fk",
+          "tableFrom": "meter_spends",
+          "tableTo": "meters",
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "meter_spends_tenant_id_meter_id_pk": {
+          "name": "meter_spends_tenant_id_meter_id_pk",
+          "columns": ["tenant_id", "meter_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "meter_spends_nonnegative": {
+          "name": "meter_spends_nonnegative",
+          "value": "spend_microcredits >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.meter_tax_types": {
+      "name": "meter_tax_types",
+      "schema": "",
+      "columns": {
+        "meter_id": {
+          "name": "meter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tax_type_id": {
+          "name": "tax_type_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "meter_tax_types_meter_id_meters_meter_id_fk": {
+          "name": "meter_tax_types_meter_id_meters_meter_id_fk",
+          "tableFrom": "meter_tax_types",
+          "tableTo": "meters",
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "meter_tax_types_tax_type_id_tax_types_tax_type_id_fk": {
+          "name": "meter_tax_types_tax_type_id_tax_types_tax_type_id_fk",
+          "tableFrom": "meter_tax_types",
+          "tableTo": "tax_types",
+          "columnsFrom": ["tax_type_id"],
+          "columnsTo": ["tax_type_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "meter_tax_types_meter_id_tax_type_id_pk": {
+          "name": "meter_tax_types_meter_id_tax_type_id_pk",
+          "columns": ["meter_id", "tax_type_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.meters": {
+      "name": "meters",
+      "schema": "",
+      "columns": {
+        "meter_id": {
+          "name": "meter_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deprecated_at": {
+          "name": "deprecated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "meter_id_format": {
+          "name": "meter_id_format",
+          "value": "\"meters\".\"meter_id\" ~ '^meter_[a-z0-9]{20}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.payment_invoices": {
+      "name": "payment_invoices",
+      "schema": "",
+      "columns": {
+        "payment_id": {
+          "name": "payment_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "invoice_id": {
+          "name": "invoice_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "payment_invoices_payment_id_payments_payment_id_fk": {
+          "name": "payment_invoices_payment_id_payments_payment_id_fk",
+          "tableFrom": "payment_invoices",
+          "tableTo": "payments",
+          "columnsFrom": ["payment_id"],
+          "columnsTo": ["payment_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "payment_invoices_invoice_id_invoices_invoice_id_fk": {
+          "name": "payment_invoices_invoice_id_invoices_invoice_id_fk",
+          "tableFrom": "payment_invoices",
+          "tableTo": "invoices",
+          "columnsFrom": ["invoice_id"],
+          "columnsTo": ["invoice_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "payment_invoices_payment_id_invoice_id_pk": {
+          "name": "payment_invoices_payment_id_invoice_id_pk",
+          "columns": ["payment_id", "invoice_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.payment_methods": {
+      "name": "payment_methods",
+      "schema": "",
+      "columns": {
+        "payment_method_id": {
+          "name": "payment_method_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_internals": {
+          "name": "provider_internals",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "payment_methods_one_default": {
+          "name": "payment_methods_one_default",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"payment_methods\".\"is_default\" and \"payment_methods\".\"deleted_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "payment_methods_tenant_id_tenants_tenant_id_fk": {
+          "name": "payment_methods_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "payment_methods",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "payment_method_id_format": {
+          "name": "payment_method_id_format",
+          "value": "\"payment_methods\".\"payment_method_id\" ~ '^payment_method_[a-z0-9]{23}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.payments": {
+      "name": "payments",
+      "schema": "",
+      "columns": {
+        "payment_id": {
+          "name": "payment_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "started_processing_at": {
+          "name": "started_processing_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "succeeded_at": {
+          "name": "succeeded_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failed_at": {
+          "name": "failed_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_internals": {
+          "name": "provider_internals",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "payments_tenant": {
+          "name": "payments_tenant",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "payments_tenant_id_tenants_tenant_id_fk": {
+          "name": "payments_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "payments",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "payment_id_format": {
+          "name": "payment_id_format",
+          "value": "\"payments\".\"payment_id\" ~ '^payment_[a-z0-9]{25}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.plan_add_ons": {
+      "name": "plan_add_ons",
+      "schema": "",
+      "columns": {
+        "plan_id": {
+          "name": "plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "add_on_id": {
+          "name": "add_on_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "plan_add_ons_plan_id_plans_plan_id_fk": {
+          "name": "plan_add_ons_plan_id_plans_plan_id_fk",
+          "tableFrom": "plan_add_ons",
+          "tableTo": "plans",
+          "columnsFrom": ["plan_id"],
+          "columnsTo": ["plan_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "plan_add_ons_add_on_id_add_ons_add_on_id_fk": {
+          "name": "plan_add_ons_add_on_id_add_ons_add_on_id_fk",
+          "tableFrom": "plan_add_ons",
+          "tableTo": "add_ons",
+          "columnsFrom": ["add_on_id"],
+          "columnsTo": ["add_on_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "plan_add_ons_plan_id_add_on_id_pk": {
+          "name": "plan_add_ons_plan_id_add_on_id_pk",
+          "columns": ["plan_id", "add_on_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.plan_features": {
+      "name": "plan_features",
+      "schema": "",
+      "columns": {
+        "plan_id": {
+          "name": "plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "feature_id": {
+          "name": "feature_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "set_to": {
+          "name": "set_to",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "plan_features_plan_id_plans_plan_id_fk": {
+          "name": "plan_features_plan_id_plans_plan_id_fk",
+          "tableFrom": "plan_features",
+          "tableTo": "plans",
+          "columnsFrom": ["plan_id"],
+          "columnsTo": ["plan_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "plan_features_feature_id_features_feature_id_fk": {
+          "name": "plan_features_feature_id_features_feature_id_fk",
+          "tableFrom": "plan_features",
+          "tableTo": "features",
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "plan_features_plan_id_feature_id_pk": {
+          "name": "plan_features_plan_id_feature_id_pk",
+          "columns": ["plan_id", "feature_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.plan_meters": {
+      "name": "plan_meters",
+      "schema": "",
+      "columns": {
+        "plan_id": {
+          "name": "plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "meter_id": {
+          "name": "meter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "default_microcredits": {
+          "name": "default_microcredits",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "limit_microcredits": {
+          "name": "limit_microcredits",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reset": {
+          "name": "reset",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rollovers": {
+          "name": "rollovers",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "top_up_prices_per_credit": {
+          "name": "top_up_prices_per_credit",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "top_up_credit_pack_sizes": {
+          "name": "top_up_credit_pack_sizes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "plan_meters_plan_id_plans_plan_id_fk": {
+          "name": "plan_meters_plan_id_plans_plan_id_fk",
+          "tableFrom": "plan_meters",
+          "tableTo": "plans",
+          "columnsFrom": ["plan_id"],
+          "columnsTo": ["plan_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "plan_meters_meter_id_meters_meter_id_fk": {
+          "name": "plan_meters_meter_id_meters_meter_id_fk",
+          "tableFrom": "plan_meters",
+          "tableTo": "meters",
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "plan_meters_plan_id_meter_id_pk": {
+          "name": "plan_meters_plan_id_meter_id_pk",
+          "columns": ["plan_id", "meter_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "plan_meters_limit_gte_default": {
+          "name": "plan_meters_limit_gte_default",
+          "value": "limit_microcredits is null or limit_microcredits >= default_microcredits"
+        },
+        "plan_meters_default_nonnegative": {
+          "name": "plan_meters_default_nonnegative",
+          "value": "default_microcredits >= 0"
+        },
+        "plan_meters_limit_positive": {
+          "name": "plan_meters_limit_positive",
+          "value": "limit_microcredits > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.plan_prices": {
+      "name": "plan_prices",
+      "schema": "",
+      "columns": {
+        "plan_id": {
+          "name": "plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cycle_id": {
+          "name": "cycle_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value_id": {
+          "name": "value_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "plan_prices_plan_id_plans_plan_id_fk": {
+          "name": "plan_prices_plan_id_plans_plan_id_fk",
+          "tableFrom": "plan_prices",
+          "tableTo": "plans",
+          "columnsFrom": ["plan_id"],
+          "columnsTo": ["plan_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "plan_prices_cycle_id_cycles_cycle_id_fk": {
+          "name": "plan_prices_cycle_id_cycles_cycle_id_fk",
+          "tableFrom": "plan_prices",
+          "tableTo": "cycles",
+          "columnsFrom": ["cycle_id"],
+          "columnsTo": ["cycle_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "plan_prices_value_id_values_value_id_fk": {
+          "name": "plan_prices_value_id_values_value_id_fk",
+          "tableFrom": "plan_prices",
+          "tableTo": "values",
+          "columnsFrom": ["value_id"],
+          "columnsTo": ["value_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "plan_prices_plan_id_cycle_id_pk": {
+          "name": "plan_prices_plan_id_cycle_id_pk",
+          "columns": ["plan_id", "cycle_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.plans": {
+      "name": "plans",
+      "schema": "",
+      "columns": {
+        "plan_id": {
+          "name": "plan_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "derived_from_plan_id": {
+          "name": "derived_from_plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deprecated_at": {
+          "name": "deprecated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "plan_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'standard'"
+        },
+        "duration": {
+          "name": "duration",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_interest_percentage": {
+          "name": "default_interest_percentage",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "minimum_payment_value_id": {
+          "name": "minimum_payment_value_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "plans_derived_from_plan_id_plans_plan_id_fk": {
+          "name": "plans_derived_from_plan_id_plans_plan_id_fk",
+          "tableFrom": "plans",
+          "tableTo": "plans",
+          "columnsFrom": ["derived_from_plan_id"],
+          "columnsTo": ["plan_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "plans_minimum_payment_value_id_values_value_id_fk": {
+          "name": "plans_minimum_payment_value_id_values_value_id_fk",
+          "tableFrom": "plans",
+          "tableTo": "values",
+          "columnsFrom": ["minimum_payment_value_id"],
+          "columnsTo": ["value_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "plan_id_format": {
+          "name": "plan_id_format",
+          "value": "\"plans\".\"plan_id\" ~ '^plan_[a-z0-9]{20}$'"
+        },
+        "plans_kind_variant": {
+          "name": "plans_kind_variant",
+          "value": "(kind = 'standard' and duration is null and default_interest_percentage is null and minimum_payment_value_id is null)\n       or (kind = 'loan' and duration is not null and minimum_payment_value_id is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.refunds": {
+      "name": "refunds",
+      "schema": "",
+      "columns": {
+        "refund_id": {
+          "name": "refund_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "started_processing_at": {
+          "name": "started_processing_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "succeeded_at": {
+          "name": "succeeded_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failed_at": {
+          "name": "failed_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "by_team_member_id": {
+          "name": "by_team_member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value_id": {
+          "name": "value_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "refunds_tenant_id_tenants_tenant_id_fk": {
+          "name": "refunds_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "refunds",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "refunds_by_team_member_id_team_members_team_member_id_fk": {
+          "name": "refunds_by_team_member_id_team_members_team_member_id_fk",
+          "tableFrom": "refunds",
+          "tableTo": "team_members",
+          "columnsFrom": ["by_team_member_id"],
+          "columnsTo": ["team_member_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "refunds_value_id_values_value_id_fk": {
+          "name": "refunds_value_id_values_value_id_fk",
+          "tableFrom": "refunds",
+          "tableTo": "values",
+          "columnsFrom": ["value_id"],
+          "columnsTo": ["value_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "refund_id_format": {
+          "name": "refund_id_format",
+          "value": "\"refunds\".\"refund_id\" ~ '^refund_[a-z0-9]{23}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.rule_runs": {
+      "name": "rule_runs",
+      "schema": "",
+      "columns": {
+        "rule_run_id": {
+          "name": "rule_run_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rule_id": {
+          "name": "rule_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "trigger_key": {
+          "name": "trigger_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action_index": {
+          "name": "action_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "available_at": {
+          "name": "available_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "succeeded_at": {
+          "name": "succeeded_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failed_at": {
+          "name": "failed_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "rule_runs_idempotency": {
+          "name": "rule_runs_idempotency",
+          "columns": [
+            {
+              "expression": "rule_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "trigger_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "action_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "rule_runs_pending": {
+          "name": "rule_runs_pending",
+          "columns": [
+            {
+              "expression": "available_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"rule_runs\".\"succeeded_at\" is null and \"rule_runs\".\"failed_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "rule_runs_rule_tenant_created": {
+          "name": "rule_runs_rule_tenant_created",
+          "columns": [
+            {
+              "expression": "rule_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "rule_runs_rule_id_rules_rule_id_fk": {
+          "name": "rule_runs_rule_id_rules_rule_id_fk",
+          "tableFrom": "rule_runs",
+          "tableTo": "rules",
+          "columnsFrom": ["rule_id"],
+          "columnsTo": ["rule_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "rule_runs_tenant_id_tenants_tenant_id_fk": {
+          "name": "rule_runs_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "rule_runs",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "rule_run_id_format": {
+          "name": "rule_run_id_format",
+          "value": "\"rule_runs\".\"rule_run_id\" ~ '^rule_run_[a-z0-9]{27}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.rule_scheduler_state": {
+      "name": "rule_scheduler_state",
+      "schema": "",
+      "columns": {
+        "rule_id": {
+          "name": "rule_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "evaluated_through_ms": {
+          "name": "evaluated_through_ms",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rule_scheduler_state_rule_id_rules_rule_id_fk": {
+          "name": "rule_scheduler_state_rule_id_rules_rule_id_fk",
+          "tableFrom": "rule_scheduler_state",
+          "tableTo": "rules",
+          "columnsFrom": ["rule_id"],
+          "columnsTo": ["rule_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.rules": {
+      "name": "rules",
+      "schema": "",
+      "columns": {
+        "rule_id": {
+          "name": "rule_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deprecated_at": {
+          "name": "deprecated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "trigger": {
+          "name": "trigger",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recurrence": {
+          "name": "recurrence",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actions": {
+          "name": "actions",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "rule_id_format": {
+          "name": "rule_id_format",
+          "value": "\"rules\".\"rule_id\" ~ '^rule_[a-z0-9]{20}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.task_types": {
+      "name": "task_types",
+      "schema": "",
+      "columns": {
+        "task_type_id": {
+          "name": "task_type_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deprecated_at": {
+          "name": "deprecated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "default_assignee_team_member_id": {
+          "name": "default_assignee_team_member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "integrations": {
+          "name": "integrations",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "task_types_default_assignee_team_member_id_team_members_team_member_id_fk": {
+          "name": "task_types_default_assignee_team_member_id_team_members_team_member_id_fk",
+          "tableFrom": "task_types",
+          "tableTo": "team_members",
+          "columnsFrom": ["default_assignee_team_member_id"],
+          "columnsTo": ["team_member_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "task_type_id_format": {
+          "name": "task_type_id_format",
+          "value": "\"task_types\".\"task_type_id\" ~ '^task_type_[a-z0-9]{20}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.tasks": {
+      "name": "tasks",
+      "schema": "",
+      "columns": {
+        "task_id": {
+          "name": "task_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "task_type_id": {
+          "name": "task_type_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_rule_id": {
+          "name": "source_rule_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assigned_to_team_member_id": {
+          "name": "assigned_to_team_member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_refs": {
+          "name": "external_refs",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "tasks_tenant": {
+          "name": "tasks_tenant",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "tasks_type": {
+          "name": "tasks_type",
+          "columns": [
+            {
+              "expression": "task_type_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "tasks_task_type_id_task_types_task_type_id_fk": {
+          "name": "tasks_task_type_id_task_types_task_type_id_fk",
+          "tableFrom": "tasks",
+          "tableTo": "task_types",
+          "columnsFrom": ["task_type_id"],
+          "columnsTo": ["task_type_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tasks_tenant_id_tenants_tenant_id_fk": {
+          "name": "tasks_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "tasks",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tasks_source_rule_id_rules_rule_id_fk": {
+          "name": "tasks_source_rule_id_rules_rule_id_fk",
+          "tableFrom": "tasks",
+          "tableTo": "rules",
+          "columnsFrom": ["source_rule_id"],
+          "columnsTo": ["rule_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tasks_assigned_to_team_member_id_team_members_team_member_id_fk": {
+          "name": "tasks_assigned_to_team_member_id_team_members_team_member_id_fk",
+          "tableFrom": "tasks",
+          "tableTo": "team_members",
+          "columnsFrom": ["assigned_to_team_member_id"],
+          "columnsTo": ["team_member_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "task_id_format": {
+          "name": "task_id_format",
+          "value": "\"tasks\".\"task_id\" ~ '^task_[a-z0-9]{25}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.tax_types": {
+      "name": "tax_types",
+      "schema": "",
+      "columns": {
+        "tax_type_id": {
+          "name": "tax_type_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deprecated_at": {
+          "name": "deprecated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "tax_type_id_format": {
+          "name": "tax_type_id_format",
+          "value": "\"tax_types\".\"tax_type_id\" ~ '^tax_type_[a-z0-9]{20}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.taxation_amount_items": {
+      "name": "taxation_amount_items",
+      "schema": "",
+      "columns": {
+        "taxation_amount_id": {
+          "name": "taxation_amount_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "taxation_amount_items_taxation_amount_id_taxation_amounts_taxation_amount_id_fk": {
+          "name": "taxation_amount_items_taxation_amount_id_taxation_amounts_taxation_amount_id_fk",
+          "tableFrom": "taxation_amount_items",
+          "tableTo": "taxation_amounts",
+          "columnsFrom": ["taxation_amount_id"],
+          "columnsTo": ["taxation_amount_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "taxation_amount_items_item_id_items_item_id_fk": {
+          "name": "taxation_amount_items_item_id_items_item_id_fk",
+          "tableFrom": "taxation_amount_items",
+          "tableTo": "items",
+          "columnsFrom": ["item_id"],
+          "columnsTo": ["item_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "taxation_amount_items_taxation_amount_id_item_id_pk": {
+          "name": "taxation_amount_items_taxation_amount_id_item_id_pk",
+          "columns": ["taxation_amount_id", "item_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.taxation_amounts": {
+      "name": "taxation_amounts",
+      "schema": "",
+      "columns": {
+        "taxation_amount_id": {
+          "name": "taxation_amount_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "invoice_id": {
+          "name": "invoice_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tax_id": {
+          "name": "tax_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amount": {
+          "name": "amount",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "taxation_amounts_invoice_id_invoices_invoice_id_fk": {
+          "name": "taxation_amounts_invoice_id_invoices_invoice_id_fk",
+          "tableFrom": "taxation_amounts",
+          "tableTo": "invoices",
+          "columnsFrom": ["invoice_id"],
+          "columnsTo": ["invoice_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "taxation_amounts_tax_id_taxes_tax_id_fk": {
+          "name": "taxation_amounts_tax_id_taxes_tax_id_fk",
+          "tableFrom": "taxation_amounts",
+          "tableTo": "taxes",
+          "columnsFrom": ["tax_id"],
+          "columnsTo": ["tax_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "taxation_amount_id_format": {
+          "name": "taxation_amount_id_format",
+          "value": "\"taxation_amounts\".\"taxation_amount_id\" ~ '^taxation_amount_[a-z0-9]{27}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.taxes": {
+      "name": "taxes",
+      "schema": "",
+      "columns": {
+        "tax_id": {
+          "name": "tax_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deprecated_at": {
+          "name": "deprecated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tax_type_id": {
+          "name": "tax_type_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "taxes_tax_type_id_tax_types_tax_type_id_fk": {
+          "name": "taxes_tax_type_id_tax_types_tax_type_id_fk",
+          "tableFrom": "taxes",
+          "tableTo": "tax_types",
+          "columnsFrom": ["tax_type_id"],
+          "columnsTo": ["tax_type_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "tax_id_format": {
+          "name": "tax_id_format",
+          "value": "\"taxes\".\"tax_id\" ~ '^tax_[a-z0-9]{20}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.team_members": {
+      "name": "team_members",
+      "schema": "",
+      "columns": {
+        "team_member_id": {
+          "name": "team_member_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profile_picture_url": {
+          "name": "profile_picture_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "team_members_email_unique": {
+          "name": "team_members_email_unique",
+          "nullsNotDistinct": false,
+          "columns": ["email"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "team_member_id_format": {
+          "name": "team_member_id_format",
+          "value": "\"team_members\".\"team_member_id\" ~ '^team_member_[a-z0-9]{16}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.tenant_last_activity": {
+      "name": "tenant_last_activity",
+      "schema": "",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "meter_id": {
+          "name": "meter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_event_at_micros": {
+          "name": "last_event_at_micros",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tenant_last_activity_tenant_id_tenants_tenant_id_fk": {
+          "name": "tenant_last_activity_tenant_id_tenants_tenant_id_fk",
+          "tableFrom": "tenant_last_activity",
+          "tableTo": "tenants",
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tenant_last_activity_meter_id_meters_meter_id_fk": {
+          "name": "tenant_last_activity_meter_id_meters_meter_id_fk",
+          "tableFrom": "tenant_last_activity",
+          "tableTo": "meters",
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "tenant_last_activity_tenant_id_meter_id_pk": {
+          "name": "tenant_last_activity_tenant_id_meter_id_pk",
+          "columns": ["tenant_id", "meter_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tenants": {
+      "name": "tenants",
+      "schema": "",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_ids": {
+          "name": "external_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "tenant_id_format": {
+          "name": "tenant_id_format",
+          "value": "\"tenants\".\"tenant_id\" ~ '^tenant_[a-z0-9]{22}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.values": {
+      "name": "values",
+      "schema": "",
+      "columns": {
+        "value_id": {
+          "name": "value_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deprecated_at": {
+          "name": "deprecated_at",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amounts": {
+          "name": "amounts",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "value_id_format": {
+          "name": "value_id_format",
+          "value": "\"values\".\"value_id\" ~ '^value_[a-z0-9]{20}$'"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.charged": {
+      "name": "charged",
+      "schema": "public",
+      "values": ["upfront", "arrears"]
+    },
+    "public.grantor_type": {
+      "name": "grantor_type",
+      "schema": "public",
+      "values": ["team_member", "tenant", "reciprocal"]
+    },
+    "public.meter_event_status": {
+      "name": "meter_event_status",
+      "schema": "public",
+      "values": ["succeeded", "insufficient_balance", "unexpected_error"]
+    },
+    "public.plan_kind": {
+      "name": "plan_kind",
+      "schema": "public",
+      "values": ["standard", "loan"]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

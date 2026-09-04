@@ -35,11 +35,13 @@ import {
 } from "drizzle-orm/pg-core";
 import type { CurrencyAmount, Duration } from "../schemas/common.ts";
 import type { Award } from "../schemas/coupon.ts";
-import type { DunningAction } from "../schemas/cycle.ts";
 import { idSuffixLengths, type IdPrefix } from "../schemas/ids.ts";
 import type { Payment } from "../schemas/payment.ts";
 import type { PaymentMethod } from "../schemas/payment-method.ts";
 import type { PlanMeter } from "../schemas/plan.ts";
+import type { FiringPayload, Rule } from "../schemas/rule.ts";
+import type { IntegrationTarget } from "../schemas/task-type.ts";
+import type { ExternalRef } from "../schemas/task.ts";
 
 /** Check constraint enforcing "<prefix>_<suffix of [a-z0-9]>" id format. */
 function idFormatCheck(prefix: IdPrefix, id: SQLWrapper) {
@@ -94,17 +96,13 @@ const chargingColumns = {
   cycleLength: jsonb("cycle_length").$type<Duration | "one_time">().notNull(),
   creditPeriod: duration("credit_period"),
   gracePeriod: duration("grace_period"),
-  dunningSchedule:
-    jsonb("dunning_schedule").$type<
-      { after: Duration; actions: DunningAction[] }[]
-    >(),
 };
 
 /** Upfront rows carry no arrears-only fields; arrears rows require them. */
 function chargingCheck(table: string) {
   return check(
     `${table}_charging_variant`,
-    sql`(charged = 'upfront' and credit_period is null and grace_period is null and dunning_schedule is null)
+    sql`(charged = 'upfront' and credit_period is null and grace_period is null)
      or (charged = 'arrears' and credit_period is not null)`,
   );
 }
@@ -601,6 +599,48 @@ export const experimentTreatmentTenants = pgTable(
   ],
 );
 
+/**
+ * A category of task (analogous to tax/tax-type): shared behavior and the
+ * external systems every instance routes to. See schemas/task-type.ts.
+ */
+export const taskTypes = pgTable(
+  "task_types",
+  {
+    taskTypeId: text("task_type_id").primaryKey(),
+    createdAt: epochMs("created_at").notNull(),
+    deprecatedAt: epochMs("deprecated_at"),
+    defaultAssigneeTeamMemberId: text(
+      "default_assignee_team_member_id",
+    ).references(() => teamMembers.teamMemberId),
+    integrations: jsonb("integrations").$type<IntegrationTarget[]>(),
+    name: text("name").notNull(),
+    description: text("description"),
+  },
+  (t) => [idFormatCheck("task_type", t.taskTypeId)],
+);
+
+/**
+ * A metering- or lifecycle-triggered action item (generalizes dunning).
+ * scope/trigger/actions are self-contained value objects stored as jsonb;
+ * evaluation lives in api/v0/rule/ and the scheduler in api/cache/. See
+ * schemas/rule.ts.
+ */
+export const rules = pgTable(
+  "rules",
+  {
+    ruleId: text("rule_id").primaryKey(),
+    createdAt: epochMs("created_at").notNull(),
+    deprecatedAt: epochMs("deprecated_at"),
+    scope: jsonb("scope").$type<Rule["scope"]>().notNull(),
+    trigger: jsonb("trigger").$type<Rule["trigger"]>().notNull(),
+    recurrence: jsonb("recurrence").$type<Rule["recurrence"]>().notNull(),
+    actions: jsonb("actions").$type<Rule["actions"]>().notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+  },
+  (t) => [idFormatCheck("rule", t.ruleId)],
+);
+
 // ---------------------------------------------------------------------------
 // Tenants and everything scoped to one
 // ---------------------------------------------------------------------------
@@ -641,6 +681,10 @@ export const assignments = pgTable(
   (t) => [
     idFormatCheck("assignment", t.assignmentId),
     index("assignments_tenant").on(t.tenantId),
+    // At most one open assignment per tenant.
+    uniqueIndex("assignments_one_open")
+      .on(t.tenantId)
+      .where(sql`${t.endsAt} is null`),
   ],
 );
 
@@ -698,6 +742,13 @@ export const invoices = pgTable(
     idFormatCheck("invoice", t.invoiceId),
     chargingCheck("invoices"),
     index("invoices_tenant").on(t.tenantId),
+    /* The lifecycle rule scheduler scans recently-closed invoices per tick
+     * with no tenant predicate, so the tenant-composite index can't serve
+     * that scan; a partial closed_at index does, and stays small by
+     * covering only the rows the scan can match. */
+    index("invoices_closed")
+      .on(t.closedAt)
+      .where(sql`${t.closedAt} is not null`),
   ],
 );
 
@@ -911,6 +962,104 @@ export const creditGrants = pgTable(
   ],
 );
 
+/**
+ * An internal action item. Operational data, so deleted (deleted_at), not
+ * deprecated. external_refs holds sync handles to external trackers. See
+ * schemas/task.ts.
+ */
+export const tasks = pgTable(
+  "tasks",
+  {
+    taskId: text("task_id").primaryKey(),
+    createdAt: epochMs("created_at").notNull(),
+    deletedAt: epochMs("deleted_at"),
+    taskTypeId: text("task_type_id")
+      .notNull()
+      .references(() => taskTypes.taskTypeId),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.tenantId),
+    sourceRuleId: text("source_rule_id").references(() => rules.ruleId),
+    title: text("title").notNull(),
+    description: text("description"),
+    assignedToTeamMemberId: text("assigned_to_team_member_id").references(
+      () => teamMembers.teamMemberId,
+    ),
+    completedAt: epochMs("completed_at"),
+    externalRefs: jsonb("external_refs").$type<ExternalRef[]>(),
+  },
+  (t) => [
+    idFormatCheck("task", t.taskId),
+    index("tasks_tenant").on(t.tenantId),
+    index("tasks_type").on(t.taskTypeId),
+  ],
+);
+
+/**
+ * One durable execution of a single rule action for a single firing.
+ * Inserted synchronously when a rule fires (the firing is never lost), then
+ * drained by the executor worker with retries. The (rule_id, tenant_id,
+ * trigger_key, action_index) unique index is the idempotency backstop. See
+ * schemas/rule-run.ts.
+ */
+export const ruleRuns = pgTable(
+  "rule_runs",
+  {
+    ruleRunId: text("rule_run_id").primaryKey(),
+    createdAt: epochMs("created_at").notNull(),
+    ruleId: text("rule_id")
+      .notNull()
+      .references(() => rules.ruleId),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.tenantId),
+    triggerKey: text("trigger_key").notNull(),
+    actionIndex: integer("action_index").notNull(),
+    payload: jsonb("payload").$type<FiringPayload>().notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    availableAt: epochMs("available_at").notNull(),
+    /* Set while a worker holds the row; a claim older than the lease is
+     * stale (its worker died mid-execution) and reclaimable. */
+    claimedAt: epochMs("claimed_at"),
+    succeededAt: epochMs("succeeded_at"),
+    failedAt: epochMs("failed_at"),
+    lastError: text("last_error"),
+  },
+  (t) => [
+    idFormatCheck("rule_run", t.ruleRunId),
+    uniqueIndex("rule_runs_idempotency").on(
+      t.ruleId,
+      t.tenantId,
+      t.triggerKey,
+      t.actionIndex,
+    ),
+    /* The claim query scans only the live queue; the partial predicate keeps
+     * the index from growing with finished rows. */
+    index("rule_runs_pending")
+      .on(t.availableAt)
+      .where(sql`${t.succeededAt} is null and ${t.failedAt} is null`),
+    // firingKey's per-window quota count scopes to one rule+tenant, recent rows.
+    index("rule_runs_rule_tenant_created").on(
+      t.ruleId,
+      t.tenantId,
+      t.createdAt,
+    ),
+  ],
+);
+
+/**
+ * Per-rule scheduler high-water mark: the newest lifecycle timestamp already
+ * evaluated, so each tick scans only invoices closed since the last one
+ * instead of the full closed history. One row per rule; absent = start at 0.
+ */
+export const ruleSchedulerState = pgTable("rule_scheduler_state", {
+  ruleId: text("rule_id")
+    .primaryKey()
+    .references(() => rules.ruleId),
+  /** Newest lifecycle timestamp (epoch ms) already evaluated for this rule. */
+  evaluatedThroughMs: epochMs("evaluated_through_ms").notNull(),
+});
+
 export const couponGrants = pgTable(
   "coupon_grants",
   {
@@ -1010,6 +1159,8 @@ export const meterEvents = pgTable(
       t.meterId,
       t.createdAt,
     ),
+    // The inactive_for scheduler scans recent events per meter.
+    index("meter_events_meter_received").on(t.meterId, t.receivedAtMicros),
   ],
 );
 
@@ -1034,6 +1185,55 @@ export const meterBalances = pgTable(
     primaryKey({ columns: [t.tenantId, t.meterId] }),
     check("meter_balances_nonnegative", sql`balance_microcredits >= 0`),
   ],
+);
+
+/**
+ * Checkpointed cumulative spend. Redis (api/cache/) INCRBYs a flat spend
+ * counter on the ingest hot path; this table is the durable copy spend is
+ * checkpointed to and rebuilt from. Spend-since-cycle-start is read at
+ * evaluation time as this durable base plus the pg sum of events received
+ * after the checkpoint (the flush-lag delta), so no billing-cycle anchor ever
+ * touches the ingest hot path. Mirrors meter_balances exactly.
+ */
+export const meterSpends = pgTable(
+  "meter_spends",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.tenantId),
+    meterId: text("meter_id")
+      .notNull()
+      .references(() => meters.meterId),
+    spendMicrocredits: microcredits("spend_microcredits").notNull(),
+    updatedAt: epochMs("updated_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.meterId] }),
+    check("meter_spends_nonnegative", sql`spend_microcredits >= 0`),
+  ],
+);
+
+/**
+ * Last activity per tenant+meter: the newest event timestamp seen, in µs.
+ * The ingest Lua keeps a Redis key (mlast:) as the hot read via a GREATEST
+ * max-update; this table is the durable copy it checkpoints to and rebuilds
+ * from, so the inactive_for scheduler never has to derive recency from the
+ * meter_events history (an unbounded scan) — staleness is an O(1) lookup.
+ */
+export const tenantLastActivity = pgTable(
+  "tenant_last_activity",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.tenantId),
+    meterId: text("meter_id")
+      .notNull()
+      .references(() => meters.meterId),
+    lastEventAtMicros: bigint("last_event_at_micros", {
+      mode: "number",
+    }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.tenantId, t.meterId] })],
 );
 
 /**

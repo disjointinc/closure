@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "assignments_one_open" ON "assignments" USING btree ("tenant_id") WHERE "assignments"."ends_at" is null;
