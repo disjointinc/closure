@@ -46,10 +46,16 @@
  * The pre-window gap (a cycle start after the last checkpoint) is a bounded
  * pg read. Rebuild of a lost spend key (rebuildMeterSpend) restores just the
  * post-checkpoint delta; the durable base itself lives in meter_spends.
- * Unlike balances, a missing spend key never read-repairs (the ingest INCRBY
- * would silently restart it at 0), so recovery is the startup scan
- * (rebuildMissingMeterBalances) plus the periodic reconciler
- * (cache/meter/reconcile.ts) -- both cover meter_spends alongside balances.
+ *
+ * Unlike balances, spend cannot read-repair at ingest. The balance Lua
+ * GETs mbal: before decrementing and returns "uninitialized" when the key
+ * is absent; the caller rebuilds and retries. The spend Lua never reads
+ * mspend: -- a blind INCRBY on a missing key succeeds, creating it at the
+ * increment amount, so the script cannot distinguish "key existed" from
+ * "key was just born". Missingness is invisible at write time, so recovery
+ * falls to the startup scan (rebuildMissingMeterBalances) and the periodic
+ * reconciler (cache/meter/reconcile.ts), which covers meter_spends
+ * alongside balances.
  *
  * Flush path (flushPendingMeterEvents): batched, idempotent inserts
  * (ON CONFLICT DO NOTHING on the pg unique index). Flush-attempt markers
@@ -383,13 +389,13 @@ export async function recordMeterEvent({
 }: {
   event: MeterEventPayload;
 }): Promise<RecordedMeterEvent> {
-  // Default the idempotency key to the event's own id so callers who don't
-  // need idempotent redelivery never mint a second id. The buffered payload
-  // carries the resolved value, so the flush always writes a non-null
-  // external_id to pg.
+  /* Default the idempotency key to the event's own id so callers who don't
+   * need idempotent redelivery never mint a second id. The buffered payload
+   * carries the resolved value, so the flush always writes a non-null
+   * external_id to pg. */
   const externalId = event.externalId ?? event.meterEventId;
-  // Ordered args: numberOfKeys: 4 on the defineCommand above splits this
-  // list into KEYS (idempotency, balance, stream, spend) and ARGV (the rest).
+  /* Ordered args: numberOfKeys: 4 on the defineCommand above splits this
+   * list into KEYS (idempotency, balance, stream, spend) and ARGV (the rest). */
   const args = [
     keys.meterEventIdempotency({
       externalId,
@@ -615,8 +621,8 @@ export async function rebuildMeterBalance({
         })
         .onConflictDoNothing();
     } catch (error) {
-      // The tenant/meter may not exist in pg (FK); the Redis-side zero still
-      // preserves the historical fail-closed behavior for unknown meters.
+      /* The tenant/meter may not exist in pg (FK); the Redis-side zero still
+       * preserves the historical fail-closed behavior for unknown meters. */
       console.error("could not persist base checkpoint row", {
         error,
         meterId,
@@ -668,13 +674,13 @@ export async function spendSince({
     (await redis.get(keys.meterSpend({ meterId, tenantId }))) ?? 0,
   );
   if (!checkpoint) {
-    // No checkpoint yet: the counter delta is the whole history.
+    /* No checkpoint yet: the counter delta is the whole history. */
     return counterDelta;
   }
-  // Spend earned after the checkpoint but at or before the window start is a
-  // pre-window gap that must not be counted; it's always bounded to one
-  // checkpoint interval, so this pg read stays cheap and only runs when the
-  // window opened after the checkpoint.
+  /* Spend earned after the checkpoint but at or before the window start is a
+   * pre-window gap that must not be counted; it's always bounded to one
+   * checkpoint interval, so this pg read stays cheap and only runs when the
+   * window opened after the checkpoint. */
   let preWindowGap = 0;
   if (sinceMicros > checkpoint.updatedAt) {
     preWindowGap = await sumSucceededMeterEventsBetween({
@@ -684,8 +690,8 @@ export async function spendSince({
       toMicros: sinceMicros,
     });
   }
-  // Result = durable in-window base + in-window post-checkpoint delta.
-  // delta covers all post-checkpoint spend; subtract the pre-window part.
+  /* Result = durable in-window base + in-window post-checkpoint delta.
+   * delta covers all post-checkpoint spend; subtract the pre-window part. */
   return checkpoint.spendMicrocredits + counterDelta - preWindowGap;
 }
 
@@ -708,10 +714,10 @@ export async function rebuildMeterSpend({
       and(eq(meterSpends.tenantId, tenantId), eq(meterSpends.meterId, meterId)),
     )
     .limit(1);
-  // The Redis counter is a DELTA since the last checkpoint (checkpoint()
-  // accumulates it into the pg base and resets it). A lost key therefore
-  // rebuilds to just the post-checkpoint pg sum; the durable base itself
-  // stays in pg. Rebuild the counter to that delta, not the absolute total.
+  /* The Redis counter is a DELTA since the last checkpoint (checkpoint()
+   * accumulates it into the pg base and resets it). A lost key therefore
+   * rebuilds to just the post-checkpoint pg sum; the durable base itself
+   * stays in pg. Rebuild the counter to that delta, not the absolute total. */
   let spend: number;
   if (checkpoint) {
     spend = await sumSucceededMeterEvents({
@@ -1030,8 +1036,8 @@ export async function flushPendingMeterEvents(): Promise<number> {
   );
   const values = parseable.map((row) => ({
     meterEventId: row.event.meterEventId,
-    // Ingest resolves this before buffering; the fallback covers entries
-    // buffered by other means (e.g. hand-repaired streams).
+    /* Ingest resolves this before buffering; the fallback covers entries
+     * buffered by other means (e.g. hand-repaired streams). */
     externalId: row.event.externalId ?? row.event.meterEventId,
     createdAt: row.event.createdAt,
     receivedAtMicros: row.receivedAtMicros,
@@ -1069,8 +1075,8 @@ export async function flushPendingMeterEvents(): Promise<number> {
     }
   }
   if (batchFailed) {
-    // One poison row fails the whole (atomic) batch insert; go row-by-row so
-    // good rows still land and only the poison goes to the DLQ.
+    /* One poison row fails the whole (atomic) batch insert; go row-by-row so
+     * good rows still land and only the poison goes to the DLQ. */
     for (const [i, value] of values.entries()) {
       try {
         const inserted = await db
@@ -1119,8 +1125,8 @@ export async function flushPendingMeterEvents(): Promise<number> {
     const { amountMicrocredits, meterId, tenantId } = row.event;
     const externalId = row.event.externalId ?? row.event.meterEventId;
     const balanceKey = keys.meterBalance({ meterId, tenantId });
-    // Only credit back if the key still holds the duplicate charge; a key
-    // lost and rebuilt since is already correct from pg.
+    /* Only credit back if the key still holds the duplicate charge; a key
+     * lost and rebuilt since is already correct from pg. */
     if (await redis.exists(balanceKey)) {
       await redis.incrby(balanceKey, amountMicrocredits);
       await redis.incrby(
@@ -1188,10 +1194,10 @@ export async function checkpointMeterBalances(): Promise<number> {
   if (tracked.length === 0) {
     return 0;
   }
-  // Balances come from one snapshot (clock + every balance in the same
-  // instant). Spend deltas are captured with GETSET (atomic read-and-zero),
-  // so an INCRBY can never land between a snapshot and a reset and be
-  // swallowed from the delta.
+  /* Balances come from one snapshot (clock + every balance in the same
+   * instant). Spend deltas are captured with GETSET (atomic read-and-zero),
+   * so an INCRBY can never land between a snapshot and a reset and be
+   * swallowed from the delta. */
   const spendKeys = tracked.map((key) => {
     const [, tenantId, meterId] = key.split(":");
     return keys.meterSpend({ meterId, tenantId });
@@ -1238,8 +1244,8 @@ export async function checkpointMeterBalances(): Promise<number> {
       .onConflictDoUpdate({
         target: [meterSpends.tenantId, meterSpends.meterId],
         set: {
-          // Accumulate: the snapshotted counter is a delta since the last
-          // checkpoint, so the new base is old base + delta.
+          /* Accumulate: the snapshotted counter is a delta since the last
+           * checkpoint, so the new base is old base + delta. */
           spendMicrocredits: sql`${meterSpends.spendMicrocredits} + excluded.spend_microcredits`,
           updatedAt: sql`excluded.updated_at`,
         },
