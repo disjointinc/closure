@@ -20,8 +20,10 @@ export const idSuffixLengths = {
   feature_option: 20,
   meter: 20,
   plan: 20,
+  rule: 20,
   tax: 20,
   tax_type: 20,
+  task_type: 20,
   value: 20,
   // tenants: 1e12
   tenant: 22,
@@ -37,10 +39,12 @@ export const idSuffixLengths = {
   credit_grant: 25,
   invoice: 25,
   payment: 25,
+  task: 25,
   // ~1e4 per tenant (referrals) / ~1e1 per invoice -> ~1e16
   coupon_grant: 27,
   coupon_receipt: 27,
   item: 27,
+  rule_run: 27,
   taxation_amount: 27,
   // meter events: 1e12 per tenant -> 1e24
   meter_event: 37,
@@ -89,9 +93,13 @@ export const paymentIdSchema = prefixedId("payment");
 export const paymentMethodIdSchema = prefixedId("payment_method");
 export const planIdSchema = prefixedId("plan");
 export const refundIdSchema = prefixedId("refund");
+export const ruleIdSchema = prefixedId("rule");
+export const ruleRunIdSchema = prefixedId("rule_run");
 export const taxIdSchema = prefixedId("tax");
 export const taxTypeIdSchema = prefixedId("tax_type");
 export const taxationAmountIdSchema = prefixedId("taxation_amount");
 export const teamMemberIdSchema = prefixedId("team_member");
 export const tenantIdSchema = prefixedId("tenant");
+export const taskIdSchema = prefixedId("task");
+export const taskTypeIdSchema = prefixedId("task_type");
 export const valueIdSchema = prefixedId("value");
