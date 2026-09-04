@@ -1,29 +1,6 @@
 import { z } from "zod";
 import { durationSchema, epochMs } from "./common.ts";
-import { cycleIdSchema, valueIdSchema } from "./ids.ts";
-
-export const dunningActionSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("retry_customer"),
-    notes: z.string(),
-  }),
-  // A late fee is a flat amount and/or a percentage of the invoice; at least
-  // one must be set.
-  z
-    .object({
-      type: z.literal("add_late_fee"),
-      fixedValueId: valueIdSchema.nullable(),
-      percentageOfInvoice: z.number().positive().nullable(),
-    })
-    .refine(
-      (action) =>
-        action.fixedValueId !== null || action.percentageOfInvoice !== null,
-      {
-        message: "add_late_fee requires a flat fee and/or a percentage",
-      },
-    ),
-]);
-export type DunningAction = z.infer<typeof dunningActionSchema>;
+import { cycleIdSchema } from "./ids.ts";
 
 export const upfrontChargingSchema = z.object({
   charged: z.literal("upfront"),
@@ -35,13 +12,6 @@ export const arrearsChargingSchema = z.object({
   cycleLength: durationSchema,
   creditPeriod: durationSchema,
   gracePeriod: durationSchema.nullable(),
-  dunningSchedule: z.array(
-    z.object({
-      /** How long after the due date these actions trigger. */
-      after: durationSchema,
-      actions: z.array(dunningActionSchema).min(1),
-    }),
-  ),
 });
 
 /** How a cycle or invoice gets collected. */
