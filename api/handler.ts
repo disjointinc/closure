@@ -27,10 +27,12 @@ import { experimentApp } from "./v0/experiment/routes.ts";
 import { featureApp } from "./v0/feature/routes.ts";
 import { meterApp } from "./v0/meter/routes.ts";
 import { planApp } from "./v0/plan/routes.ts";
+import { ruleApp } from "./v0/rule/routes.ts";
 import { taxApp } from "./v0/tax/routes.ts";
 import { taxTypeApp } from "./v0/tax-type/routes.ts";
 import { teamMemberApp } from "./v0/team-member/routes.ts";
 import { tenantApp } from "./v0/tenant/routes.ts";
+import { taskTypeApp } from "./v0/task-type/routes.ts";
 
 const app = new Hono()
   // Browser calls from the web console are cross-origin in the dev stack.
@@ -52,6 +54,8 @@ const app = new Hono()
   .route("/v0/feature", featureApp)
   .route("/v0/meter", meterApp)
   .route("/v0/plan", planApp)
+  .route("/v0/rule", ruleApp)
+  .route("/v0/task-type", taskTypeApp)
   .route("/v0/tax", taxApp)
   .route("/v0/tax-type", taxTypeApp)
   .route("/v0/team-member", teamMemberApp)
