@@ -11,8 +11,9 @@
  *     pg fallback query for cache misses. Cost scales with subscriptions,
  *     not with the event history, and windows are unbounded.
  *   - relative_to_lifecycle_event keeps a per-rule high-water mark
- *     (rule_scheduler_state), so each tick scans only invoices closed since
- *     the last tick instead of the full closed history.
+ *     (rule_scheduler_state, committed per chunk), so each tick scans only
+ *     invoices closed since the last tick, in bounded keyset-paged chunks,
+ *     instead of the full closed history.
  *   - Per-tenant billing cycles are batched into one query
  *     (getBillingCycles), so a tick does O(1) pg round-trips, not
  *     O(candidates).
@@ -22,7 +23,18 @@
  * nothing new. Trigger keys encode the window/instance so a new billing cycle
  * or inactivity window fires afresh.
  */
-import { and, eq, gt, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import {
   assignments,
@@ -38,6 +50,16 @@ import {
   getBillingCycles,
   recordFiring,
 } from "./evaluate.ts";
+
+/*
+ * Lifecycle chunking: one factor in converting close-throughput bursts and
+ * outage backlogs into a drain-rate question. Steady-state ticks see at
+ * most one chunk; the max bounds how much work one tick monopolizes before
+ * deferring the remainder to the next tick (the watermark guarantees it is
+ * not lost).
+ */
+const LIFECYCLE_CHUNK_SIZE = 1_000;
+const MAX_CHUNKS_PER_TICK = 10;
 
 /**
  * The open-assignment tenants a rule applies to, with each tenant's plan.
@@ -159,82 +181,105 @@ async function evaluateLifecycle(): Promise<void> {
     if (relativeTo !== "invoice_closed" && relativeTo !== "invoice_due") {
       continue;
     }
-    // High-water mark: only scan invoices closed since the last tick, so the
-    // scan stays bounded as the closed-invoice history grows.
+    /* High-water mark: only scan invoices closed since the last tick, in
+     * fixed-size chunks paged by a (closedAt, invoiceId) keyset cursor --
+     * the partial invoices_closed index serves the range scan, and the
+     * composite cursor makes same-millisecond closes paginate correctly
+     * (a bare closed_at cursor would skip or repeat them at chunk
+     * boundaries). The mark is committed per chunk, so a crash resumes at
+     * the last committed chunk rather than re-scanning the whole delta,
+     * and a tick processes at most MAX_CHUNKS_PER_TICK, converting bursts
+     * and outage backlogs into a drain-rate question. */
     const [stateRow] = await db
       .select()
       .from(ruleSchedulerState)
       .where(eq(ruleSchedulerState.ruleId, rule.ruleId))
       .limit(1);
-    const evaluatedThroughMs = stateRow?.evaluatedThroughMs ?? 0;
-    const due = await db
-      .select()
-      .from(invoices)
-      .where(
-        and(
-          isNotNull(invoices.closedAt),
-          gt(invoices.closedAt, evaluatedThroughMs),
-          lte(invoices.closedAt, threshold),
-        ),
-      )
-      .orderBy(invoices.closedAt);
-    if (due.length === 0) {
-      continue;
-    }
-    // Scope-filter in one query against open assignments.
-    const candidates = await scopeCandidatePlans({ rule });
-    const inScope = due.filter((invoice) => {
-      if (rule.scope.kind === "global") {
-        return true;
+    let cursorAt = stateRow?.evaluatedThroughMs ?? 0;
+    let cursorId = "";
+    /* Scope lookup once per rule. Global rules skip it entirely: the open-
+     * assignment map would be loaded and then ignored for every chunk. */
+    const candidates =
+      rule.scope.kind === "global" ? null : await scopeCandidatePlans({ rule });
+    for (let chunk = 0; chunk < MAX_CHUNKS_PER_TICK; chunk++) {
+      const due = await db
+        .select()
+        .from(invoices)
+        .where(
+          and(
+            isNotNull(invoices.closedAt),
+            or(
+              gt(invoices.closedAt, cursorAt),
+              and(
+                eq(invoices.closedAt, cursorAt),
+                gt(invoices.invoiceId, cursorId),
+              ),
+            ),
+            lte(invoices.closedAt, threshold),
+          ),
+        )
+        .orderBy(asc(invoices.closedAt), asc(invoices.invoiceId))
+        .limit(LIFECYCLE_CHUNK_SIZE);
+      if (due.length === 0) {
+        break;
       }
-      return candidates.has(invoice.tenantId);
-    });
-    const cyclesByTenant = await getBillingCycles({
-      tenantIds: inScope.map((invoice) => invoice.tenantId),
-    });
-    let maxClosedAt = evaluatedThroughMs;
-    for (const invoice of due) {
-      if (invoice.closedAt === null) {
-        continue;
-      }
-      // Advance the watermark over every scanned invoice, even out-of-scope
-      // ones, so a tenant leaving a plan doesn't wedge the mark.
-      maxClosedAt = Math.max(maxClosedAt, invoice.closedAt);
-      if (!inScope.includes(invoice)) {
-        continue;
-      }
-      const tenantId = invoice.tenantId;
-      const triggerKey = await firingKey({
-        baseTriggerKey: `${relativeTo}:${invoice.invoiceId}`,
-        cycle: cyclesByTenant.get(tenantId) ?? null,
-        firingId: invoice.invoiceId,
-        rule,
-        tenantId,
+      const inScope = due.filter((invoice) => {
+        if (candidates === null) {
+          return true;
+        }
+        return candidates.has(invoice.tenantId);
       });
-      if (triggerKey === null) {
-        continue;
-      }
-      await recordFiring({
-        firing: {
+      const cyclesByTenant = await getBillingCycles({
+        tenantIds: inScope.map((invoice) => invoice.tenantId),
+      });
+      for (const invoice of due) {
+        if (invoice.closedAt === null) {
+          continue;
+        }
+        /* Advance the mark over every scanned invoice, even out-of-scope
+         * ones, so a tenant leaving a plan doesn't wedge it. */
+        cursorAt = Math.max(cursorAt, invoice.closedAt);
+        cursorId = invoice.invoiceId;
+        if (!inScope.includes(invoice)) {
+          continue;
+        }
+        const tenantId = invoice.tenantId;
+        const triggerKey = await firingKey({
+          baseTriggerKey: `${relativeTo}:${invoice.invoiceId}`,
+          cycle: cyclesByTenant.get(tenantId) ?? null,
+          firingId: invoice.invoiceId,
           rule,
           tenantId,
-          triggerKey,
-          payload: {
-            type: "relative_to_lifecycle_event",
-            invoiceId: invoice.invoiceId,
+        });
+        if (triggerKey === null) {
+          continue;
+        }
+        await recordFiring({
+          firing: {
+            rule,
+            tenantId,
+            triggerKey,
+            payload: {
+              type: "relative_to_lifecycle_event",
+              invoiceId: invoice.invoiceId,
+            },
           },
-        },
-      });
+        });
+      }
+      /* Commit the mark per chunk, so resume starts at the last processed
+       * chunk rather than the start of the delta. Boundary rows at the same
+       * closedAt re-scan on crash; the idempotency index dedupes them. */
+      await db
+        .insert(ruleSchedulerState)
+        .values({ ruleId: rule.ruleId, evaluatedThroughMs: cursorAt })
+        .onConflictDoUpdate({
+          target: ruleSchedulerState.ruleId,
+          set: { evaluatedThroughMs: cursorAt },
+        });
+      if (due.length < LIFECYCLE_CHUNK_SIZE) {
+        break;
+      }
     }
-    // Persist the high-water mark so the next tick resumes where this one
-    // stopped. Upsert: the rule row appears on its first evaluated invoice.
-    await db
-      .insert(ruleSchedulerState)
-      .values({ ruleId: rule.ruleId, evaluatedThroughMs: maxClosedAt })
-      .onConflictDoUpdate({
-        target: ruleSchedulerState.ruleId,
-        set: { evaluatedThroughMs: maxClosedAt },
-      });
   }
 }
 
