@@ -25,6 +25,7 @@ import { meterOverrideApp } from "./meter-override/routes.ts";
 import { paymentMethodApp } from "./payment-method/routes.ts";
 import { paymentApp } from "./payment/routes.ts";
 import { refundApp } from "./refund/routes.ts";
+import { taskApp } from "./task/routes.ts";
 import {
   createTenant,
   deleteTenant,
@@ -103,4 +104,5 @@ export const tenantApp = new Hono<{ Variables: { tenantId: string } }>()
   .route("/:tenantId/meter-override", meterOverrideApp)
   .route("/:tenantId/payment", paymentApp)
   .route("/:tenantId/payment-method", paymentMethodApp)
-  .route("/:tenantId/refund", refundApp);
+  .route("/:tenantId/refund", refundApp)
+  .route("/:tenantId/task", taskApp);
