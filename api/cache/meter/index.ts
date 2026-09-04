@@ -47,15 +47,23 @@
  * pg read. Rebuild of a lost spend key (rebuildMeterSpend) restores just the
  * post-checkpoint delta; the durable base itself lives in meter_spends.
  *
- * Unlike balances, spend cannot read-repair at ingest. The balance Lua
- * GETs mbal: before decrementing and returns "uninitialized" when the key
- * is absent; the caller rebuilds and retries. The spend Lua never reads
- * mspend: -- a blind INCRBY on a missing key succeeds, creating it at the
- * increment amount, so the script cannot distinguish "key existed" from
- * "key was just born". Missingness is invisible at write time, so recovery
- * falls to the startup scan (rebuildMissingMeterBalances) and the periodic
- * reconciler (cache/meter/reconcile.ts), which covers meter_spends
- * alongside balances.
+ * Unlike balances, spend deliberately does not read-repair at ingest. The
+ * balance Lua GETs mbal: before decrementing and returns "uninitialized"
+ * when the key is absent; the caller rebuilds and retries. Mirroring that
+ * for mspend: was rejected on three grounds:
+ *
+ *   1. Blast radius. A missing mbal: means "unknown credit balance" --
+ *      ingesting anyway could hand out unbounded free usage, so balances
+ *      must fail closed. A missing mspend: means a spend-threshold
+ *      notification fires late once -- annoying, not dangerous -- so it
+ *      doesn't justify fail-closed machinery.
+ *   2. The compensating control is proportionate: the periodic reconciler
+ *      (cache/meter/reconcile.ts) rebuilds missing spend keys and heals
+ *      drift, bounding silent undercounting to one interval, and the
+ *      startup scan (rebuildMissingMeterBalances) covers full Redis loss.
+ *   3. Hot-path cost. The EXISTS check + branch would add a command to the
+ *      atomic ingest script, plus a rebuild-and-retry path. Small, but the
+ *      hot path is the hot path.
  *
  * Flush path (flushPendingMeterEvents): batched, idempotent inserts
  * (ON CONFLICT DO NOTHING on the pg unique index). Flush-attempt markers

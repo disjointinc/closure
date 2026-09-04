@@ -231,8 +231,9 @@ export async function reconcileMeterBalances(): Promise<ReconcileReport> {
    * (checkpointMeterBalances accumulates it into meter_spends and resets it),
    * so the expected value is the pg sum of succeeded events after the
    * checkpoint, minus the still-buffered debits already counted in Redis.
-   * Unlike balances, a missing spend key never read-repairs (the ingest
-   * INCRBY silently restarts it at 0), so this pass is the only backstop.
+   * Unlike balances, spend deliberately skips ingest-time read-repair (see
+   * the mspend: note in metering.ts for the tradeoff), so this pass is the
+   * only backstop against a silent restart-at-0 after Redis loss.
    */
   const spendCheckpoints = await db.select().from(meterSpends);
   for (const checkpoint of spendCheckpoints) {
