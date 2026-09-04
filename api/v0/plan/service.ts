@@ -7,7 +7,7 @@
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import {
-  planAddOns,
+  planAddOnTypes,
   planFeatures,
   planMeters,
   planPrices,
@@ -104,10 +104,10 @@ export async function getPlan({
     .select()
     .from(planMeters)
     .where(eq(planMeters.planId, planId));
-  const addOnRows = await db
+  const addOnTypeRows = await db
     .select()
-    .from(planAddOns)
-    .where(eq(planAddOns.planId, planId));
+    .from(planAddOnTypes)
+    .where(eq(planAddOnTypes.planId, planId));
   const valueIds = [
     ...priceRows.map((price) => price.valueId),
     ...(row.minimumPaymentValueId === null ? [] : [row.minimumPaymentValueId]),
@@ -151,7 +151,9 @@ export async function getPlan({
           ),
         }))
       : null,
-    addOnIds: addOnRows.length ? addOnRows.map((addOn) => addOn.addOnId) : null,
+    addOnTypeIds: addOnTypeRows.length
+      ? addOnTypeRows.map((addOnType) => addOnType.addOnTypeId)
+      : null,
   };
 }
 
@@ -224,11 +226,14 @@ export async function createPlan({
         .onConflictDoNothing();
     }
   }
-  if (plan.addOnIds) {
+  if (plan.addOnTypeIds) {
     await db
-      .insert(planAddOns)
+      .insert(planAddOnTypes)
       .values(
-        plan.addOnIds.map((addOnId) => ({ planId: plan.planId, addOnId })),
+        plan.addOnTypeIds.map((addOnTypeId) => ({
+          planId: plan.planId,
+          addOnTypeId,
+        })),
       )
       .onConflictDoNothing();
   }
