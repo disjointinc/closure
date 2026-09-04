@@ -8,7 +8,7 @@ import {
   resetSchedule,
 } from "./common.ts";
 import {
-  addOnIdSchema,
+  addOnTypeIdSchema,
   featureIdSchema,
   meterIdSchema,
   planIdSchema,
@@ -236,7 +236,7 @@ export const planSchema = z
     prices: z.array(priceSchema),
     features: z.array(planFeatureSchema).nullable(),
     meters: z.array(planMeterSchema).nullable(),
-    addOnIds: z.array(addOnIdSchema).nullable(),
+    addOnTypeIds: z.array(addOnTypeIdSchema).nullable(),
   })
   .superRefine(checkPlan);
 export type Plan = z.infer<typeof planSchema>;

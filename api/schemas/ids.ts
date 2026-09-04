@@ -11,7 +11,7 @@ export const idSuffixLengths = {
   // users of the pricing application: 1e8
   team_member: 16,
   // pricing schema entities: ~1e3 per user -> ~1e11 each
-  add_on: 20,
+  add_on_type: 20,
   coupon: 20,
   coupon_template: 20,
   cycle: 20,
@@ -31,6 +31,7 @@ export const idSuffixLengths = {
   payment_method: 23,
   refund: 23,
   // tenant-scoped, ~1e2 per tenant -> ~1e14
+  add_on: 24,
   assignment: 24,
   feature_override: 24,
   loan: 24,
@@ -72,6 +73,7 @@ function prefixedId(prefix: IdPrefix) {
 }
 
 export const addOnIdSchema = prefixedId("add_on");
+export const addOnTypeIdSchema = prefixedId("add_on_type");
 export const assignmentIdSchema = prefixedId("assignment");
 export const couponIdSchema = prefixedId("coupon");
 export const couponGrantIdSchema = prefixedId("coupon_grant");

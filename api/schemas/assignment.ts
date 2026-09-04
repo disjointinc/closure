@@ -2,6 +2,7 @@ import { z } from "zod";
 import { currencyAmountSchema, epochMs } from "./common.ts";
 import {
   addOnIdSchema,
+  addOnTypeIdSchema,
   assignmentIdSchema,
   cycleIdSchema,
   experimentIdSchema,
@@ -29,11 +30,12 @@ export const assignmentSchema = z.object({
     .nullable(),
   addOns: z.array(
     z.object({
+      addOnId: addOnIdSchema,
+      addOnTypeId: addOnTypeIdSchema,
       startsAt: epochMs,
       endsAt: epochMs.nullable(),
       /** Manually deleted ahead of the end, whether or not one is set. */
       deletedAt: epochMs.nullable(),
-      addOnId: addOnIdSchema,
     }),
   ),
 });
