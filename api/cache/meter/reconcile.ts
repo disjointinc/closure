@@ -12,6 +12,10 @@
  *      value against the pg-derived expectation and heal drift with an
  *      INCRBY of the difference -- commutative with concurrent decrements,
  *      so no locking is needed and repeated runs converge.
+ *   3. For every checkpointed spend counter, same comparison against the
+ *      since-checkpoint delta. Missing spend keys are rebuilt -- unlike
+ *      balances, nothing read-repairs them, so this pass is their only
+ *      backstop against a silent restart-at-0 after Redis loss.
  *
  * Events still buffered on mev:pending have decremented Redis but aren't in
  * pg yet, so their amounts are subtracted from the pg-derived expectation;
@@ -20,7 +24,7 @@
  */
 import { isNull } from "drizzle-orm";
 import { db } from "../../db/index.ts";
-import { creditGrants, meterBalances } from "../../db/schema.ts";
+import { creditGrants, meterBalances, meterSpends } from "../../db/schema.ts";
 import { redis } from "../index.ts";
 import { keys } from "../keys.ts";
 import {
@@ -28,6 +32,7 @@ import {
   applyCreditGrant,
   parsePendingEntry,
   rebuildMeterBalance,
+  rebuildMeterSpend,
   stampGrantApplied,
   sumAppliedGrants,
   sumSucceededMeterEvents,
@@ -59,6 +64,9 @@ export type ReconcileReport = {
   rebuilt: number;
   healed: number;
   skipped: boolean;
+  spendsChecked: number;
+  spendsRebuilt: number;
+  spendsHealed: number;
 };
 
 export async function reconcileMeterBalances(): Promise<ReconcileReport> {
@@ -68,9 +76,12 @@ export async function reconcileMeterBalances(): Promise<ReconcileReport> {
     rebuilt: 0,
     healed: 0,
     skipped: false,
+    spendsChecked: 0,
+    spendsRebuilt: 0,
+    spendsHealed: 0,
   };
 
-  // 1. Grants recorded in pg but never applied to Redis.
+  /* 1. Grants recorded in pg but never applied to Redis. */
   const pendingGrants = await db
     .select()
     .from(creditGrants)
@@ -96,7 +107,7 @@ export async function reconcileMeterBalances(): Promise<ReconcileReport> {
     }
   }
 
-  // 2. Heal drifted balances.
+  /* 2. Heal drifted balances. */
   const pending = await redis.xrange(keys.pendingMeterEvents, "-", "+");
   if (pending.length > MAX_STREAM_SCAN) {
     console.error("skipping balance reconcile: pending stream too deep", {
@@ -156,8 +167,8 @@ export async function reconcileMeterBalances(): Promise<ReconcileReport> {
       continue;
     }
     if (!checkpoint) {
-      // Pre-dates synchronous checkpoint writes; nothing durable to derive
-      // from. The next checkpoint pass will establish a base row.
+      /* Pre-dates synchronous checkpoint writes; nothing durable to derive
+       * from. The next checkpoint pass will establish a base row. */
       console.error("meter balance key has no pg checkpoint; skipping", {
         meter,
         tenant,
@@ -181,9 +192,9 @@ export async function reconcileMeterBalances(): Promise<ReconcileReport> {
       grantsTotal -
       (pendingDebitByKey.get(key) ?? 0);
     if (expected < 0) {
-      // Impossible via the fail-closed hot path, so this means the durable
-      // record itself is inconsistent -- healing would push Redis negative
-      // and wedge the row's checkpoint against the pg CHECK constraint.
+      /* Impossible via the fail-closed hot path, so this means the durable
+       * record itself is inconsistent -- healing would push Redis negative
+       * and wedge the row's checkpoint against the pg CHECK constraint. */
       console.error("pg-derived balance is negative; skipping heal", {
         checkpoint: checkpoint.balanceMicrocredits,
         eventsTotal,
@@ -197,8 +208,8 @@ export async function reconcileMeterBalances(): Promise<ReconcileReport> {
     report.checked += 1;
     const drift = expected - Number(actual);
     if (drift !== 0) {
-      // INCRBY the difference: commutative with concurrent decrements, so a
-      // heal can't lose an event that lands mid-pass.
+      /* INCRBY the difference: commutative with concurrent decrements, so a
+       * heal can't lose an event that lands mid-pass. */
       await adjustMeterBalance({
         deltaMicrocredits: drift,
         meterId: meter,
@@ -206,6 +217,55 @@ export async function reconcileMeterBalances(): Promise<ReconcileReport> {
       });
       report.healed += 1;
       console.log("healed meter balance drift", {
+        actual: Number(actual),
+        drift,
+        expected,
+        meter,
+        tenant,
+      });
+    }
+  }
+
+  /*
+   * 3. Heal spend deltas. The mspend: counter is a since-checkpoint delta
+   * (checkpointMeterBalances accumulates it into meter_spends and resets it),
+   * so the expected value is the pg sum of succeeded events after the
+   * checkpoint, minus the still-buffered debits already counted in Redis.
+   * Unlike balances, a missing spend key never read-repairs (the ingest
+   * INCRBY silently restarts it at 0), so this pass is the only backstop.
+   */
+  const spendCheckpoints = await db.select().from(meterSpends);
+  for (const checkpoint of spendCheckpoints) {
+    const { tenantId: tenant, meterId: meter } = checkpoint;
+    const spendKey = keys.meterSpend({ meterId: meter, tenantId: tenant });
+    const balanceKey = keys.meterBalance({ meterId: meter, tenantId: tenant });
+    const actual = await redis.get(spendKey);
+    if (actual === null) {
+      await rebuildMeterSpend({ meterId: meter, tenantId: tenant });
+      report.spendsRebuilt += 1;
+      continue;
+    }
+    const eventsTotal = await sumSucceededMeterEvents({
+      meterId: meter,
+      since: checkpoint.updatedAt,
+      tenantId: tenant,
+    });
+    const expected = eventsTotal - (pendingDebitByKey.get(balanceKey) ?? 0);
+    if (expected < 0) {
+      console.error("pg-derived spend delta is negative; skipping heal", {
+        eventsTotal,
+        expected,
+        meter,
+        tenant,
+      });
+      continue;
+    }
+    report.spendsChecked += 1;
+    const drift = expected - Number(actual);
+    if (drift !== 0) {
+      await redis.incrby(spendKey, drift);
+      report.spendsHealed += 1;
+      console.log("healed meter spend drift", {
         actual: Number(actual),
         drift,
         expected,
