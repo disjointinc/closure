@@ -1,5 +1,5 @@
 /**
- * v0/add-on/service.ts -- add-on type business logic. Prices reference
+ * v0/add-on-type/service.ts -- add-on type business logic. Prices reference
  * existing cycles by id and own their values (defined inline at creation,
  * deprecated with the add-on type). Immutable, so deletes deprecate.
  */

@@ -1,6 +1,6 @@
 /**
- * v0/add-on/routes.ts -- HTTP for /v0/add-on-type: request validation and
- * wiring. Business logic lives in service.ts.
+ * v0/add-on-type/routes.ts -- HTTP for /v0/add-on-type: request validation
+ * and wiring. Business logic lives in service.ts.
  */
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
