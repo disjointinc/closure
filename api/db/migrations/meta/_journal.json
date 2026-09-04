@@ -134,6 +134,13 @@
       "when": 1788522414791,
       "tag": "0018_calm_romulus",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788530194652,
+      "tag": "0019_add_on_type_split",
+      "breakpoints": true
     }
   ]
 }

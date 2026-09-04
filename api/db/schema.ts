@@ -345,37 +345,37 @@ export const planMeters = pgTable(
   ],
 );
 
-export const planAddOns = pgTable(
-  "plan_add_ons",
+export const planAddOnTypes = pgTable(
+  "plan_add_on_types",
   {
     planId: text("plan_id")
       .notNull()
       .references(() => plans.planId),
-    addOnId: text("add_on_id")
+    addOnTypeId: text("add_on_type_id")
       .notNull()
-      .references(() => addOns.addOnId),
+      .references(() => addOnTypes.addOnTypeId),
   },
-  (t) => [primaryKey({ columns: [t.planId, t.addOnId] })],
+  (t) => [primaryKey({ columns: [t.planId, t.addOnTypeId] })],
 );
 
-export const addOns = pgTable(
-  "add_ons",
+export const addOnTypes = pgTable(
+  "add_on_types",
   {
-    addOnId: text("add_on_id").primaryKey(),
+    addOnTypeId: text("add_on_type_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     name: text("name").notNull(),
     description: text("description"),
   },
-  (t) => [idFormatCheck("add_on", t.addOnId)],
+  (t) => [idFormatCheck("add_on_type", t.addOnTypeId)],
 );
 
-export const addOnPrices = pgTable(
-  "add_on_prices",
+export const addOnTypePrices = pgTable(
+  "add_on_type_prices",
   {
-    addOnId: text("add_on_id")
+    addOnTypeId: text("add_on_type_id")
       .notNull()
-      .references(() => addOns.addOnId),
+      .references(() => addOnTypes.addOnTypeId),
     cycleId: text("cycle_id")
       .notNull()
       .references(() => cycles.cycleId),
@@ -383,21 +383,21 @@ export const addOnPrices = pgTable(
       .notNull()
       .references(() => values.valueId),
   },
-  (t) => [primaryKey({ columns: [t.addOnId, t.cycleId] })],
+  (t) => [primaryKey({ columns: [t.addOnTypeId, t.cycleId] })],
 );
 
-export const addOnFeatures = pgTable(
-  "add_on_features",
+export const addOnTypeFeatures = pgTable(
+  "add_on_type_features",
   {
-    addOnId: text("add_on_id")
+    addOnTypeId: text("add_on_type_id")
       .notNull()
-      .references(() => addOns.addOnId),
+      .references(() => addOnTypes.addOnTypeId),
     featureId: text("feature_id")
       .notNull()
       .references(() => features.featureId),
     setTo: featureSetTo("set_to").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.addOnId, t.featureId] })],
+  (t) => [primaryKey({ columns: [t.addOnTypeId, t.featureId] })],
 );
 
 /**
@@ -691,18 +691,19 @@ export const assignments = pgTable(
 export const assignmentAddOns = pgTable(
   "assignment_add_ons",
   {
+    addOnId: text("add_on_id").primaryKey(),
     assignmentId: text("assignment_id")
       .notNull()
       .references(() => assignments.assignmentId),
-    addOnId: text("add_on_id")
+    addOnTypeId: text("add_on_type_id")
       .notNull()
-      .references(() => addOns.addOnId),
+      .references(() => addOnTypes.addOnTypeId),
     startsAt: epochMs("starts_at").notNull(),
     endsAt: epochMs("ends_at"),
     /** Manually deleted ahead of the end, whether or not one is set. */
     deletedAt: epochMs("deleted_at"),
   },
-  (t) => [primaryKey({ columns: [t.assignmentId, t.addOnId, t.startsAt] })],
+  (t) => [idFormatCheck("add_on", t.addOnId)],
 );
 
 export const loans = pgTable(
