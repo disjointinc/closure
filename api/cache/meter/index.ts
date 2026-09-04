@@ -10,7 +10,8 @@
  *      original outcome without double-charging),
  *   2. check and decrement the balance (exact integer arithmetic; amounts
  *      are signed -- a negative amount is a refund and always succeeds),
- *      INCRBYing the mspend: spend counter in the same atomic step,
+ *      INCRBYing the mspend: spend counter and GREATEST-updating the
+ *      mlast: last-activity timestamp in the same atomic step,
  *   3. buffer the event on a stream for batched flush to pg, stamped with
  *      received_at on the Redis server's clock,
  *   4. mark the balance key as tracked for checkpointing.
@@ -65,6 +66,16 @@
  *      atomic ingest script, plus a rebuild-and-retry path. Small, but the
  *      hot path is the hot path.
  *
+ * The mlast: last-activity key powers the inactive_for scheduler without
+ * ever scanning meter_events: ingest GREATEST-updates it with the event's
+ * received_at, so staleness is an O(1) per-candidate lookup. The durable
+ * copy is tenant_last_activity, checkpointed alongside balances; rebuild of
+ * a lost key (rebuildLastActivity) restores the durable max, and the
+ * startup scan plus the periodic reconciler cover it like the other
+ * counters. It cannot read-repair at ingest (GREATEST on a missing key
+ * would silently start at the first event's timestamp), same tradeoff as
+ * the spend counter.
+ *
  * Flush path (flushPendingMeterEvents): batched, idempotent inserts
  * (ON CONFLICT DO NOTHING on the pg unique index). Flush-attempt markers
  * (mflush:) tell "crash between insert and stream-trim" (replay harmlessly)
@@ -86,6 +97,7 @@ import {
   meterEvents,
   meterEventsDlq,
   meterSpends,
+  tenantLastActivity,
 } from "../../db/schema.ts";
 import type { MeterEvent } from "../../schemas/meter-event.ts";
 import { redis } from "../index.ts";
@@ -132,6 +144,7 @@ const commands = redis as unknown as {
     balanceKey: string,
     pendingStream: string,
     spendKey: string,
+    lastActivityKey: string,
     amountMicrocredits: number,
     idempotencyTtlMs: number,
     payloadJson: string,
@@ -159,7 +172,7 @@ const commands = redis as unknown as {
 };
 
 redis.defineCommand("meterEventIngest", {
-  numberOfKeys: 4,
+  numberOfKeys: 5,
   lua: `
     local existing = redis.call("GET", KEYS[1])
     if existing then
@@ -184,6 +197,12 @@ redis.defineCommand("meterEventIngest", {
     local time = redis.call("TIME")
     local received_at = tonumber(time[1]) * 1000000 + tonumber(time[2])
     redis.call("XADD", KEYS[3], "*", "payload", ARGV[3], "status", status, "received_at", received_at)
+    -- GREATEST-update the last-activity key: a concurrent ingest with an
+    -- older timestamp never regresses it.
+    local last = redis.call("GET", KEYS[5])
+    if not last or received_at > tonumber(last) then
+      redis.call("SET", KEYS[5], received_at)
+    end
     return {status, balance}
   `,
 });
@@ -411,6 +430,7 @@ export async function recordMeterEvent({
     keys.meterBalance({ meterId: event.meterId, tenantId: event.tenantId }),
     keys.pendingMeterEvents,
     keys.meterSpend({ meterId: event.meterId, tenantId: event.tenantId }),
+    keys.lastActivity({ meterId: event.meterId, tenantId: event.tenantId }),
     event.amountMicrocredits,
     METER_EVENT_IDEMPOTENCY_TTL_MS,
     JSON.stringify({ ...event, externalId }),
@@ -756,6 +776,56 @@ export async function rebuildMeterSpend({
   return spend;
 }
 
+/**
+ * Latest event timestamp for a tenant+meter, or null if never recorded.
+ * Read from the mlast: Redis key; the scheduler's staleness check never
+ * touches pg when the key exists.
+ */
+export async function getLastActivity({
+  meterId,
+  tenantId,
+}: {
+  meterId: string;
+  tenantId: string;
+}): Promise<number | null> {
+  const raw = await redis.get(keys.lastActivity({ meterId, tenantId }));
+  return raw === null ? null : Number(raw);
+}
+
+/**
+ * Rebuild a lost last-activity key from the durable tenant_last_activity
+ * row. Only call for a key MISSING from Redis -- overwriting a live key
+ * could regress the max.
+ */
+export async function rebuildLastActivity({
+  meterId,
+  tenantId,
+}: {
+  meterId: string;
+  tenantId: string;
+}): Promise<number | null> {
+  const [row] = await db
+    .select()
+    .from(tenantLastActivity)
+    .where(
+      and(
+        eq(tenantLastActivity.tenantId, tenantId),
+        eq(tenantLastActivity.meterId, meterId),
+      ),
+    )
+    .limit(1);
+  if (!row) {
+    return null;
+  }
+  await redis.set(keys.lastActivity({ meterId, tenantId }), row.lastEventAtMicros);
+  console.log("rebuilt last activity", {
+    lastEventAtMicros: row.lastEventAtMicros,
+    meterId,
+    tenantId,
+  });
+  return row.lastEventAtMicros;
+}
+
 /** Succeeded meter-event debits after `since` (µs), including the DLQ. */
 export async function sumSucceededMeterEvents({
   meterId,
@@ -924,16 +994,17 @@ async function ensureMeterBalance({
 
 /** Per-kind counts from the startup missing-key rebuild. */
 export type RebuildMissingReport = {
+  activityRebuilt: number;
   balancesRebuilt: number;
   spendsRebuilt: number;
 };
 
 /**
- * Startup reconciliation: rebuild every pg-checkpointed balance or spend
- * counter whose Redis key is missing. Covers whole-fleet Redis loss (flush,
- * failover without state) without waiting for per-key read repair -- which
- * spend counters never get, since their ingest INCRBY succeeds on a missing
- * key and would otherwise silently restart the delta at 0.
+ * Startup reconciliation: rebuild every pg-checkpointed balance, spend
+ * counter, or last-activity key whose Redis key is missing. Covers
+ * whole-fleet Redis loss (flush, failover without state) without waiting
+ * for per-key read repair -- which spend and last-activity counters never
+ * get, since their ingest INCRBY/GREATEST succeeds on a missing key.
  */
 export async function rebuildMissingMeterBalances(): Promise<RebuildMissingReport> {
   const balanceRows = await db
@@ -978,7 +1049,28 @@ export async function rebuildMissingMeterBalances(): Promise<RebuildMissingRepor
   if (spendsRebuilt > 0) {
     console.log(`rebuilt ${spendsRebuilt} missing meter spend(s)`);
   }
-  return { balancesRebuilt, spendsRebuilt };
+  const activityRows = await db
+    .select({
+      tenantId: tenantLastActivity.tenantId,
+      meterId: tenantLastActivity.meterId,
+    })
+    .from(tenantLastActivity);
+  let activityRebuilt = 0;
+  for (const row of activityRows) {
+    if (
+      await redis.exists(
+        keys.lastActivity({ meterId: row.meterId, tenantId: row.tenantId }),
+      )
+    ) {
+      continue;
+    }
+    await rebuildLastActivity({ meterId: row.meterId, tenantId: row.tenantId });
+    activityRebuilt += 1;
+  }
+  if (activityRebuilt > 0) {
+    console.log(`rebuilt ${activityRebuilt} missing last-activity key(s)`);
+  }
+  return { activityRebuilt, balancesRebuilt, spendsRebuilt };
 }
 
 /**
@@ -1200,15 +1292,23 @@ export async function checkpointMeterBalances(): Promise<number> {
   if (tracked.length === 0) {
     return 0;
   }
-  /* Balances come from one snapshot (clock + every balance in the same
+  /* Balances come from one snapshot (clock + every value in the same
    * instant). Spend deltas are captured with GETSET (atomic read-and-zero),
    * so an INCRBY can never land between a snapshot and a reset and be
-   * swallowed from the delta. */
+   * swallowed from the delta. Last-activity keys are monotonic (GREATEST on
+   * ingest), so a plain GETSET-like read plus a max-guard upsert is enough. */
   const spendKeys = tracked.map((key) => {
     const [, tenantId, meterId] = key.split(":");
     return keys.meterSpend({ meterId, tenantId });
   });
-  const snapshot = await commands.meterCheckpointSnapshot(...tracked);
+  const activityKeys = tracked.map((key) => {
+    const [, tenantId, meterId] = key.split(":");
+    return keys.lastActivity({ meterId, tenantId });
+  });
+  const snapshot = await commands.meterCheckpointSnapshot(
+    ...tracked,
+    ...activityKeys,
+  );
   const updatedAt = Number(snapshot[0]) * 1_000_000 + Number(snapshot[1]);
   const spendDeltas = await Promise.all(
     spendKeys.map((key) => redis.getset(key, 0)),
@@ -1228,6 +1328,14 @@ export async function checkpointMeterBalances(): Promise<number> {
     }
     const [, tenantId, meterId] = key.split(":");
     return [{ tenantId, meterId, spendMicrocredits: Number(raw), updatedAt }];
+  });
+  const activityRows = activityKeys.flatMap((key, i) => {
+    const raw = snapshot[tracked.length + i + 2];
+    if (raw === null) {
+      return [];
+    }
+    const [, tenantId, meterId] = key.split(":");
+    return [{ tenantId, meterId, lastEventAtMicros: Number(raw) }];
   });
   if (rows.length === 0) {
     return 0;
@@ -1256,6 +1364,20 @@ export async function checkpointMeterBalances(): Promise<number> {
           updatedAt: sql`excluded.updated_at`,
         },
         setWhere: sql`${meterSpends.updatedAt} <= excluded.updated_at`,
+      });
+  }
+  if (activityRows.length > 0) {
+    await db
+      .insert(tenantLastActivity)
+      .values(activityRows)
+      .onConflictDoUpdate({
+        target: [tenantLastActivity.tenantId, tenantLastActivity.meterId],
+        set: {
+          lastEventAtMicros: sql`excluded.last_event_at_micros`,
+        },
+        /* GREATEST semantics: a stale checkpoint snapshot can never move the
+         * durable max backwards. */
+        setWhere: sql`${tenantLastActivity.lastEventAtMicros} < excluded.last_event_at_micros`,
       });
   }
   return rows.length;

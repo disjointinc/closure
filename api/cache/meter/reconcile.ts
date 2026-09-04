@@ -24,13 +24,19 @@
  */
 import { isNull } from "drizzle-orm";
 import { db } from "../../db/index.ts";
-import { creditGrants, meterBalances, meterSpends } from "../../db/schema.ts";
+import {
+  creditGrants,
+  meterBalances,
+  meterSpends,
+  tenantLastActivity,
+} from "../../db/schema.ts";
 import { redis } from "../index.ts";
 import { keys } from "../keys.ts";
 import {
   adjustMeterBalance,
   applyCreditGrant,
   parsePendingEntry,
+  rebuildLastActivity,
   rebuildMeterBalance,
   rebuildMeterSpend,
   stampGrantApplied,
@@ -67,6 +73,9 @@ export type ReconcileReport = {
   spendsChecked: number;
   spendsRebuilt: number;
   spendsHealed: number;
+  activityChecked: number;
+  activityRebuilt: number;
+  activityHealed: number;
 };
 
 export async function reconcileMeterBalances(): Promise<ReconcileReport> {
@@ -79,6 +88,9 @@ export async function reconcileMeterBalances(): Promise<ReconcileReport> {
     spendsChecked: 0,
     spendsRebuilt: 0,
     spendsHealed: 0,
+    activityChecked: 0,
+    activityRebuilt: 0,
+    activityHealed: 0,
   };
 
   /* 1. Grants recorded in pg but never applied to Redis. */
@@ -270,6 +282,34 @@ export async function reconcileMeterBalances(): Promise<ReconcileReport> {
         actual: Number(actual),
         drift,
         expected,
+        meter,
+        tenant,
+      });
+    }
+  }
+  /*
+   * 4. Heal last-activity keys. Monotonic (GREATEST on ingest), so the
+   * expected value is the durable tenant_last_activity row; a Redis value
+   * below it is drifted, a missing key is rebuilt, and both are corrected
+   * upward only.
+   */
+  const activityRows = await db.select().from(tenantLastActivity);
+  for (const row of activityRows) {
+    const { tenantId: tenant, meterId: meter } = row;
+    const activityKey = keys.lastActivity({ meterId: meter, tenantId: tenant });
+    const actual = await redis.get(activityKey);
+    if (actual === null) {
+      await rebuildLastActivity({ meterId: meter, tenantId: tenant });
+      report.activityRebuilt += 1;
+      continue;
+    }
+    report.activityChecked += 1;
+    if (Number(actual) < row.lastEventAtMicros) {
+      await redis.set(activityKey, row.lastEventAtMicros);
+      report.activityHealed += 1;
+      console.log("healed last-activity drift", {
+        actual: Number(actual),
+        expected: row.lastEventAtMicros,
         meter,
         tenant,
       });

@@ -24,6 +24,10 @@
  *                              string  firing count this window for a capped
  *                                      rule; cached from rule_runs, TTL'd to
  *                                      the window so keys die with it
+ * mlast:{tenantId}:{meterId}   string  newest event timestamp (µs) for the
+ *                                      tenant+meter; GREATEST-updated on
+ *                                      ingest, checkpointed to
+ *                                      tenant_last_activity
  */
 export const keys = {
   meterBalance: ({
@@ -73,6 +77,8 @@ export const keys = {
     tenantId: string;
     windowStart: number;
   }) => `rquota:${ruleId}:${tenantId}:${windowStart}`,
+  lastActivity: ({ meterId, tenantId }: { meterId: string; tenantId: string }) =>
+    `mlast:${tenantId}:${meterId}`,
 } as const;
 
 /**
