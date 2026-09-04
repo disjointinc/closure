@@ -19,7 +19,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { config } from "../config.ts";
 import { db } from "./db/index.ts";
-import { addOnApp } from "./v0/add-on/routes.ts";
+import { addOnTypeApp } from "./v0/add-on-type/routes.ts";
 import { couponApp } from "./v0/coupon/routes.ts";
 import { couponTemplateApp } from "./v0/coupon-template/routes.ts";
 import { cycleApp } from "./v0/cycle/routes.ts";
@@ -46,7 +46,7 @@ const app = new Hono()
       return c.text("db unavailable\n", 503);
     }
   })
-  .route("/v0/add-on", addOnApp)
+  .route("/v0/add-on-type", addOnTypeApp)
   .route("/v0/coupon", couponApp)
   .route("/v0/coupon-template", couponTemplateApp)
   .route("/v0/cycle", cycleApp)
