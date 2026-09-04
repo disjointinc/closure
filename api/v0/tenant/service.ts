@@ -4,7 +4,7 @@
  * current assignment, add-ons, and overrides).
  */
 import { and, desc, eq, isNull } from "drizzle-orm";
-import { getMeterBalance } from "../../cache/metering.ts";
+import { getMeterBalance } from "../../cache/meter/index.ts";
 import { db } from "../../db/index.ts";
 import {
   addOnFeatures,
@@ -85,9 +85,7 @@ export async function getEntitlements({ tenantId }: { tenantId: string }) {
   const [assignment] = await db
     .select()
     .from(assignments)
-    .where(and(eq(assignments.tenantId, tenantId), isNull(assignments.endsAt)))
-    .orderBy(desc(assignments.startsAt))
-    .limit(1);
+    .where(and(eq(assignments.tenantId, tenantId), isNull(assignments.endsAt)));
   if (!assignment) {
     return { tenantId, assignmentId: null, features: [], meters: [] };
   }
@@ -105,7 +103,9 @@ export async function getEntitlements({ tenantId }: { tenantId: string }) {
   const activeAddOnIds = assignmentAddOnRows
     .filter(
       (addOn) =>
-        addOn.startsAt <= now && (addOn.endsAt === null || addOn.endsAt > now),
+        addOn.deletedAt === null &&
+        addOn.startsAt <= now &&
+        (addOn.endsAt === null || addOn.endsAt > now),
     )
     .map((addOn) => addOn.addOnId);
   const addOnFeatureRows = (
