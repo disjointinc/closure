@@ -89,7 +89,7 @@
  * interleavings are theoretically possible on coarse clocks. The periodic
  * reconciler (cache/meter/reconcile.ts) heals any residual drift.
  */
-import { and, eq, gt, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import {
   creditGrants,
@@ -777,19 +777,65 @@ export async function rebuildMeterSpend({
 }
 
 /**
- * Latest event timestamp for a tenant+meter, or null if never recorded.
- * Read from the mlast: Redis key; the scheduler's staleness check never
- * touches pg when the key exists.
+ * Latest event timestamp for many tenants on one meter: one MGET for the
+ * mlast: keys, plus a single tenant_last_activity query for the misses.
+ * Values are null only for tenants with no recorded activity. The
+ * scheduler's candidate loop uses this instead of per-candidate round
+ * trips, which do not scale.
  */
-export async function getLastActivity({
+export async function getLastActivities({
   meterId,
-  tenantId,
+  tenantIds,
 }: {
   meterId: string;
-  tenantId: string;
-}): Promise<number | null> {
-  const raw = await redis.get(keys.lastActivity({ meterId, tenantId }));
-  return raw === null ? null : Number(raw);
+  tenantIds: string[];
+}): Promise<Map<string, number | null>> {
+  const result = new Map<string, number | null>();
+  if (tenantIds.length === 0) {
+    return result;
+  }
+  const keyByTenant = tenantIds.map((tenantId) =>
+    keys.lastActivity({ meterId, tenantId }),
+  );
+  const raws = await redis.mget(...keyByTenant);
+  const missing: string[] = [];
+  tenantIds.forEach((tenantId, i) => {
+    const raw = raws[i];
+    if (raw === null) {
+      missing.push(tenantId);
+    } else {
+      result.set(tenantId, Number(raw));
+    }
+  });
+  if (missing.length > 0) {
+    const rows = await db
+      .select({
+        tenantId: tenantLastActivity.tenantId,
+        lastEventAtMicros: tenantLastActivity.lastEventAtMicros,
+      })
+      .from(tenantLastActivity)
+      .where(
+        and(
+          eq(tenantLastActivity.meterId, meterId),
+          inArray(tenantLastActivity.tenantId, missing),
+        ),
+      );
+    /* Rewarm the missed keys from the durable rows so the next lookup hits
+     * Redis; never-activity tenants stay null. */
+    for (const row of rows) {
+      await redis.set(
+        keys.lastActivity({ meterId, tenantId: row.tenantId }),
+        row.lastEventAtMicros,
+      );
+      result.set(row.tenantId, row.lastEventAtMicros);
+    }
+    for (const tenantId of missing) {
+      if (!result.has(tenantId)) {
+        result.set(tenantId, null);
+      }
+    }
+  }
+  return result;
 }
 
 /**
