@@ -77,8 +77,13 @@ export const keys = {
     tenantId: string;
     windowStart: number;
   }) => `rquota:${ruleId}:${tenantId}:${windowStart}`,
-  lastActivity: ({ meterId, tenantId }: { meterId: string; tenantId: string }) =>
-    `mlast:${tenantId}:${meterId}`,
+  lastActivity: ({
+    meterId,
+    tenantId,
+  }: {
+    meterId: string;
+    tenantId: string;
+  }) => `mlast:${tenantId}:${meterId}`,
 } as const;
 
 /**
