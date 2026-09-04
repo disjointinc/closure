@@ -817,7 +817,10 @@ export async function rebuildLastActivity({
   if (!row) {
     return null;
   }
-  await redis.set(keys.lastActivity({ meterId, tenantId }), row.lastEventAtMicros);
+  await redis.set(
+    keys.lastActivity({ meterId, tenantId }),
+    row.lastEventAtMicros,
+  );
   console.log("rebuilt last activity", {
     lastEventAtMicros: row.lastEventAtMicros,
     meterId,
