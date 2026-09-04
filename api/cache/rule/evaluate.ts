@@ -11,10 +11,17 @@
  *     evaluateMeterEventRules runs in the meter-event hot path against a
  *     resolved watch set cached in Redis, so evaluation does no pg config
  *     reads per-event. resolveWatchSet does the pg-backed scope/plan/
- *     allocation resolution once and caches the result. Cumulative spend and
- *     firing quotas likewise read Redis counters (mspend:, rquota:) cached
- *     from pg, touching pg only to seed a cold window or a bounded
- *     pre-window gap.
+ *     allocation resolution once and caches the result. Cumulative spend
+ *     (net of refunds) and firing quotas likewise read Redis counters
+ *     (mspend:, rquota:) cached from pg, touching pg only to seed a cold
+ *     window or a bounded pre-window gap.
+ *
+ * Both metering triggers fire on threshold crossings, not on every event
+ * that happens to be past the threshold: microcredits_remaining detects a
+ * downward level transition, microcredits_spent detects an upward level
+ * transition (previous < threshold <= current). The quota still suppresses
+ * duplicate firings, but the event-time check is an edge detector, not a
+ * level check.
  *   - Periodic (inactive_for, relative_to_lifecycle_event): the scheduler
  *     loop in cache/rule/schedule.ts scans candidate tenants and fires.
  *
@@ -522,8 +529,9 @@ export type RecordedEvent = {
 };
 
 /**
- * Edge detection: did this charge move the balance from above the threshold
- * to at-or-below it? Refunds (negative) never cross downward.
+ * Edge detection, downward: did this event move a level from above the
+ * threshold to at-or-below it? Used for the balance (microcredits_remaining).
+ * Refunds raise the balance and can only un-cross, never cross downward.
  */
 function crossedRemainingThreshold({
   balanceMicrocredits,
@@ -538,6 +546,28 @@ function crossedRemainingThreshold({
   return (
     previousBalance > thresholdMicrocredits &&
     balanceMicrocredits <= thresholdMicrocredits
+  );
+}
+
+/**
+ * Edge detection, upward: did this event move a level from below the
+ * threshold to at-or-above it? Used for cumulative spend
+ * (microcredits_spent). Refunds reduce spend and can only un-cross, never
+ * cross upward.
+ */
+function crossedSpendThreshold({
+  event,
+  spentMicrocredits,
+  thresholdMicrocredits,
+}: {
+  event: RecordedEvent;
+  spentMicrocredits: number;
+  thresholdMicrocredits: number;
+}): boolean {
+  const previousSpend = spentMicrocredits - event.amountMicrocredits;
+  return (
+    previousSpend < thresholdMicrocredits &&
+    spentMicrocredits >= thresholdMicrocredits
   );
 }
 
@@ -570,7 +600,7 @@ export async function evaluateMeterEventRules({
 }: {
   event: RecordedEvent;
 }): Promise<void> {
-  if (event.status !== "succeeded" || event.amountMicrocredits <= 0) {
+  if (event.status !== "succeeded") {
     return;
   }
   const { rules: watched, cycle } = await getWatchSet({
@@ -627,7 +657,11 @@ export async function evaluateMeterEventRules({
     if (
       trigger.type === "microcredits_spent" &&
       spentMicrocredits !== null &&
-      spentMicrocredits >= threshold
+      crossedSpendThreshold({
+        event,
+        spentMicrocredits,
+        thresholdMicrocredits: threshold,
+      })
     ) {
       payload = {
         type: "microcredits_spent",

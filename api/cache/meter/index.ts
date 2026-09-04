@@ -177,9 +177,7 @@ redis.defineCommand("meterEventIngest", {
     else
       balance = redis.call("DECRBY", KEYS[2], amount)
       redis.call("SADD", ARGV[4], KEYS[2])
-      if amount > 0 then
-        redis.call("INCRBY", KEYS[4], amount)
-      end
+      redis.call("INCRBY", KEYS[4], amount)
       status = "succeeded"
     end
     redis.call("SET", KEYS[1], status, "PX", ARGV[2])
