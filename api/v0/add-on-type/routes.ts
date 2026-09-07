@@ -7,7 +7,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { addOnTypeSchema } from "../../schemas/add-on-type.ts";
 import { cycleIdSchema } from "../../schemas/ids.ts";
-import { valueSchema } from "../../schemas/value.ts";
+import { valueCreateSchema, valueSchema } from "../../schemas/value.ts";
 import {
   createAddOnType,
   deprecateAddOnType,
@@ -18,14 +18,25 @@ import {
 // The call surface for prices: an existing cycle id plus the owned value
 // inline. Cycles are first-class (referenced by id); values are owned by
 // the add-on type, so they're always written and read as full objects.
-const addOnTypeApiSchema = addOnTypeSchema.extend({
+export const addOnTypeApiSchema = addOnTypeSchema.extend({
   prices: z.array(z.object({ cycleId: cycleIdSchema, value: valueSchema })),
 });
 
 export type AddOnTypeApi = z.infer<typeof addOnTypeApiSchema>;
 
+/** Create-input: the server mints the add-on type and value ids and stamps times. */
+const addOnTypeCreateSchema = addOnTypeSchema
+  .omit({ addOnTypeId: true, createdAt: true, deprecatedAt: true })
+  .extend({
+    prices: z.array(
+      z.object({ cycleId: cycleIdSchema, value: valueCreateSchema }),
+    ),
+  });
+
+export type AddOnTypeCreateBody = z.infer<typeof addOnTypeCreateSchema>;
+
 export const addOnTypeApp = new Hono()
-  .post("/", zValidator("json", addOnTypeApiSchema), async (c) => {
+  .post("/", zValidator("json", addOnTypeCreateSchema), async (c) => {
     const body = c.req.valid("json");
     return c.json(await createAddOnType({ addOnType: body }), 201);
   })

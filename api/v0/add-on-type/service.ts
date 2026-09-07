@@ -11,7 +11,8 @@ import {
   addOnTypes,
   values,
 } from "../../db/schema.ts";
-import type { AddOnTypeApi } from "./routes.ts";
+import { generateId } from "../../lib/id.ts";
+import type { AddOnTypeApi, AddOnTypeCreateBody } from "./routes.ts";
 
 export async function getAddOnType({
   addOnTypeId,
@@ -74,40 +75,52 @@ export async function listAddOnTypes(): Promise<AddOnTypeApi[]> {
 export async function createAddOnType({
   addOnType,
 }: {
-  addOnType: AddOnTypeApi;
+  addOnType: AddOnTypeCreateBody;
 }): Promise<AddOnTypeApi | null> {
+  const addOnTypeId = generateId({ prefix: "add_on_type" });
   await db
     .insert(addOnTypes)
     .values({
-      addOnTypeId: addOnType.addOnTypeId,
-      createdAt: addOnType.createdAt,
-      deprecatedAt: addOnType.deprecatedAt,
+      addOnTypeId,
+      createdAt: Date.now(),
+      deprecatedAt: null,
       name: addOnType.name,
       description: addOnType.description,
     })
     .onConflictDoNothing();
   for (const price of addOnType.prices) {
-    await db.insert(values).values(price.value).onConflictDoNothing();
+    const valueId = generateId({ prefix: "value" });
+    await db
+      .insert(values)
+      .values({
+        ...price.value,
+        valueId,
+        createdAt: Date.now(),
+        deprecatedAt: null,
+      })
+      .onConflictDoNothing();
     await db
       .insert(addOnTypePrices)
       .values({
-        addOnTypeId: addOnType.addOnTypeId,
+        addOnTypeId,
         cycleId: price.cycleId,
-        valueId: price.value.valueId,
+        valueId,
       })
       .onConflictDoNothing();
   }
-  await db
-    .insert(addOnTypeFeatures)
-    .values(
-      addOnType.features.map((feature) => ({
-        addOnTypeId: addOnType.addOnTypeId,
-        featureId: feature.featureId,
-        setTo: feature.setTo,
-      })),
-    )
-    .onConflictDoNothing();
-  return getAddOnType({ addOnTypeId: addOnType.addOnTypeId });
+  if (addOnType.features.length > 0) {
+    await db
+      .insert(addOnTypeFeatures)
+      .values(
+        addOnType.features.map((feature) => ({
+          addOnTypeId,
+          featureId: feature.featureId,
+          setTo: feature.setTo,
+        })),
+      )
+      .onConflictDoNothing();
+  }
+  return getAddOnType({ addOnTypeId });
 }
 
 /**
