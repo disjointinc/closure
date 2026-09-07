@@ -48,6 +48,7 @@ const couponTemplateCreateSchema = z
       )
       .nullable(),
   })
+  .omit({ couponTemplateId: true, createdAt: true, deprecatedAt: true })
   .superRefine(checkCouponTemplate);
 
 export type CouponTemplateCreateBody = z.infer<

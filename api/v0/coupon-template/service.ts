@@ -12,6 +12,7 @@ import {
   couponTemplateFeaturesGranted,
   couponTemplates,
 } from "../../db/schema.ts";
+import { generateId } from "../../lib/id.ts";
 import type { Award } from "../../schemas/coupon.ts";
 import type { CouponTemplate } from "../../schemas/coupon-template.ts";
 import { type AwardApi, expandAward, resolveAward } from "../award/service.ts";
@@ -105,12 +106,13 @@ export async function createCouponTemplate({
 }: {
   template: CouponTemplateCreateBody;
 }): Promise<CouponTemplateApi | null> {
+  const couponTemplateId = generateId({ prefix: "coupon_template" });
   await db
     .insert(couponTemplates)
     .values({
-      couponTemplateId: template.couponTemplateId,
-      createdAt: template.createdAt,
-      deprecatedAt: template.deprecatedAt,
+      couponTemplateId,
+      createdAt: Date.now(),
+      deprecatedAt: null,
       grantableByTenants: template.grantableByTenants,
       limitPerGrantingTenant: template.limitPerGrantingTenant,
       name: template.name,
@@ -127,7 +129,7 @@ export async function createCouponTemplate({
       await db
         .insert(couponTemplateFeaturesGranted)
         .values({
-          couponTemplateId: template.couponTemplateId,
+          couponTemplateId,
           featureId: feature.featureId,
           setTo: feature.setTo,
           award: await resolveAward(feature.award),
@@ -140,7 +142,7 @@ export async function createCouponTemplate({
       await db
         .insert(couponTemplateCreditsGranted)
         .values({
-          couponTemplateId: template.couponTemplateId,
+          couponTemplateId,
           meterId: credit.meterId,
           amountMicrocredits: credit.amountMicrocredits,
           expiration: credit.expiration,
@@ -150,7 +152,7 @@ export async function createCouponTemplate({
         .onConflictDoNothing();
     }
   }
-  return getCouponTemplate({ couponTemplateId: template.couponTemplateId });
+  return getCouponTemplate({ couponTemplateId });
 }
 
 /** Deprecate the template, or return null if no such template exists. */
