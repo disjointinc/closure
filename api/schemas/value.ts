@@ -8,6 +8,23 @@ import { valueIdSchema } from "./ids.ts";
  * an integer in that currency's smallest billable unit, and each currency
  * may appear at most once.
  */
+function checkUniqueCurrencies(
+  value: { amounts: { currency: string }[] },
+  ctx: z.RefinementCtx,
+) {
+  const seen = new Set<string>();
+  value.amounts.forEach((amount, index) => {
+    if (seen.has(amount.currency)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["amounts", index, "currency"],
+        message: "currencies must be unique within a value",
+      });
+    }
+    seen.add(amount.currency);
+  });
+}
+
 export const valueSchema = z
   .object({
     valueId: valueIdSchema,
@@ -23,18 +40,20 @@ export const valueSchema = z
       )
       .min(1),
   })
-  .superRefine((value, ctx) => {
-    const seen = new Set<string>();
-    value.amounts.forEach((amount, index) => {
-      if (seen.has(amount.currency)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["amounts", index, "currency"],
-          message: "currencies must be unique within a value",
-        });
-      }
-      seen.add(amount.currency);
-    });
-  });
+  .superRefine(checkUniqueCurrencies);
 
 export type Value = z.infer<typeof valueSchema>;
+
+/**
+ * Create-input for a value: the server mints valueId and stamps createdAt;
+ * a value is never created pre-deprecated.
+ */
+export const valueCreateSchema = z
+  .object({
+    name: valueSchema.shape.name,
+    description: valueSchema.shape.description,
+    amounts: valueSchema.shape.amounts,
+  })
+  .superRefine(checkUniqueCurrencies);
+
+export type ValueCreateBody = z.infer<typeof valueCreateSchema>;
