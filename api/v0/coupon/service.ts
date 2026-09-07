@@ -13,6 +13,7 @@ import {
   couponFeaturesGranted,
   coupons,
 } from "../../db/schema.ts";
+import { generateId } from "../../lib/id.ts";
 import { type Award, type Coupon } from "../../schemas/coupon.ts";
 import { type AwardApi, expandAward, resolveAward } from "../award/service.ts";
 import { getCouponTemplate } from "../coupon-template/service.ts";
@@ -106,6 +107,8 @@ export async function createCoupon({
 }: {
   coupon: CouponCreateBody;
 }): Promise<CouponApi | null> {
+  const couponId = generateId({ prefix: "coupon" });
+  const createdAt = Date.now();
   // An explicit null check, not a truthiness check: the template branch's
   // templateId is a string, and "" is falsy, so truthiness wouldn't narrow
   // the union.
@@ -119,9 +122,9 @@ export async function createCoupon({
     await db
       .insert(coupons)
       .values({
-        couponId: coupon.couponId,
-        createdAt: coupon.createdAt,
-        deletedAt: coupon.deletedAt,
+        couponId,
+        createdAt,
+        deletedAt: null,
         templateId: template.couponTemplateId,
         grantableByTenants: template.grantableByTenants,
         limitPerGrantingTenant: template.limitPerGrantingTenant,
@@ -143,7 +146,7 @@ export async function createCoupon({
         await db
           .insert(couponFeaturesGranted)
           .values({
-            couponId: coupon.couponId,
+            couponId,
             featureId: feature.featureId,
             setTo: feature.setTo,
             award: await resolveAward(feature.award),
@@ -156,7 +159,7 @@ export async function createCoupon({
         await db
           .insert(couponCreditsGranted)
           .values({
-            couponId: coupon.couponId,
+            couponId,
             meterId: credit.meterId,
             amountMicrocredits: credit.amountMicrocredits,
             expiration: credit.expiration,
@@ -166,14 +169,14 @@ export async function createCoupon({
           .onConflictDoNothing();
       }
     }
-    return getCoupon({ couponId: coupon.couponId });
+    return getCoupon({ couponId });
   }
   await db
     .insert(coupons)
     .values({
-      couponId: coupon.couponId,
-      createdAt: coupon.createdAt,
-      deletedAt: coupon.deletedAt,
+      couponId,
+      createdAt,
+      deletedAt: null,
       templateId: null,
       grantableByTenants: coupon.grantableByTenants,
       limitPerGrantingTenant: coupon.limitPerGrantingTenant,
@@ -190,7 +193,7 @@ export async function createCoupon({
       await db
         .insert(couponFeaturesGranted)
         .values({
-          couponId: coupon.couponId,
+          couponId,
           featureId: feature.featureId,
           setTo: feature.setTo,
           award: await resolveAward(feature.award),
@@ -203,7 +206,7 @@ export async function createCoupon({
       await db
         .insert(couponCreditsGranted)
         .values({
-          couponId: coupon.couponId,
+          couponId,
           meterId: credit.meterId,
           amountMicrocredits: credit.amountMicrocredits,
           expiration: credit.expiration,
@@ -213,7 +216,7 @@ export async function createCoupon({
         .onConflictDoNothing();
     }
   }
-  return getCoupon({ couponId: coupon.couponId });
+  return getCoupon({ couponId });
 }
 
 /** Mark the coupon deleted, or return null if no such coupon exists. */

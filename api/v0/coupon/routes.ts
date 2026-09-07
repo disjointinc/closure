@@ -6,7 +6,6 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import {
-  epochMs,
   featureSetTo,
   microcredits,
   resetSchedule,
@@ -61,9 +60,6 @@ const couponCreateSchema = z.union([
   // Inline definition.
   z
     .object({
-      couponId: couponIdSchema,
-      createdAt: epochMs,
-      deletedAt: epochMs.nullable(),
       templateId: z.null(),
       ...couponDefinitionFields,
     })
@@ -73,9 +69,6 @@ const couponCreateSchema = z.union([
   // silently strip them.)
   z
     .object({
-      couponId: couponIdSchema,
-      createdAt: epochMs,
-      deletedAt: epochMs.nullable(),
       templateId: couponTemplateIdSchema,
       reciprocalBenefitCouponId: couponIdSchema.nullable(),
     })
