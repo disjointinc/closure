@@ -6,14 +6,14 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import {
   createCycle,
-  cycleApiSchema,
+  cycleCreateSchema,
   deprecateCycle,
   getCycle,
   listCycles,
 } from "./service.ts";
 
 export const cycleApp = new Hono()
-  .post("/", zValidator("json", cycleApiSchema), async (c) => {
+  .post("/", zValidator("json", cycleCreateSchema), async (c) => {
     const body = c.req.valid("json");
     return c.json(await createCycle({ cycle: body }), 201);
   })

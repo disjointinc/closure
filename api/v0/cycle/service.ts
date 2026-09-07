@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../db/index.ts";
 import { cycles } from "../../db/schema.ts";
+import { generateId } from "../../lib/id.ts";
 import { epochMs, type Duration } from "../../schemas/common.ts";
 import {
   arrearsChargingSchema,
@@ -14,13 +15,17 @@ import {
 } from "../../schemas/cycle.ts";
 import { cycleIdSchema } from "../../schemas/ids.ts";
 
+const cycleBaseFields = {
+  defaultDiscountPercentage: z.number().nullable(),
+  name: z.string().min(1),
+  description: z.string().nullable(),
+};
+
 const cycleFields = {
   cycleId: cycleIdSchema,
   createdAt: epochMs,
   deprecatedAt: epochMs.nullable(),
-  defaultDiscountPercentage: z.number().nullable(),
-  name: z.string().min(1),
-  description: z.string().nullable(),
+  ...cycleBaseFields,
 };
 
 /** The cycle shape the call surface reads and writes. */
@@ -29,6 +34,13 @@ export const cycleApiSchema = z.discriminatedUnion("charged", [
   arrearsChargingSchema.extend(cycleFields),
 ]);
 export type CycleApi = z.infer<typeof cycleApiSchema>;
+
+/** The cycle create body: no id or lifecycle fields. */
+export const cycleCreateSchema = z.discriminatedUnion("charged", [
+  upfrontChargingSchema.extend(cycleBaseFields),
+  arrearsChargingSchema.extend(cycleBaseFields),
+]);
+export type CycleCreateBody = z.infer<typeof cycleCreateSchema>;
 
 function cycleToRow(cycle: Cycle) {
   const base = {
@@ -101,10 +113,21 @@ export async function getCycle({
 export async function createCycle({
   cycle,
 }: {
-  cycle: CycleApi;
+  cycle: CycleCreateBody;
 }): Promise<CycleApi | null> {
-  await db.insert(cycles).values(cycleToRow(cycle)).onConflictDoNothing();
-  return getCycle({ cycleId: cycle.cycleId });
+  const cycleId = generateId({ prefix: "cycle" });
+  await db
+    .insert(cycles)
+    .values(
+      cycleToRow({
+        ...cycle,
+        cycleId,
+        createdAt: Date.now(),
+        deprecatedAt: null,
+      }),
+    )
+    .onConflictDoNothing();
+  return getCycle({ cycleId });
 }
 
 /** Deprecate the cycle, or return null if no such cycle exists. */
