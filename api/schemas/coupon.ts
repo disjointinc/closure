@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  durationSchema,
   epochMs,
   featureSetTo,
   microcredits,
@@ -13,27 +14,37 @@ import {
   valueIdSchema,
 } from "./ids.ts";
 
+/**
+ * How long an award applies once used, e.g. a flat discount for 90 days.
+ * Null means no limit.
+ */
+const awardDuration = {
+  duration: durationSchema.nullable(),
+};
+
 export const awardSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("payout"),
-    valueId: valueIdSchema,
-  }),
   z.object({
     type: z.literal("flat_discount"),
     valueId: valueIdSchema,
+    ...awardDuration,
+  }),
+  z.object({
+    type: z.literal("flat_payout"),
+    valueId: valueIdSchema,
+    ...awardDuration,
   }),
   z.object({
     type: z.literal("percentage_discount"),
     percentage: z.number().gt(0).lte(100),
+    ...awardDuration,
+  }),
+  z.object({
+    type: z.literal("percentage_payout"),
+    percentage: z.number().positive(),
+    ...awardDuration,
   }),
 ]);
 export type Award = z.infer<typeof awardSchema>;
-
-/** Awards default to a full (100%) discount when unspecified. */
-export const defaultAward = {
-  type: "percentage_discount",
-  percentage: 100,
-} as const;
 
 /**
  * The features/credits a coupon (or coupon template) grants. Shared: a
@@ -44,7 +55,7 @@ export const couponFeaturesGrantedSchema = z
     z.object({
       featureId: featureIdSchema,
       setTo: featureSetTo,
-      award: awardSchema.default(defaultAward),
+      award: awardSchema,
     }),
   )
   .nullable();
@@ -57,7 +68,7 @@ export const couponCreditsGrantedSchema = z
       expiration: resetSchedule.nullable(),
       /** Null means unlimited rollovers. */
       rollovers: z.number().int().nonnegative().nullable(),
-      award: awardSchema.default(defaultAward),
+      award: awardSchema,
     }),
   )
   .nullable();
