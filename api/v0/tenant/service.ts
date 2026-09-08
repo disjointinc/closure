@@ -16,6 +16,7 @@ import {
   planMeters,
   tenants,
 } from "../../db/schema.ts";
+import { generateId } from "../../lib/id.ts";
 import type { TenantCreateBody, TenantPatchBody } from "./routes.ts";
 
 export async function getTenant({ tenantId }: { tenantId: string }) {
@@ -31,16 +32,18 @@ export async function listTenants() {
 }
 
 export async function createTenant({ tenant }: { tenant: TenantCreateBody }) {
+  const tenantId = generateId({ prefix: "tenant" });
+  const createdAt = Date.now();
   await db
     .insert(tenants)
     .values({
-      tenantId: tenant.tenantId,
-      createdAt: tenant.createdAt,
+      tenantId,
+      createdAt,
       deletedAt: null,
       externalIds: tenant.externalIds,
     })
     .onConflictDoNothing();
-  return { ...tenant, deletedAt: null };
+  return { ...tenant, tenantId, createdAt, deletedAt: null };
 }
 
 /** Patch the tenant, or return null if no such tenant exists. */

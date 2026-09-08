@@ -10,8 +10,6 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
-import { epochMs } from "../../schemas/common.ts";
-import { tenantIdSchema } from "../../schemas/ids.ts";
 import { addOnApp } from "./add-on/routes.ts";
 import { assignmentApp } from "./assignment/routes.ts";
 import { couponGrantApp } from "./coupon-grant/routes.ts";
@@ -37,8 +35,6 @@ import {
 } from "./service.ts";
 
 const tenantCreateSchema = z.object({
-  tenantId: tenantIdSchema,
-  createdAt: epochMs,
   externalIds: z.record(z.string(), z.string()),
 });
 
