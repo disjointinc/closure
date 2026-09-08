@@ -4,6 +4,7 @@
  */
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import { z } from "zod";
 import { meterSchema } from "../../schemas/meter.ts";
 import {
   createMeter,
@@ -12,11 +13,17 @@ import {
   listMeters,
 } from "./service.ts";
 
+const meterCreateSchema = meterSchema.omit({
+  createdAt: true,
+  deprecatedAt: true,
+  meterId: true,
+});
+
+export type MeterCreateBody = z.infer<typeof meterCreateSchema>;
+
 export const meterApp = new Hono()
-  .post("/", zValidator("json", meterSchema), async (c) => {
-    const body = c.req.valid("json");
-    await createMeter({ meter: body });
-    return c.json(body, 201);
+  .post("/", zValidator("json", meterCreateSchema), async (c) => {
+    return c.json(await createMeter({ meter: c.req.valid("json") }), 201);
   })
   .get("/", async (c) => {
     return c.json(await listMeters());

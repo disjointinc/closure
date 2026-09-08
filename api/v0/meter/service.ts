@@ -5,7 +5,9 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import { meters, meterTaxTypes } from "../../db/schema.ts";
+import { generateId } from "../../lib/id.ts";
 import type { Meter } from "../../schemas/meter.ts";
+import type { MeterCreateBody } from "./routes.ts";
 
 export async function getMeter({
   meterId,
@@ -43,13 +45,19 @@ export async function listMeters(): Promise<Meter[]> {
   return found.filter((meter) => meter !== null);
 }
 
-export async function createMeter({ meter }: { meter: Meter }): Promise<void> {
+export async function createMeter({
+  meter,
+}: {
+  meter: MeterCreateBody;
+}): Promise<Meter> {
+  const meterId = generateId({ prefix: "meter" });
+  const createdAt = Date.now();
   await db
     .insert(meters)
     .values({
-      meterId: meter.meterId,
-      createdAt: meter.createdAt,
-      deprecatedAt: meter.deprecatedAt,
+      meterId,
+      createdAt,
+      deprecatedAt: null,
       name: meter.name,
       description: meter.description,
     })
@@ -59,12 +67,13 @@ export async function createMeter({ meter }: { meter: Meter }): Promise<void> {
       .insert(meterTaxTypes)
       .values(
         meter.applicableTaxTypeIds.map((taxTypeId) => ({
-          meterId: meter.meterId,
+          meterId,
           taxTypeId,
         })),
       )
       .onConflictDoNothing();
   }
+  return { ...meter, meterId, createdAt, deprecatedAt: null };
 }
 
 /** Deprecate the meter, or return null if no such meter exists. */
