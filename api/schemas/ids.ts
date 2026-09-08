@@ -18,6 +18,7 @@ export const idSuffixLengths = {
   experiment: 20,
   feature: 20,
   feature_option: 20,
+  loan_template: 20,
   meter: 20,
   plan: 20,
   rule: 20,
@@ -88,6 +89,7 @@ export const featureOverrideIdSchema = prefixedId("feature_override");
 export const invoiceIdSchema = prefixedId("invoice");
 export const itemIdSchema = prefixedId("item");
 export const loanIdSchema = prefixedId("loan");
+export const loanTemplateIdSchema = prefixedId("loan_template");
 export const meterIdSchema = prefixedId("meter");
 export const meterEventIdSchema = prefixedId("meter_event");
 export const meterOverrideIdSchema = prefixedId("meter_override");

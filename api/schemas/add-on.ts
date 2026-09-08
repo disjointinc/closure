@@ -10,6 +10,7 @@ export const addOnSchema = z.object({
   addOnId: addOnIdSchema,
   assignmentId: assignmentIdSchema,
   addOnTypeId: addOnTypeIdSchema,
+  createdAt: epochMs,
   startsAt: epochMs,
   endsAt: epochMs.nullable(),
   /** Manually deleted ahead of the end, whether or not one is set. */

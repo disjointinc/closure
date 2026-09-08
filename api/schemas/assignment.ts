@@ -17,6 +17,7 @@ export const assignmentSchema = z.object({
   /** Set when the assignment came from an experiment treatment. */
   experimentId: experimentIdSchema.nullable(),
   cycleId: cycleIdSchema,
+  createdAt: epochMs,
   startsAt: epochMs,
   endsAt: epochMs.nullable(),
   /** For loan plans: the loan to auto-create, keyed by id. */
@@ -32,6 +33,7 @@ export const assignmentSchema = z.object({
     z.object({
       addOnId: addOnIdSchema,
       addOnTypeId: addOnTypeIdSchema,
+      createdAt: epochMs,
       startsAt: epochMs,
       endsAt: epochMs.nullable(),
       /** Manually deleted ahead of the end, whether or not one is set. */
