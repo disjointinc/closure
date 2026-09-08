@@ -201,6 +201,15 @@ function templatePlaceholders(template: string): string[] {
 }
 
 /**
+ * RuleAction without the server-minted value id, so the create schema can
+ * validate before the id exists. Derived by omission so new fields and
+ * variants on RuleAction flow through automatically.
+ */
+type RuleCheckAction =
+  | Omit<Extract<RuleAction, { type: "add_invoice_item" }>, "fixedValueId">
+  | Exclude<RuleAction, { type: "add_invoice_item" }>;
+
+/**
  * Cross-field rule check: every {{placeholder}} in a create_task template
  * must be one the rule's trigger supplies (PLACEHOLDERS_BY_TRIGGER), so a
  * template can't reference a value its trigger never captures. And
@@ -212,7 +221,7 @@ export function checkRule(
   rule: {
     trigger: RuleTrigger;
     recurrence: RuleRecurrence;
-    actions: RuleAction[];
+    actions: RuleCheckAction[];
   },
   ctx: z.RefinementCtx,
 ): void {
