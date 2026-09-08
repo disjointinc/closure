@@ -25,6 +25,7 @@ import { couponTemplateApp } from "./v0/coupon-template/routes.ts";
 import { cycleApp } from "./v0/cycle/routes.ts";
 import { experimentApp } from "./v0/experiment/routes.ts";
 import { featureApp } from "./v0/feature/routes.ts";
+import { loanTemplateApp } from "./v0/loan-template/routes.ts";
 import { meterApp } from "./v0/meter/routes.ts";
 import { planApp } from "./v0/plan/routes.ts";
 import { ruleApp } from "./v0/rule/routes.ts";
@@ -52,6 +53,7 @@ const app = new Hono()
   .route("/v0/cycle", cycleApp)
   .route("/v0/experiment", experimentApp)
   .route("/v0/feature", featureApp)
+  .route("/v0/loan-template", loanTemplateApp)
   .route("/v0/meter", meterApp)
   .route("/v0/plan", planApp)
   .route("/v0/rule", ruleApp)
