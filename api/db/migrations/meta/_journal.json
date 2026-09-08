@@ -148,6 +148,13 @@
       "when": 1788828098382,
       "tag": "0020_add_created_at_timestamps",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788829226156,
+      "tag": "0021_tidy_trauma",
+      "breakpoints": true
     }
   ]
 }

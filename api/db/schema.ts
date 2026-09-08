@@ -540,6 +540,24 @@ export const couponCreditsGranted = pgTable(
   ],
 );
 
+/**
+ * Reusable loan definitions. Templates are deprecated, never deleted:
+ * loans minted from one keep the definition they copied at creation.
+ */
+export const loanTemplates = pgTable(
+  "loan_templates",
+  {
+    loanTemplateId: text("loan_template_id").primaryKey(),
+    createdAt: epochMs("created_at").notNull(),
+    deprecatedAt: epochMs("deprecated_at"),
+    name: text("name").notNull(),
+    description: text("description"),
+    principal: jsonb("principal").$type<CurrencyAmount>().notNull(),
+    interestPercentage: doublePrecision("interest_percentage").notNull(),
+  },
+  (t) => [idFormatCheck("loan_template", t.loanTemplateId)],
+);
+
 export const experiments = pgTable(
   "experiments",
   {
@@ -721,6 +739,10 @@ export const loans = pgTable(
       .references(() => assignments.assignmentId),
     createdAt: epochMs("created_at").notNull(),
     closedAt: epochMs("closed_at"),
+    /** The template this loan's definition was copied from, if any. */
+    templateId: text("template_id").references(
+      () => loanTemplates.loanTemplateId,
+    ),
     principal: jsonb("principal").$type<CurrencyAmount>().notNull(),
     interestPercentage: doublePrecision("interest_percentage").notNull(),
   },
