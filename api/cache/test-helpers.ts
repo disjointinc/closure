@@ -118,6 +118,7 @@ export async function makeAssignment({
     planId,
     experimentId: null,
     cycleId,
+    createdAt: Date.now(),
     startsAt: Date.now(),
     endsAt: null,
   });
@@ -129,6 +130,7 @@ export async function makeTeamMember(): Promise<string> {
   await db.insert(teamMembers).values({
     teamMemberId,
     email: `${teamMemberId}@test.invalid`,
+    createdAt: Date.now(),
     name: null,
     profilePictureUrl: null,
   });

@@ -116,6 +116,7 @@ export const teamMembers = pgTable(
   {
     teamMemberId: text("team_member_id").primaryKey(),
     email: text("email").notNull().unique(),
+    createdAt: epochMs("created_at").notNull(),
     deletedAt: epochMs("deleted_at"),
     name: text("name"),
     profilePictureUrl: text("profile_picture_url"),
@@ -675,6 +676,7 @@ export const assignments = pgTable(
     cycleId: text("cycle_id")
       .notNull()
       .references(() => cycles.cycleId),
+    createdAt: epochMs("created_at").notNull(),
     startsAt: epochMs("starts_at").notNull(),
     endsAt: epochMs("ends_at"),
   },
@@ -698,6 +700,7 @@ export const assignmentAddOns = pgTable(
     addOnTypeId: text("add_on_type_id")
       .notNull()
       .references(() => addOnTypes.addOnTypeId),
+    createdAt: epochMs("created_at").notNull(),
     startsAt: epochMs("starts_at").notNull(),
     endsAt: epochMs("ends_at"),
     /** Manually deleted ahead of the end, whether or not one is set. */
