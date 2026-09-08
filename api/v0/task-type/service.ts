@@ -34,18 +34,15 @@ export async function createTaskType({
   taskType,
 }: {
   taskType: TaskTypeCreateBody;
-}): Promise<TaskType | null> {
-  const taskTypeId = generateId({ prefix: "task_type" });
-  await db
-    .insert(taskTypes)
-    .values({
-      ...taskType,
-      taskTypeId,
-      createdAt: Date.now(),
-      deprecatedAt: null,
-    })
-    .onConflictDoNothing();
-  return getTaskType({ taskTypeId });
+}): Promise<TaskType> {
+  const created: TaskType = {
+    ...taskType,
+    taskTypeId: generateId({ prefix: "task_type" }),
+    createdAt: Date.now(),
+    deprecatedAt: null,
+  };
+  await db.insert(taskTypes).values(created).onConflictDoNothing();
+  return created;
 }
 
 /** Deprecate the task type, or return null if no such task type exists. */

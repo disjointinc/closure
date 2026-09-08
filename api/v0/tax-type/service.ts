@@ -41,18 +41,15 @@ export async function createTaxType({
   taxType,
 }: {
   taxType: TaxTypeCreateBody;
-}): Promise<TaxType | null> {
-  const taxTypeId = generateId({ prefix: "tax_type" });
-  await db
-    .insert(taxTypes)
-    .values({
-      ...taxType,
-      taxTypeId,
-      createdAt: Date.now(),
-      deprecatedAt: null,
-    })
-    .onConflictDoNothing();
-  return getTaxType({ taxTypeId });
+}): Promise<TaxType> {
+  const created: TaxType = {
+    ...taxType,
+    taxTypeId: generateId({ prefix: "tax_type" }),
+    createdAt: Date.now(),
+    deprecatedAt: null,
+  };
+  await db.insert(taxTypes).values(created).onConflictDoNothing();
+  return created;
 }
 
 /** Deprecate the tax type, or return null if no such tax type exists. */

@@ -114,20 +114,15 @@ export async function createCycle({
   cycle,
 }: {
   cycle: CycleCreateBody;
-}): Promise<CycleApi | null> {
-  const cycleId = generateId({ prefix: "cycle" });
-  await db
-    .insert(cycles)
-    .values(
-      cycleToRow({
-        ...cycle,
-        cycleId,
-        createdAt: Date.now(),
-        deprecatedAt: null,
-      }),
-    )
-    .onConflictDoNothing();
-  return getCycle({ cycleId });
+}): Promise<CycleApi> {
+  const created: CycleApi = {
+    ...cycle,
+    cycleId: generateId({ prefix: "cycle" }),
+    createdAt: Date.now(),
+    deprecatedAt: null,
+  };
+  await db.insert(cycles).values(cycleToRow(created)).onConflictDoNothing();
+  return created;
 }
 
 /** Deprecate the cycle, or return null if no such cycle exists. */

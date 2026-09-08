@@ -33,18 +33,15 @@ export async function createLoanTemplate({
   template,
 }: {
   template: LoanTemplateCreateBody;
-}): Promise<LoanTemplate | null> {
-  const loanTemplateId = generateId({ prefix: "loan_template" });
-  await db
-    .insert(loanTemplates)
-    .values({
-      ...template,
-      loanTemplateId,
-      createdAt: Date.now(),
-      deprecatedAt: null,
-    })
-    .onConflictDoNothing();
-  return getLoanTemplate({ loanTemplateId });
+}): Promise<LoanTemplate> {
+  const created: LoanTemplate = {
+    ...template,
+    loanTemplateId: generateId({ prefix: "loan_template" }),
+    createdAt: Date.now(),
+    deprecatedAt: null,
+  };
+  await db.insert(loanTemplates).values(created).onConflictDoNothing();
+  return created;
 }
 
 /** Deprecate the template, or return null if no such template exists. */
