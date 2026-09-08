@@ -4,6 +4,7 @@
  */
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import { z } from "zod";
 import { taskTypeSchema } from "../../schemas/task-type.ts";
 import {
   createTaskType,
@@ -12,8 +13,16 @@ import {
   listTaskTypes,
 } from "./service.ts";
 
+const taskTypeCreateSchema = taskTypeSchema.omit({
+  taskTypeId: true,
+  createdAt: true,
+  deprecatedAt: true,
+});
+
+export type TaskTypeCreateBody = z.infer<typeof taskTypeCreateSchema>;
+
 export const taskTypeApp = new Hono()
-  .post("/", zValidator("json", taskTypeSchema), async (c) => {
+  .post("/", zValidator("json", taskTypeCreateSchema), async (c) => {
     const body = c.req.valid("json");
     return c.json(await createTaskType({ taskType: body }), 201);
   })

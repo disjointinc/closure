@@ -7,7 +7,9 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import { taskTypes } from "../../db/schema.ts";
+import { generateId } from "../../lib/id.ts";
 import type { TaskType } from "../../schemas/task-type.ts";
+import type { TaskTypeCreateBody } from "./routes.ts";
 
 export async function listTaskTypes(): Promise<TaskType[]> {
   return db.select().from(taskTypes);
@@ -31,10 +33,19 @@ export async function getTaskType({
 export async function createTaskType({
   taskType,
 }: {
-  taskType: TaskType;
+  taskType: TaskTypeCreateBody;
 }): Promise<TaskType | null> {
-  await db.insert(taskTypes).values(taskType).onConflictDoNothing();
-  return getTaskType({ taskTypeId: taskType.taskTypeId });
+  const taskTypeId = generateId({ prefix: "task_type" });
+  await db
+    .insert(taskTypes)
+    .values({
+      ...taskType,
+      taskTypeId,
+      createdAt: Date.now(),
+      deprecatedAt: null,
+    })
+    .onConflictDoNothing();
+  return getTaskType({ taskTypeId });
 }
 
 /** Deprecate the task type, or return null if no such task type exists. */
