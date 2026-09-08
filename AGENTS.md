@@ -30,6 +30,8 @@ Nested if statements are a code smell. Short circuit to keep code simple.
 
 Choose the right ID for the right job. Every ID should be prefixed with some string that helps humans identify what type of ID it is when it shows up in some logs (i.e. prefix user IDs with `u_`, workspace IDs with `w_`, etc). The general preference should be for IDs of lowercase letters and numbers. Sometimes, a more complex ID structure may be necessary (for example, a snowflake ID when dealing with time access read / insert conditions), but whenever possible, pick the ID structure that respects performance requirements while being optimally human-readable.
 
+ID names should be the same everywhere they appear. Just because we're in the `users` table, for example, doesn't mean we can name the id column `id`. It should be `user_id`, and referenced by ORM as `userId`, the same as it would be in any other table that had a foreign-keyed user ID reference.
+
 If you think it should be a boolean in the DB, it should almost always be a timestamp. For example, "deleted" is a bad boolean to add - "deleted_at" is generally much better because it conveys richer information for minimal cost.
 
 All else being equal, prefer data structures that don't delete old data over ones that do. For example, unless there's a reason to delete old data in a table, it's generally better to have a `deleted_at` field rather than actually delete rows in the table.
