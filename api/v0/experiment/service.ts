@@ -9,8 +9,9 @@ import {
   experimentTreatmentTenants,
   experimentTreatments,
 } from "../../db/schema.ts";
+import { generateId } from "../../lib/id.ts";
 import type { Experiment } from "../../schemas/experiment.ts";
-import type { ConcludeExperimentBody } from "./routes.ts";
+import type { ConcludeExperimentBody, ExperimentCreateBody } from "./routes.ts";
 
 export async function getExperiment({
   experimentId,
@@ -67,15 +68,16 @@ export async function listExperiments(): Promise<Experiment[]> {
 export async function createExperiment({
   experiment,
 }: {
-  experiment: Experiment;
+  experiment: ExperimentCreateBody;
 }): Promise<Experiment | null> {
+  const experimentId = generateId({ prefix: "experiment" });
   await db
     .insert(experiments)
     .values({
-      experimentId: experiment.experimentId,
-      createdAt: experiment.createdAt,
-      concludedAt: experiment.concludedAt,
-      concludingPlanId: experiment.concludingPlanId,
+      experimentId,
+      createdAt: Date.now(),
+      concludedAt: null,
+      concludingPlanId: null,
       name: experiment.name,
       description: experiment.description,
     })
@@ -84,7 +86,7 @@ export async function createExperiment({
     await db
       .insert(experimentTreatments)
       .values({
-        experimentId: experiment.experimentId,
+        experimentId,
         planId: treatment.planId,
         tenantPercentage: treatment.tenantPercentage,
       })
@@ -94,7 +96,7 @@ export async function createExperiment({
         .insert(experimentTreatmentTenants)
         .values(
           treatment.assignedTenantIds.map((tenantId) => ({
-            experimentId: experiment.experimentId,
+            experimentId,
             planId: treatment.planId,
             tenantId,
           })),
@@ -102,7 +104,7 @@ export async function createExperiment({
         .onConflictDoNothing();
     }
   }
-  return getExperiment({ experimentId: experiment.experimentId });
+  return getExperiment({ experimentId });
 }
 
 /** Conclude the experiment, or return null if no such experiment exists. */
@@ -116,7 +118,7 @@ export async function concludeExperiment({
   const updated = await db
     .update(experiments)
     .set({
-      concludedAt: body.concludedAt,
+      concludedAt: Date.now(),
       concludingPlanId: body.concludingPlanId,
     })
     .where(eq(experiments.experimentId, experimentId))
