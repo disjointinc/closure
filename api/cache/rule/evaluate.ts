@@ -31,7 +31,7 @@
  * The executor worker (cache/rule/execute.ts) then runs each action.
  *
  */
-import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import {
   assignments,
@@ -78,7 +78,8 @@ export function durationToMs(duration: Duration): number {
 
 /**
  * The tenant's billing-cycle anchor: the open assignment's start plus the
- * cycle's length. Null for one-time cycles and tenants with no assignment.
+ * cycle's length. Null for one-time cycles and tenants with no open
+ * assignment (none at all, or only future-dated ones).
  * Shared by resolveWatchSet (event-time) and the scheduler.
  */
 export async function getBillingCycle({
@@ -89,7 +90,13 @@ export async function getBillingCycle({
   const [assignment] = await db
     .select()
     .from(assignments)
-    .where(and(eq(assignments.tenantId, tenantId), isNull(assignments.endsAt)));
+    .where(
+      and(
+        eq(assignments.tenantId, tenantId),
+        isNull(assignments.endsAt),
+        lte(assignments.startsAt, Date.now()),
+      ),
+    );
   if (!assignment) {
     return null;
   }
@@ -131,7 +138,11 @@ export async function getBillingCycles({
     .from(assignments)
     .innerJoin(cycles, eq(assignments.cycleId, cycles.cycleId))
     .where(
-      and(inArray(assignments.tenantId, tenantIds), isNull(assignments.endsAt)),
+      and(
+        inArray(assignments.tenantId, tenantIds),
+        isNull(assignments.endsAt),
+        lte(assignments.startsAt, Date.now()),
+      ),
     );
   for (const row of rows) {
     if (row.cycleLength === "one_time") {
@@ -200,7 +211,13 @@ export async function resolveWatchSet({
   const [assignment] = await db
     .select()
     .from(assignments)
-    .where(and(eq(assignments.tenantId, tenantId), isNull(assignments.endsAt)));
+    .where(
+      and(
+        eq(assignments.tenantId, tenantId),
+        isNull(assignments.endsAt),
+        lte(assignments.startsAt, Date.now()),
+      ),
+    );
 
   // Scope filtering happens in TypeScript, not the SQL query: the rules
   // table is small (team-configured, not tenant-scale), this runs at most

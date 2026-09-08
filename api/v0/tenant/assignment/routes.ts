@@ -1,43 +1,57 @@
 /**
- * v0/tenant/assignment/routes.ts -- HTTP for /v0/tenant/:id/assignment: request
+ * v0/tenant/assignment/routes.ts -- HTTP for /v0/tenant/:tenantId/assignment: request
  * validation and wiring. Business logic lives in service.ts.
  */
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import { assignmentSchema } from "../../../schemas/assignment.ts";
-import { epochMs } from "../../../schemas/common.ts";
-import { addOnIdSchema } from "../../../schemas/ids.ts";
-import { attachAddOn, createAssignment, listAssignments } from "./service.ts";
+import {
+  AssignmentBodyError,
+  createAssignment,
+  listAssignments,
+} from "./service.ts";
 
-const addOnAttachSchema = z.object({
-  addOn: addOnIdSchema,
-  start: epochMs,
-  end: epochMs.nullable(),
-});
+// Ids and lifecycle timestamps are server-minted: the body carries the
+// plan/cycle references and the loan/add-on terms.
+const assignmentCreateSchema = assignmentSchema
+  .omit({ assignmentId: true, createdAt: true })
+  .extend({
+    loan: assignmentSchema.shape.loan
+      .unwrap()
+      .omit({ loanId: true })
+      .nullable(),
+    addOns: z.array(
+      assignmentSchema.shape.addOns.element.omit({
+        addOnId: true,
+        createdAt: true,
+        deletedAt: true,
+      }),
+    ),
+  });
 
-export type AddOnAttachBody = z.infer<typeof addOnAttachSchema>;
+export type AssignmentCreateBody = z.infer<typeof assignmentCreateSchema>;
 
 export const assignmentApp = new Hono<{ Variables: { tenantId: string } }>()
-  .post("/", zValidator("json", assignmentSchema), async (c) => {
+  .post("/", zValidator("json", assignmentCreateSchema), async (c) => {
     const tenantId = c.get("tenantId");
     const body = c.req.valid("json");
-    return c.json(await createAssignment({ assignment: body, tenantId }), 201);
+    try {
+      const assignment = await createAssignment({
+        assignment: body,
+        tenantId,
+      });
+      if (!assignment) {
+        return c.json({ error: "Plan not found" }, 404);
+      }
+      return c.json(assignment, 201);
+    } catch (error) {
+      if (error instanceof AssignmentBodyError) {
+        return c.json({ error: error.message }, 400);
+      }
+      throw error;
+    }
   })
   .get("/", async (c) => {
     return c.json(await listAssignments({ tenantId: c.get("tenantId") }));
-  })
-  .post(
-    "/:assignment_id/add-ons",
-    zValidator("json", addOnAttachSchema),
-    async (c) => {
-      const assignment = await attachAddOn({
-        addOn: c.req.valid("json"),
-        assignmentId: c.req.param("assignment_id"),
-      });
-      if (!assignment) {
-        return c.json({ error: "not found" }, 404);
-      }
-      return c.json(assignment, 201);
-    },
-  );
+  });

@@ -74,7 +74,10 @@ async function scopeCandidatePlans({
   rule: Rule;
 }): Promise<Map<string, string>> {
   const scope = rule.scope;
-  const conditions = [isNull(assignments.endsAt)];
+  const conditions = [
+    isNull(assignments.endsAt),
+    lte(assignments.startsAt, Date.now()),
+  ];
   if (scope.kind === "tenant") {
     conditions.push(eq(assignments.tenantId, scope.tenantId));
   }

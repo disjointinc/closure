@@ -93,7 +93,6 @@ export async function makePlan(): Promise<string> {
     createdAt: Date.now(),
     deprecatedAt: null,
     kind: "standard",
-    duration: null,
     defaultInterestPercentage: null,
     minimumPaymentValueId: null,
     name: "Test plan",
@@ -105,9 +104,12 @@ export async function makePlan(): Promise<string> {
 /** Assign a tenant to a plan on a fresh cycle. Returns the assignmentId. */
 export async function makeAssignment({
   planId,
+  startsAt,
   tenantId,
 }: {
   planId: string;
+  /** Defaults to now; pass a future time for a not-yet-open assignment. */
+  startsAt?: number;
   tenantId: string;
 }): Promise<string> {
   const assignmentId = newAssignmentId();
@@ -119,7 +121,7 @@ export async function makeAssignment({
     experimentId: null,
     cycleId,
     createdAt: Date.now(),
-    startsAt: Date.now(),
+    startsAt: startsAt ?? Date.now(),
     endsAt: null,
   });
   return assignmentId;

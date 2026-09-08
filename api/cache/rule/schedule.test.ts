@@ -245,4 +245,49 @@ describe("rule scheduler scope filtering", () => {
     expect(fired).toContain(tenantOnB);
     expect(fired).not.toContain(tenantOnOther);
   });
+
+  it("skips tenants whose only assignment is future-dated", async () => {
+    const meterId = await makeMeter();
+    const taskTypeId = await makeTaskType();
+    const planId = await makePlan();
+    const tenantStarted = await makeTenant();
+    const tenantFuture = await makeTenant();
+    await makeAssignment({ planId, tenantId: tenantStarted });
+    await makeAssignment({
+      planId,
+      startsAt: Date.now() + 24 * 60 * 60 * 1000,
+      tenantId: tenantFuture,
+    });
+    await makeStaleEvent({ meterId, tenantId: tenantStarted });
+    await makeStaleEvent({ meterId, tenantId: tenantFuture });
+
+    const ruleId = await makeRule({
+      rule: {
+        scope: { kind: "global" },
+        trigger: {
+          type: "inactive_for",
+          meterId,
+          duration: { days: 7, months: null },
+        },
+        recurrence: ONCE,
+        actions: [
+          {
+            type: "create_task",
+            taskTypeId,
+            title: "Tenant went quiet",
+            description: null,
+            assignToTeamMemberId: null,
+          },
+        ],
+        name: "future-dated assignment rule",
+        description: null,
+      },
+    });
+
+    await runScheduler();
+
+    const fired = await firedTenantIds({ ruleId });
+    expect(fired).toContain(tenantStarted);
+    expect(fired).not.toContain(tenantFuture);
+  });
 });
