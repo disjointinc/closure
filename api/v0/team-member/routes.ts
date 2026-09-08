@@ -14,6 +14,12 @@ import {
   patchTeamMember,
 } from "./service.ts";
 
+const teamMemberCreateSchema = teamMemberSchema.omit({
+  teamMemberId: true,
+  createdAt: true,
+  deletedAt: true,
+});
+
 const teamMemberPatchSchema = z
   .object({
     name: z.string().min(1).nullable(),
@@ -21,13 +27,13 @@ const teamMemberPatchSchema = z
   })
   .partial();
 
+export type TeamMemberCreateBody = z.infer<typeof teamMemberCreateSchema>;
 export type TeamMemberPatchBody = z.infer<typeof teamMemberPatchSchema>;
 
 export const teamMemberApp = new Hono()
-  .post("/", zValidator("json", teamMemberSchema), async (c) => {
+  .post("/", zValidator("json", teamMemberCreateSchema), async (c) => {
     const body = c.req.valid("json");
-    await createTeamMember({ teamMember: body });
-    return c.json(body, 201);
+    return c.json(await createTeamMember({ teamMember: body }), 201);
   })
   .get("/", async (c) => {
     return c.json(await listTeamMembers());

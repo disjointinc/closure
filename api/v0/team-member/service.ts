@@ -5,8 +5,9 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import { teamMembers } from "../../db/schema.ts";
+import { generateId } from "../../lib/id.ts";
 import type { TeamMember } from "../../schemas/team-member.ts";
-import type { TeamMemberPatchBody } from "./routes.ts";
+import type { TeamMemberCreateBody, TeamMemberPatchBody } from "./routes.ts";
 
 export async function getTeamMember({
   teamMemberId,
@@ -27,9 +28,17 @@ export async function listTeamMembers(): Promise<TeamMember[]> {
 export async function createTeamMember({
   teamMember,
 }: {
-  teamMember: TeamMember;
-}): Promise<void> {
-  await db.insert(teamMembers).values(teamMember).onConflictDoNothing();
+  teamMember: TeamMemberCreateBody;
+}): Promise<TeamMember> {
+  const teamMemberId = generateId({ prefix: "team_member" });
+  const created = {
+    ...teamMember,
+    teamMemberId,
+    createdAt: Date.now(),
+    deletedAt: null,
+  };
+  await db.insert(teamMembers).values(created).onConflictDoNothing();
+  return created;
 }
 
 /** Soft-delete the team member, or return null if no such member exists. */
