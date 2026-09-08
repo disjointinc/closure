@@ -4,16 +4,16 @@
  */
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
-import { taxTypeSchema } from "../../schemas/tax-type.ts";
 import {
   createTaxType,
   deprecateTaxType,
   getTaxType,
   listTaxTypes,
+  taxTypeCreateSchema,
 } from "./service.ts";
 
 export const taxTypeApp = new Hono()
-  .post("/", zValidator("json", taxTypeSchema), async (c) => {
+  .post("/", zValidator("json", taxTypeCreateSchema), async (c) => {
     const body = c.req.valid("json");
     return c.json(await createTaxType({ taxType: body }), 201);
   })
