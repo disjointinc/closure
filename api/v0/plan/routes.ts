@@ -13,14 +13,14 @@ import {
   planMeterFields,
   planSchema,
 } from "../../schemas/plan.ts";
-import { valueSchema } from "../../schemas/value.ts";
+import { valueCreateSchema } from "../../schemas/value.ts";
 import { createPlan, deprecatePlan, getPlan, listPlans } from "./service.ts";
 
 // Prices reference first-class cycles by id but own their values, which are
 // always passed as full objects.
 const priceInputSchema = z.object({
   cycleId: cycleIdSchema,
-  value: valueSchema,
+  value: valueCreateSchema,
 });
 
 /** A top-up usage tier as passed on the wire: its prices own their values. */
@@ -37,12 +37,32 @@ const planMeterInputSchema = z
   .superRefine(checkPlanMeter);
 
 const planCreateSchema = z
-  .object({
-    ...planSchema.shape,
+  .object(planSchema.shape)
+  .omit({
+    planId: true,
+    createdAt: true,
+    deprecatedAt: true,
+    minimumPaymentValueId: true,
+  })
+  .extend({
+    /* Loan plans own their minimum payment value inline, like prices do:
+     * no standalone value route exists for a client to reference. */
+    minimumPaymentValue: valueCreateSchema.nullable(),
     prices: z.array(priceInputSchema),
     meters: z.array(planMeterInputSchema).nullable(),
   })
-  .superRefine(checkPlan);
+  /* checkPlan reads minimumPaymentValueId; the wire carries the value
+   * inline, so feed the check a null-ness stub. */
+  .superRefine((plan, ctx) =>
+    checkPlan(
+      {
+        ...plan,
+        minimumPaymentValueId:
+          plan.minimumPaymentValue === null ? null : "value_pending",
+      },
+      ctx,
+    ),
+  );
 
 export type PlanMeterInput = z.infer<typeof planMeterInputSchema>;
 export type PlanCreateBody = z.infer<typeof planCreateSchema>;

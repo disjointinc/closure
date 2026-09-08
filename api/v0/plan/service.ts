@@ -14,8 +14,9 @@ import {
   plans,
   values,
 } from "../../db/schema.ts";
+import { generateId } from "../../lib/id.ts";
 import type { Plan, PlanMeter } from "../../schemas/plan.ts";
-import { type Value } from "../../schemas/value.ts";
+import { type Value, type ValueCreateBody } from "../../schemas/value.ts";
 import type { PlanCreateBody, PlanMeterInput } from "./routes.ts";
 
 export type PlanPriceApi = { cycleId: string; value: Value };
@@ -28,6 +29,25 @@ export type PlanApi = Omit<Plan, "prices" | "meters"> & {
   prices: PlanPriceApi[];
   meters: PlanMeterApi[] | null;
 };
+
+/** Store an inline value, returning the minted value id. */
+async function insertValue({
+  value,
+}: {
+  value: ValueCreateBody;
+}): Promise<string> {
+  const valueId = generateId({ prefix: "value" });
+  await db
+    .insert(values)
+    .values({
+      valueId,
+      createdAt: Date.now(),
+      deprecatedAt: null,
+      ...value,
+    })
+    .onConflictDoNothing();
+  return valueId;
+}
 
 /** Store the inline values, returning the db-ready meter entry. */
 async function resolveMeter({
@@ -45,13 +65,10 @@ async function resolveMeter({
       topUps.map(async (tier) => ({
         startingAt: tier.startingAt,
         prices: await Promise.all(
-          tier.prices.map(async (price) => {
-            await db.insert(values).values(price.value).onConflictDoNothing();
-            return {
-              cycleId: price.cycleId,
-              valueId: price.value.valueId,
-            };
-          }),
+          tier.prices.map(async (price) => ({
+            cycleId: price.cycleId,
+            valueId: await insertValue({ value: price.value }),
+          })),
         ),
       })),
     ),
@@ -170,29 +187,34 @@ export async function createPlan({
 }: {
   plan: PlanCreateBody;
 }): Promise<PlanApi | null> {
+  const planId = generateId({ prefix: "plan" });
+  const minimumPaymentValueId =
+    plan.minimumPaymentValue === null
+      ? null
+      : await insertValue({ value: plan.minimumPaymentValue });
   await db
     .insert(plans)
     .values({
-      planId: plan.planId,
+      planId,
       derivedFromPlanId: plan.derivedFromPlanId,
-      createdAt: plan.createdAt,
-      deprecatedAt: plan.deprecatedAt,
+      createdAt: Date.now(),
+      deprecatedAt: null,
       kind: plan.kind,
       duration: plan.duration,
       defaultInterestPercentage: plan.defaultInterestPercentage,
-      minimumPaymentValueId: plan.minimumPaymentValueId,
+      minimumPaymentValueId,
       name: plan.name,
       description: plan.description,
     })
     .onConflictDoNothing();
   for (const price of plan.prices) {
-    await db.insert(values).values(price.value).onConflictDoNothing();
+    const valueId = await insertValue({ value: price.value });
     await db
       .insert(planPrices)
       .values({
-        planId: plan.planId,
+        planId,
         cycleId: price.cycleId,
-        valueId: price.value.valueId,
+        valueId,
       })
       .onConflictDoNothing();
   }
@@ -201,7 +223,7 @@ export async function createPlan({
       .insert(planFeatures)
       .values(
         plan.features.map((feature) => ({
-          planId: plan.planId,
+          planId,
           featureId: feature.featureId,
           setTo: feature.setTo,
         })),
@@ -214,7 +236,7 @@ export async function createPlan({
       await db
         .insert(planMeters)
         .values({
-          planId: plan.planId,
+          planId,
           meterId: resolved.meterId,
           defaultMicrocredits: resolved.defaultMicrocredits,
           limitMicrocredits: resolved.limitMicrocredits,
@@ -231,13 +253,13 @@ export async function createPlan({
       .insert(planAddOnTypes)
       .values(
         plan.addOnTypeIds.map((addOnTypeId) => ({
-          planId: plan.planId,
+          planId,
           addOnTypeId,
         })),
       )
       .onConflictDoNothing();
   }
-  return getPlan({ planId: plan.planId });
+  return getPlan({ planId });
 }
 
 /** Deprecate the plan, or return null if no such plan exists. */
