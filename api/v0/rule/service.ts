@@ -1,19 +1,26 @@
 /**
  * v0/rule/service.ts -- rule business logic. Rules are shared, first-class
  * definitions evaluated against metering and lifecycle events. The call
- * surface passes add_invoice_item flat fees as full value objects; the
- * canonical rule stored in the db keeps value ids (the same resolve/expand
- * pattern items use for per-unit values).
+ * surface writes add_invoice_item flat fees as inline value create-inputs
+ * and reads them back as full value objects; the canonical rule stored in
+ * the db keeps value ids (the same resolve/expand pattern items use for
+ * per-unit values).
  */
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../db/index.ts";
 import { rules, values } from "../../db/schema.ts";
+import { generateId } from "../../lib/id.ts";
 import { taskTypeIdSchema, teamMemberIdSchema } from "../../schemas/ids.ts";
-import { type Rule, type RuleAction, ruleSchema } from "../../schemas/rule.ts";
-import { valueSchema, type Value } from "../../schemas/value.ts";
+import {
+  checkRule,
+  type Rule,
+  type RuleAction,
+  ruleSchema,
+} from "../../schemas/rule.ts";
+import { type Value, valueCreateSchema } from "../../schemas/value.ts";
 
-/** Call-surface rule actions: add_invoice_item carries the full value. */
+/** Call-surface rule actions: add_invoice_item carries an inline value create-input. */
 const ruleActionApiSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("create_task"),
@@ -25,7 +32,7 @@ const ruleActionApiSchema = z.discriminatedUnion("type", [
   z
     .object({
       type: z.literal("add_invoice_item"),
-      fixedValue: valueSchema.nullable(),
+      fixedValue: valueCreateSchema.nullable(),
       percentageOfInvoice: z.number().positive().nullable(),
     })
     .refine(
@@ -42,34 +49,60 @@ const ruleActionApiSchema = z.discriminatedUnion("type", [
 ]);
 export type RuleActionApi = z.infer<typeof ruleActionApiSchema>;
 
-/** The rule shape the call surface reads and writes. */
-export const ruleApiSchema = ruleSchema.extend({
-  actions: z.array(ruleActionApiSchema).min(1),
-});
-export type RuleApi = z.infer<typeof ruleApiSchema>;
+/**
+ * The create-input rule: the server mints ruleId and stamps times. checkRule
+ * only reads fields identical across the canonical and call-surface action
+ * shapes (its signature admits nothing else), so actions pass straight
+ * through with no mapping.
+ */
+export const ruleApiSchema = z
+  .object(ruleSchema.shape)
+  .omit({ ruleId: true, createdAt: true, deprecatedAt: true })
+  .extend({ actions: z.array(ruleActionApiSchema).min(1) })
+  .superRefine((rule, ctx) => checkRule(rule, ctx));
+export type RuleCreateBody = z.infer<typeof ruleApiSchema>;
 
-/** Store a call-surface action's values, returning the canonical action. */
+/** The rule shape the call surface reads. */
+export type RuleApi = Omit<Rule, "actions"> & { actions: RuleActionApi[] };
+
+/** Mint and store a call-surface action's value, returning the canonical action. */
 async function resolveAction(action: RuleActionApi): Promise<RuleAction> {
   if (action.type !== "add_invoice_item") {
     return action;
   }
+  let fixedValueId: string | null = null;
   if (action.fixedValue !== null) {
-    await db.insert(values).values(action.fixedValue).onConflictDoNothing();
+    fixedValueId = generateId({ prefix: "value" });
+    await db
+      .insert(values)
+      .values({
+        ...action.fixedValue,
+        valueId: fixedValueId,
+        createdAt: Date.now(),
+        deprecatedAt: null,
+      })
+      .onConflictDoNothing();
   }
   return {
     type: "add_invoice_item",
-    fixedValueId: action.fixedValue === null ? null : action.fixedValue.valueId,
+    fixedValueId,
     percentageOfInvoice: action.percentageOfInvoice,
   };
 }
 
-/** Store a call-surface rule's action values, returning the canonical rule. */
-async function resolveRule(rule: RuleApi): Promise<Rule> {
+/** Mint the rule id and store action values, returning the canonical rule. */
+async function resolveRule(rule: RuleCreateBody): Promise<Rule> {
   const actions: RuleAction[] = [];
   for (const action of rule.actions) {
     actions.push(await resolveAction(action));
   }
-  return { ...rule, actions };
+  return {
+    ...rule,
+    ruleId: generateId({ prefix: "rule" }),
+    createdAt: Date.now(),
+    deprecatedAt: null,
+    actions,
+  };
 }
 
 /** Expand a stored rule's add_invoice_item value ids into full values. */
@@ -122,15 +155,15 @@ export async function getRule({
   return expandRule(row);
 }
 
-/** Create a rule, storing add_invoice_item fee values as ids. */
+/** Create a rule, minting its id and storing add_invoice_item fee values as ids. */
 export async function createRule({
   rule,
 }: {
-  rule: RuleApi;
+  rule: RuleCreateBody;
 }): Promise<RuleApi | null> {
   const stored = await resolveRule(rule);
   await db.insert(rules).values(stored).onConflictDoNothing();
-  return getRule({ ruleId: rule.ruleId });
+  return getRule({ ruleId: stored.ruleId });
 }
 
 /** Deprecate the rule, or return null if no such rule exists. */
