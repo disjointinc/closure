@@ -258,9 +258,7 @@ export const plans = pgTable(
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     kind: planKindEnum("kind").notNull().default("standard"),
-    /** Fixed term for loan plans; null on standard plans. */
-    duration: duration("duration"),
-    /** Suggested rate for loans on this plan; assignments set theirs explicitly. */
+    /** Suggested rate for loans on this plan; loans set theirs explicitly. */
     defaultInterestPercentage: doublePrecision("default_interest_percentage"),
     /** The minimum payment due each cycle on loan plans. */
     minimumPaymentValueId: text("minimum_payment_value_id").references(
@@ -274,8 +272,8 @@ export const plans = pgTable(
     // Standard plans carry no loan terms; loan plans require them.
     check(
       "plans_kind_variant",
-      sql`(kind = 'standard' and duration is null and default_interest_percentage is null and minimum_payment_value_id is null)
-       or (kind = 'loan' and duration is not null and minimum_payment_value_id is not null)`,
+      sql`(kind = 'standard' and default_interest_percentage is null and minimum_payment_value_id is null)
+       or (kind = 'loan' and minimum_payment_value_id is not null)`,
     ),
   ],
 );
@@ -554,6 +552,8 @@ export const loanTemplates = pgTable(
     description: text("description"),
     principal: jsonb("principal").$type<CurrencyAmount>().notNull(),
     interestPercentage: doublePrecision("interest_percentage").notNull(),
+    /** Fixed term: a loan minted from this template is due created_at + duration. */
+    duration: duration("duration").notNull(),
   },
   (t) => [idFormatCheck("loan_template", t.loanTemplateId)],
 );
@@ -739,12 +739,15 @@ export const loans = pgTable(
       .references(() => assignments.assignmentId),
     createdAt: epochMs("created_at").notNull(),
     closedAt: epochMs("closed_at"),
+    /** When repayment is due: created_at + duration, stamped at creation. */
+    endsAt: epochMs("ends_at").notNull(),
     /** The template this loan's definition was copied from, if any. */
     loanTemplateId: text("loan_template_id").references(
       () => loanTemplates.loanTemplateId,
     ),
     principal: jsonb("principal").$type<CurrencyAmount>().notNull(),
     interestPercentage: doublePrecision("interest_percentage").notNull(),
+    duration: duration("duration").notNull(),
   },
   (t) => [
     idFormatCheck("loan", t.loanId),

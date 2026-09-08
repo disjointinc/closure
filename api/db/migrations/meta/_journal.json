@@ -162,6 +162,13 @@
       "when": 1788830529298,
       "tag": "0022_rename_template_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788900238970,
+      "tag": "0023_loan_duration",
+      "breakpoints": true
     }
   ]
 }
