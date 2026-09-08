@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { currencyAmountSchema, epochMs } from "./common.ts";
+import { currencyAmountSchema, durationSchema, epochMs } from "./common.ts";
 import {
   assignmentIdSchema,
   loanIdSchema,
@@ -15,15 +15,22 @@ import {
 export const loanDefinitionFields = {
   principal: currencyAmountSchema,
   interestPercentage: z.number().positive(),
+  /** Fixed term: the loan is due createdAt + duration. */
+  duration: durationSchema,
 };
 
-/** A loan tied to an assignment: the principal, the rate, and the lifecycle. */
+/**
+ * A loan tied to the assignment that was open at creation: the principal,
+ * the rate, and the lifecycle.
+ */
 export const loanSchema = z.object({
   loanId: loanIdSchema,
   tenantId: tenantIdSchema,
   assignmentId: assignmentIdSchema,
   createdAt: epochMs,
   closedAt: epochMs.nullable(),
+  /** When repayment is due: createdAt + duration, stamped at creation. */
+  endsAt: epochMs,
   /** The template this loan's definition was copied from, if any. */
   loanTemplateId: loanTemplateIdSchema.nullable(),
   ...loanDefinitionFields,

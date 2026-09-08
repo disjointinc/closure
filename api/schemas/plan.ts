@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  durationSchema,
   epochMs,
   featureSetTo,
   microcredits,
@@ -162,7 +161,6 @@ export type PlanKind = z.infer<typeof planKindSchema>;
  */
 export interface PlanCheckInput {
   kind: PlanKind;
-  duration: unknown;
   defaultInterestPercentage: number | null;
   minimumPaymentValueId: string | null;
   prices: unknown[];
@@ -171,13 +169,6 @@ export interface PlanCheckInput {
 /** Cross-field rules for a plan's kind: loan terms vs. standard pricing. */
 export function checkPlan(plan: PlanCheckInput, ctx: z.RefinementCtx): void {
   if (plan.kind === "standard") {
-    if (plan.duration !== null) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["duration"],
-        message: "duration is only settable on loan plans",
-      });
-    }
     if (plan.defaultInterestPercentage !== null) {
       ctx.addIssue({
         code: "custom",
@@ -193,13 +184,6 @@ export function checkPlan(plan: PlanCheckInput, ctx: z.RefinementCtx): void {
       });
     }
     return;
-  }
-  if (plan.duration === null) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["duration"],
-      message: "loan plans require a duration",
-    });
   }
   if (plan.minimumPaymentValueId === null) {
     ctx.addIssue({
@@ -225,9 +209,7 @@ export const planSchema = z
     createdAt: epochMs,
     deprecatedAt: epochMs.nullable(),
     kind: planKindSchema,
-    /** Fixed term for loan plans; null on standard plans. */
-    duration: durationSchema.nullable(),
-    /** Suggested rate for loans on this plan; assignments set theirs explicitly. */
+    /** Suggested rate for loans on this plan; loans set theirs explicitly. */
     defaultInterestPercentage: z.number().positive().nullable(),
     /** The minimum payment due each cycle on loan plans. */
     minimumPaymentValueId: valueIdSchema.nullable(),
