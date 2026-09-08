@@ -3,10 +3,12 @@
  * a first-class attach of an add-on type to an assignment; it detaches
  * (soft-deletes) by its own id.
  */
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "../../../db/index.ts";
 import { assignmentAddOns, assignments } from "../../../db/schema.ts";
+import { generateId } from "../../../lib/id.ts";
 import type { AddOn } from "../../../schemas/add-on.ts";
+import type { AddOnCreateBody } from "./routes.ts";
 
 export async function listAddOns({
   tenantId,
@@ -37,31 +39,35 @@ export async function getAddOn({
   return row ?? null;
 }
 
-/** Attach an add-on, or return null if no such assignment exists. */
+/** Attach an add-on to the tenant's open assignment, or null if none. */
 export async function attachAddOn({
   addOn,
+  tenantId,
 }: {
-  addOn: AddOn;
+  addOn: AddOnCreateBody;
+  tenantId: string;
 }): Promise<AddOn | null> {
   const [assignment] = await db
     .select()
     .from(assignments)
-    .where(eq(assignments.assignmentId, addOn.assignmentId));
+    .where(and(eq(assignments.tenantId, tenantId), isNull(assignments.endsAt)));
   if (!assignment) {
     return null;
   }
+  const addOnId = generateId({ prefix: "add_on" });
   await db
     .insert(assignmentAddOns)
     .values({
-      addOnId: addOn.addOnId,
-      assignmentId: addOn.assignmentId,
+      addOnId,
+      assignmentId: assignment.assignmentId,
       addOnTypeId: addOn.addOnTypeId,
-      startsAt: addOn.startsAt,
+      createdAt: Date.now(),
+      startsAt: addOn.startsAt ?? Date.now(),
       endsAt: addOn.endsAt,
       deletedAt: null,
     })
     .onConflictDoNothing();
-  return getAddOn({ addOnId: addOn.addOnId });
+  return getAddOn({ addOnId });
 }
 
 /** Soft-delete an add-on, or return null if it is already deleted. */
