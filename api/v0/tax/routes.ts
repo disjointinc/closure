@@ -6,12 +6,12 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import { taxSchema } from "../../schemas/tax.ts";
-import { taxTypeRefSchema } from "../tax-type/service.ts";
 import { createTax, deprecateTax, getTax, listTaxes } from "./service.ts";
 
-const taxCreateSchema = z.object({
-  ...taxSchema.shape,
-  taxTypeId: taxTypeRefSchema,
+const taxCreateSchema = taxSchema.omit({
+  createdAt: true,
+  deprecatedAt: true,
+  taxId: true,
 });
 
 export type TaxCreateBody = z.infer<typeof taxCreateSchema>;
