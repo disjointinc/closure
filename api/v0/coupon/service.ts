@@ -59,7 +59,7 @@ export async function getCoupon({
     couponId: row.couponId,
     createdAt: row.createdAt,
     deletedAt: row.deletedAt,
-    templateId: row.templateId,
+    couponTemplateId: row.couponTemplateId,
     grantableByTenants: row.grantableByTenants,
     limitPerGrantingTenant: row.limitPerGrantingTenant,
     name: row.name,
@@ -98,9 +98,9 @@ export async function listCoupons(): Promise<CouponApi[]> {
 }
 
 /**
- * Mint a coupon. With `templateId` set, the definition is copied from the
- * template (returns null if no such template exists); otherwise the body's
- * inline definition is used, storing each award's value.
+ * Mint a coupon. With `couponTemplateId` set, the definition is copied from
+ * the template (returns null if no such template exists); otherwise the
+ * body's inline definition is used, storing each award's value.
  */
 export async function createCoupon({
   coupon,
@@ -110,11 +110,11 @@ export async function createCoupon({
   const couponId = generateId({ prefix: "coupon" });
   const createdAt = Date.now();
   // An explicit null check, not a truthiness check: the template branch's
-  // templateId is a string, and "" is falsy, so truthiness wouldn't narrow
-  // the union.
-  if (coupon.templateId !== null) {
+  // couponTemplateId is a string, and "" is falsy, so truthiness wouldn't
+  // narrow the union.
+  if (coupon.couponTemplateId !== null) {
     const template = await getCouponTemplate({
-      couponTemplateId: coupon.templateId,
+      couponTemplateId: coupon.couponTemplateId,
     });
     if (!template) {
       return null;
@@ -125,7 +125,7 @@ export async function createCoupon({
         couponId,
         createdAt,
         deletedAt: null,
-        templateId: template.couponTemplateId,
+        couponTemplateId: template.couponTemplateId,
         grantableByTenants: template.grantableByTenants,
         limitPerGrantingTenant: template.limitPerGrantingTenant,
         name: template.name,
@@ -177,7 +177,7 @@ export async function createCoupon({
       couponId,
       createdAt,
       deletedAt: null,
-      templateId: null,
+      couponTemplateId: null,
       grantableByTenants: coupon.grantableByTenants,
       limitPerGrantingTenant: coupon.limitPerGrantingTenant,
       name: coupon.name,

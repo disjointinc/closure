@@ -60,7 +60,7 @@ const couponCreateSchema = z.union([
   // Inline definition.
   z
     .object({
-      templateId: z.null(),
+      couponTemplateId: z.null(),
       ...couponDefinitionFields,
     })
     .superRefine(checkCoupon),
@@ -69,7 +69,7 @@ const couponCreateSchema = z.union([
   // silently strip them.)
   z
     .object({
-      templateId: couponTemplateIdSchema,
+      couponTemplateId: couponTemplateIdSchema,
       reciprocalBenefitCouponId: couponIdSchema.nullable(),
     })
     .strict(),
