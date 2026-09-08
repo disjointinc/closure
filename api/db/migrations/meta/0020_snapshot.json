@@ -33,12 +33,8 @@
           "name": "add_on_type_features_add_on_type_id_add_on_types_add_on_type_id_fk",
           "tableFrom": "add_on_type_features",
           "tableTo": "add_on_types",
-          "columnsFrom": [
-            "add_on_type_id"
-          ],
-          "columnsTo": [
-            "add_on_type_id"
-          ],
+          "columnsFrom": ["add_on_type_id"],
+          "columnsTo": ["add_on_type_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -46,12 +42,8 @@
           "name": "add_on_type_features_feature_id_features_feature_id_fk",
           "tableFrom": "add_on_type_features",
           "tableTo": "features",
-          "columnsFrom": [
-            "feature_id"
-          ],
-          "columnsTo": [
-            "feature_id"
-          ],
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -59,10 +51,7 @@
       "compositePrimaryKeys": {
         "add_on_type_features_add_on_type_id_feature_id_pk": {
           "name": "add_on_type_features_add_on_type_id_feature_id_pk",
-          "columns": [
-            "add_on_type_id",
-            "feature_id"
-          ]
+          "columns": ["add_on_type_id", "feature_id"]
         }
       },
       "uniqueConstraints": {},
@@ -99,12 +88,8 @@
           "name": "add_on_type_prices_add_on_type_id_add_on_types_add_on_type_id_fk",
           "tableFrom": "add_on_type_prices",
           "tableTo": "add_on_types",
-          "columnsFrom": [
-            "add_on_type_id"
-          ],
-          "columnsTo": [
-            "add_on_type_id"
-          ],
+          "columnsFrom": ["add_on_type_id"],
+          "columnsTo": ["add_on_type_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -112,12 +97,8 @@
           "name": "add_on_type_prices_cycle_id_cycles_cycle_id_fk",
           "tableFrom": "add_on_type_prices",
           "tableTo": "cycles",
-          "columnsFrom": [
-            "cycle_id"
-          ],
-          "columnsTo": [
-            "cycle_id"
-          ],
+          "columnsFrom": ["cycle_id"],
+          "columnsTo": ["cycle_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -125,12 +106,8 @@
           "name": "add_on_type_prices_value_id_values_value_id_fk",
           "tableFrom": "add_on_type_prices",
           "tableTo": "values",
-          "columnsFrom": [
-            "value_id"
-          ],
-          "columnsTo": [
-            "value_id"
-          ],
+          "columnsFrom": ["value_id"],
+          "columnsTo": ["value_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -138,10 +115,7 @@
       "compositePrimaryKeys": {
         "add_on_type_prices_add_on_type_id_cycle_id_pk": {
           "name": "add_on_type_prices_add_on_type_id_cycle_id_pk",
-          "columns": [
-            "add_on_type_id",
-            "cycle_id"
-          ]
+          "columns": ["add_on_type_id", "cycle_id"]
         }
       },
       "uniqueConstraints": {},
@@ -250,12 +224,8 @@
           "name": "assignment_add_ons_assignment_id_assignments_assignment_id_fk",
           "tableFrom": "assignment_add_ons",
           "tableTo": "assignments",
-          "columnsFrom": [
-            "assignment_id"
-          ],
-          "columnsTo": [
-            "assignment_id"
-          ],
+          "columnsFrom": ["assignment_id"],
+          "columnsTo": ["assignment_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -263,12 +233,8 @@
           "name": "assignment_add_ons_add_on_type_id_add_on_types_add_on_type_id_fk",
           "tableFrom": "assignment_add_ons",
           "tableTo": "add_on_types",
-          "columnsFrom": [
-            "add_on_type_id"
-          ],
-          "columnsTo": [
-            "add_on_type_id"
-          ],
+          "columnsFrom": ["add_on_type_id"],
+          "columnsTo": ["add_on_type_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -375,12 +341,8 @@
           "name": "assignments_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "assignments",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -388,12 +350,8 @@
           "name": "assignments_plan_id_plans_plan_id_fk",
           "tableFrom": "assignments",
           "tableTo": "plans",
-          "columnsFrom": [
-            "plan_id"
-          ],
-          "columnsTo": [
-            "plan_id"
-          ],
+          "columnsFrom": ["plan_id"],
+          "columnsTo": ["plan_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -401,12 +359,8 @@
           "name": "assignments_experiment_id_experiments_experiment_id_fk",
           "tableFrom": "assignments",
           "tableTo": "experiments",
-          "columnsFrom": [
-            "experiment_id"
-          ],
-          "columnsTo": [
-            "experiment_id"
-          ],
+          "columnsFrom": ["experiment_id"],
+          "columnsTo": ["experiment_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -414,12 +368,8 @@
           "name": "assignments_cycle_id_cycles_cycle_id_fk",
           "tableFrom": "assignments",
           "tableTo": "cycles",
-          "columnsFrom": [
-            "cycle_id"
-          ],
-          "columnsTo": [
-            "cycle_id"
-          ],
+          "columnsFrom": ["cycle_id"],
+          "columnsTo": ["cycle_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -482,12 +432,8 @@
           "name": "coupon_credits_granted_coupon_id_coupons_coupon_id_fk",
           "tableFrom": "coupon_credits_granted",
           "tableTo": "coupons",
-          "columnsFrom": [
-            "coupon_id"
-          ],
-          "columnsTo": [
-            "coupon_id"
-          ],
+          "columnsFrom": ["coupon_id"],
+          "columnsTo": ["coupon_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -495,12 +441,8 @@
           "name": "coupon_credits_granted_meter_id_meters_meter_id_fk",
           "tableFrom": "coupon_credits_granted",
           "tableTo": "meters",
-          "columnsFrom": [
-            "meter_id"
-          ],
-          "columnsTo": [
-            "meter_id"
-          ],
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -508,10 +450,7 @@
       "compositePrimaryKeys": {
         "coupon_credits_granted_coupon_id_meter_id_pk": {
           "name": "coupon_credits_granted_coupon_id_meter_id_pk",
-          "columns": [
-            "coupon_id",
-            "meter_id"
-          ]
+          "columns": ["coupon_id", "meter_id"]
         }
       },
       "uniqueConstraints": {},
@@ -559,12 +498,8 @@
           "name": "coupon_features_granted_coupon_id_coupons_coupon_id_fk",
           "tableFrom": "coupon_features_granted",
           "tableTo": "coupons",
-          "columnsFrom": [
-            "coupon_id"
-          ],
-          "columnsTo": [
-            "coupon_id"
-          ],
+          "columnsFrom": ["coupon_id"],
+          "columnsTo": ["coupon_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -572,12 +507,8 @@
           "name": "coupon_features_granted_feature_id_features_feature_id_fk",
           "tableFrom": "coupon_features_granted",
           "tableTo": "features",
-          "columnsFrom": [
-            "feature_id"
-          ],
-          "columnsTo": [
-            "feature_id"
-          ],
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -585,10 +516,7 @@
       "compositePrimaryKeys": {
         "coupon_features_granted_coupon_id_feature_id_pk": {
           "name": "coupon_features_granted_coupon_id_feature_id_pk",
-          "columns": [
-            "coupon_id",
-            "feature_id"
-          ]
+          "columns": ["coupon_id", "feature_id"]
         }
       },
       "uniqueConstraints": {},
@@ -649,12 +577,8 @@
           "name": "coupon_grants_from_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "coupon_grants",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "from_tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["from_tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -662,12 +586,8 @@
           "name": "coupon_grants_coupon_id_coupons_coupon_id_fk",
           "tableFrom": "coupon_grants",
           "tableTo": "coupons",
-          "columnsFrom": [
-            "coupon_id"
-          ],
-          "columnsTo": [
-            "coupon_id"
-          ],
+          "columnsFrom": ["coupon_id"],
+          "columnsTo": ["coupon_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -675,12 +595,8 @@
           "name": "coupon_grants_to_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "coupon_grants",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "to_tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["to_tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -768,12 +684,8 @@
           "name": "coupon_receipts_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "coupon_receipts",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -781,12 +693,8 @@
           "name": "coupon_receipts_coupon_id_coupons_coupon_id_fk",
           "tableFrom": "coupon_receipts",
           "tableTo": "coupons",
-          "columnsFrom": [
-            "coupon_id"
-          ],
-          "columnsTo": [
-            "coupon_id"
-          ],
+          "columnsFrom": ["coupon_id"],
+          "columnsTo": ["coupon_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -794,12 +702,8 @@
           "name": "coupon_receipts_by_team_member_id_team_members_team_member_id_fk",
           "tableFrom": "coupon_receipts",
           "tableTo": "team_members",
-          "columnsFrom": [
-            "by_team_member_id"
-          ],
-          "columnsTo": [
-            "team_member_id"
-          ],
+          "columnsFrom": ["by_team_member_id"],
+          "columnsTo": ["team_member_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -807,12 +711,8 @@
           "name": "coupon_receipts_by_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "coupon_receipts",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "by_tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["by_tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -820,12 +720,8 @@
           "name": "coupon_receipts_by_coupon_grant_id_coupon_grants_coupon_grant_id_fk",
           "tableFrom": "coupon_receipts",
           "tableTo": "coupon_grants",
-          "columnsFrom": [
-            "by_coupon_grant_id"
-          ],
-          "columnsTo": [
-            "coupon_grant_id"
-          ],
+          "columnsFrom": ["by_coupon_grant_id"],
+          "columnsTo": ["coupon_grant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -892,12 +788,8 @@
           "name": "coupon_template_credits_granted_coupon_template_id_coupon_templates_coupon_template_id_fk",
           "tableFrom": "coupon_template_credits_granted",
           "tableTo": "coupon_templates",
-          "columnsFrom": [
-            "coupon_template_id"
-          ],
-          "columnsTo": [
-            "coupon_template_id"
-          ],
+          "columnsFrom": ["coupon_template_id"],
+          "columnsTo": ["coupon_template_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -905,12 +797,8 @@
           "name": "coupon_template_credits_granted_meter_id_meters_meter_id_fk",
           "tableFrom": "coupon_template_credits_granted",
           "tableTo": "meters",
-          "columnsFrom": [
-            "meter_id"
-          ],
-          "columnsTo": [
-            "meter_id"
-          ],
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -918,10 +806,7 @@
       "compositePrimaryKeys": {
         "coupon_template_credits_granted_coupon_template_id_meter_id_pk": {
           "name": "coupon_template_credits_granted_coupon_template_id_meter_id_pk",
-          "columns": [
-            "coupon_template_id",
-            "meter_id"
-          ]
+          "columns": ["coupon_template_id", "meter_id"]
         }
       },
       "uniqueConstraints": {},
@@ -969,12 +854,8 @@
           "name": "coupon_template_features_granted_coupon_template_id_coupon_templates_coupon_template_id_fk",
           "tableFrom": "coupon_template_features_granted",
           "tableTo": "coupon_templates",
-          "columnsFrom": [
-            "coupon_template_id"
-          ],
-          "columnsTo": [
-            "coupon_template_id"
-          ],
+          "columnsFrom": ["coupon_template_id"],
+          "columnsTo": ["coupon_template_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -982,12 +863,8 @@
           "name": "coupon_template_features_granted_feature_id_features_feature_id_fk",
           "tableFrom": "coupon_template_features_granted",
           "tableTo": "features",
-          "columnsFrom": [
-            "feature_id"
-          ],
-          "columnsTo": [
-            "feature_id"
-          ],
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -995,10 +872,7 @@
       "compositePrimaryKeys": {
         "coupon_template_features_granted_coupon_template_id_feature_id_pk": {
           "name": "coupon_template_features_granted_coupon_template_id_feature_id_pk",
-          "columns": [
-            "coupon_template_id",
-            "feature_id"
-          ]
+          "columns": ["coupon_template_id", "feature_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1071,12 +945,8 @@
           "name": "coupon_templates_reciprocal_benefit_coupon_template_id_coupon_templates_coupon_template_id_fk",
           "tableFrom": "coupon_templates",
           "tableTo": "coupon_templates",
-          "columnsFrom": [
-            "reciprocal_benefit_coupon_template_id"
-          ],
-          "columnsTo": [
-            "coupon_template_id"
-          ],
+          "columnsFrom": ["reciprocal_benefit_coupon_template_id"],
+          "columnsTo": ["coupon_template_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1167,12 +1037,8 @@
           "name": "coupons_template_id_coupon_templates_coupon_template_id_fk",
           "tableFrom": "coupons",
           "tableTo": "coupon_templates",
-          "columnsFrom": [
-            "template_id"
-          ],
-          "columnsTo": [
-            "coupon_template_id"
-          ],
+          "columnsFrom": ["template_id"],
+          "columnsTo": ["coupon_template_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1180,12 +1046,8 @@
           "name": "coupons_reciprocal_benefit_coupon_id_coupons_coupon_id_fk",
           "tableFrom": "coupons",
           "tableTo": "coupons",
-          "columnsFrom": [
-            "reciprocal_benefit_coupon_id"
-          ],
-          "columnsTo": [
-            "coupon_id"
-          ],
+          "columnsFrom": ["reciprocal_benefit_coupon_id"],
+          "columnsTo": ["coupon_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1264,12 +1126,8 @@
           "name": "credit_grants_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "credit_grants",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1277,12 +1135,8 @@
           "name": "credit_grants_meter_id_meters_meter_id_fk",
           "tableFrom": "credit_grants",
           "tableTo": "meters",
-          "columnsFrom": [
-            "meter_id"
-          ],
-          "columnsTo": [
-            "meter_id"
-          ],
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1290,12 +1144,8 @@
           "name": "credit_grants_by_team_member_id_team_members_team_member_id_fk",
           "tableFrom": "credit_grants",
           "tableTo": "team_members",
-          "columnsFrom": [
-            "by_team_member_id"
-          ],
-          "columnsTo": [
-            "team_member_id"
-          ],
+          "columnsFrom": ["by_team_member_id"],
+          "columnsTo": ["team_member_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1443,12 +1293,8 @@
           "name": "experiment_treatment_tenants_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "experiment_treatment_tenants",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1456,14 +1302,8 @@
           "name": "experiment_treatment_tenants_experiment_id_plan_id_experiment_treatments_experiment_id_plan_id_fk",
           "tableFrom": "experiment_treatment_tenants",
           "tableTo": "experiment_treatments",
-          "columnsFrom": [
-            "experiment_id",
-            "plan_id"
-          ],
-          "columnsTo": [
-            "experiment_id",
-            "plan_id"
-          ],
+          "columnsFrom": ["experiment_id", "plan_id"],
+          "columnsTo": ["experiment_id", "plan_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1471,10 +1311,7 @@
       "compositePrimaryKeys": {
         "experiment_treatment_tenants_experiment_id_tenant_id_pk": {
           "name": "experiment_treatment_tenants_experiment_id_tenant_id_pk",
-          "columns": [
-            "experiment_id",
-            "tenant_id"
-          ]
+          "columns": ["experiment_id", "tenant_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1511,12 +1348,8 @@
           "name": "experiment_treatments_experiment_id_experiments_experiment_id_fk",
           "tableFrom": "experiment_treatments",
           "tableTo": "experiments",
-          "columnsFrom": [
-            "experiment_id"
-          ],
-          "columnsTo": [
-            "experiment_id"
-          ],
+          "columnsFrom": ["experiment_id"],
+          "columnsTo": ["experiment_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1524,12 +1357,8 @@
           "name": "experiment_treatments_plan_id_plans_plan_id_fk",
           "tableFrom": "experiment_treatments",
           "tableTo": "plans",
-          "columnsFrom": [
-            "plan_id"
-          ],
-          "columnsTo": [
-            "plan_id"
-          ],
+          "columnsFrom": ["plan_id"],
+          "columnsTo": ["plan_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1537,10 +1366,7 @@
       "compositePrimaryKeys": {
         "experiment_treatments_experiment_id_plan_id_pk": {
           "name": "experiment_treatments_experiment_id_plan_id_pk",
-          "columns": [
-            "experiment_id",
-            "plan_id"
-          ]
+          "columns": ["experiment_id", "plan_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1600,12 +1426,8 @@
           "name": "experiments_concluding_plan_id_plans_plan_id_fk",
           "tableFrom": "experiments",
           "tableTo": "plans",
-          "columnsFrom": [
-            "concluding_plan_id"
-          ],
-          "columnsTo": [
-            "plan_id"
-          ],
+          "columnsFrom": ["concluding_plan_id"],
+          "columnsTo": ["plan_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1656,12 +1478,8 @@
           "name": "feature_options_feature_id_features_feature_id_fk",
           "tableFrom": "feature_options",
           "tableTo": "features",
-          "columnsFrom": [
-            "feature_id"
-          ],
-          "columnsTo": [
-            "feature_id"
-          ],
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1730,12 +1548,8 @@
           "name": "feature_overrides_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "feature_overrides",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1743,12 +1557,8 @@
           "name": "feature_overrides_feature_id_features_feature_id_fk",
           "tableFrom": "feature_overrides",
           "tableTo": "features",
-          "columnsFrom": [
-            "feature_id"
-          ],
-          "columnsTo": [
-            "feature_id"
-          ],
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1756,12 +1566,8 @@
           "name": "feature_overrides_by_team_member_id_team_members_team_member_id_fk",
           "tableFrom": "feature_overrides",
           "tableTo": "team_members",
-          "columnsFrom": [
-            "by_team_member_id"
-          ],
-          "columnsTo": [
-            "team_member_id"
-          ],
+          "columnsFrom": ["by_team_member_id"],
+          "columnsTo": ["team_member_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1800,12 +1606,8 @@
           "name": "feature_tax_types_feature_id_features_feature_id_fk",
           "tableFrom": "feature_tax_types",
           "tableTo": "features",
-          "columnsFrom": [
-            "feature_id"
-          ],
-          "columnsTo": [
-            "feature_id"
-          ],
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1813,12 +1615,8 @@
           "name": "feature_tax_types_tax_type_id_tax_types_tax_type_id_fk",
           "tableFrom": "feature_tax_types",
           "tableTo": "tax_types",
-          "columnsFrom": [
-            "tax_type_id"
-          ],
-          "columnsTo": [
-            "tax_type_id"
-          ],
+          "columnsFrom": ["tax_type_id"],
+          "columnsTo": ["tax_type_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1826,10 +1624,7 @@
       "compositePrimaryKeys": {
         "feature_tax_types_feature_id_tax_type_id_pk": {
           "name": "feature_tax_types_feature_id_tax_type_id_pk",
-          "columns": [
-            "feature_id",
-            "tax_type_id"
-          ]
+          "columns": ["feature_id", "tax_type_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1983,12 +1778,8 @@
           "name": "invoices_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "invoices",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2055,12 +1846,8 @@
           "name": "items_invoice_id_invoices_invoice_id_fk",
           "tableFrom": "items",
           "tableTo": "invoices",
-          "columnsFrom": [
-            "invoice_id"
-          ],
-          "columnsTo": [
-            "invoice_id"
-          ],
+          "columnsFrom": ["invoice_id"],
+          "columnsTo": ["invoice_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2068,12 +1855,8 @@
           "name": "items_per_unit_value_id_values_value_id_fk",
           "tableFrom": "items",
           "tableTo": "values",
-          "columnsFrom": [
-            "per_unit_value_id"
-          ],
-          "columnsTo": [
-            "value_id"
-          ],
+          "columnsFrom": ["per_unit_value_id"],
+          "columnsTo": ["value_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2162,12 +1945,8 @@
           "name": "loans_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "loans",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2175,12 +1954,8 @@
           "name": "loans_assignment_id_assignments_assignment_id_fk",
           "tableFrom": "loans",
           "tableTo": "assignments",
-          "columnsFrom": [
-            "assignment_id"
-          ],
-          "columnsTo": [
-            "assignment_id"
-          ],
+          "columnsFrom": ["assignment_id"],
+          "columnsTo": ["assignment_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2231,12 +2006,8 @@
           "name": "meter_balances_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "meter_balances",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2244,12 +2015,8 @@
           "name": "meter_balances_meter_id_meters_meter_id_fk",
           "tableFrom": "meter_balances",
           "tableTo": "meters",
-          "columnsFrom": [
-            "meter_id"
-          ],
-          "columnsTo": [
-            "meter_id"
-          ],
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2257,10 +2024,7 @@
       "compositePrimaryKeys": {
         "meter_balances_tenant_id_meter_id_pk": {
           "name": "meter_balances_tenant_id_meter_id_pk",
-          "columns": [
-            "tenant_id",
-            "meter_id"
-          ]
+          "columns": ["tenant_id", "meter_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2409,12 +2173,8 @@
           "name": "meter_events_meter_id_meters_meter_id_fk",
           "tableFrom": "meter_events",
           "tableTo": "meters",
-          "columnsFrom": [
-            "meter_id"
-          ],
-          "columnsTo": [
-            "meter_id"
-          ],
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2422,12 +2182,8 @@
           "name": "meter_events_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "meter_events",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2609,12 +2365,8 @@
           "name": "meter_overrides_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "meter_overrides",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2622,12 +2374,8 @@
           "name": "meter_overrides_meter_id_meters_meter_id_fk",
           "tableFrom": "meter_overrides",
           "tableTo": "meters",
-          "columnsFrom": [
-            "meter_id"
-          ],
-          "columnsTo": [
-            "meter_id"
-          ],
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2635,12 +2383,8 @@
           "name": "meter_overrides_by_team_member_id_team_members_team_member_id_fk",
           "tableFrom": "meter_overrides",
           "tableTo": "team_members",
-          "columnsFrom": [
-            "by_team_member_id"
-          ],
-          "columnsTo": [
-            "team_member_id"
-          ],
+          "columnsFrom": ["by_team_member_id"],
+          "columnsTo": ["team_member_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2703,12 +2447,8 @@
           "name": "meter_spends_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "meter_spends",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2716,12 +2456,8 @@
           "name": "meter_spends_meter_id_meters_meter_id_fk",
           "tableFrom": "meter_spends",
           "tableTo": "meters",
-          "columnsFrom": [
-            "meter_id"
-          ],
-          "columnsTo": [
-            "meter_id"
-          ],
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2729,10 +2465,7 @@
       "compositePrimaryKeys": {
         "meter_spends_tenant_id_meter_id_pk": {
           "name": "meter_spends_tenant_id_meter_id_pk",
-          "columns": [
-            "tenant_id",
-            "meter_id"
-          ]
+          "columns": ["tenant_id", "meter_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2768,12 +2501,8 @@
           "name": "meter_tax_types_meter_id_meters_meter_id_fk",
           "tableFrom": "meter_tax_types",
           "tableTo": "meters",
-          "columnsFrom": [
-            "meter_id"
-          ],
-          "columnsTo": [
-            "meter_id"
-          ],
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2781,12 +2510,8 @@
           "name": "meter_tax_types_tax_type_id_tax_types_tax_type_id_fk",
           "tableFrom": "meter_tax_types",
           "tableTo": "tax_types",
-          "columnsFrom": [
-            "tax_type_id"
-          ],
-          "columnsTo": [
-            "tax_type_id"
-          ],
+          "columnsFrom": ["tax_type_id"],
+          "columnsTo": ["tax_type_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2794,10 +2519,7 @@
       "compositePrimaryKeys": {
         "meter_tax_types_meter_id_tax_type_id_pk": {
           "name": "meter_tax_types_meter_id_tax_type_id_pk",
-          "columns": [
-            "meter_id",
-            "tax_type_id"
-          ]
+          "columns": ["meter_id", "tax_type_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2876,12 +2598,8 @@
           "name": "payment_invoices_payment_id_payments_payment_id_fk",
           "tableFrom": "payment_invoices",
           "tableTo": "payments",
-          "columnsFrom": [
-            "payment_id"
-          ],
-          "columnsTo": [
-            "payment_id"
-          ],
+          "columnsFrom": ["payment_id"],
+          "columnsTo": ["payment_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2889,12 +2607,8 @@
           "name": "payment_invoices_invoice_id_invoices_invoice_id_fk",
           "tableFrom": "payment_invoices",
           "tableTo": "invoices",
-          "columnsFrom": [
-            "invoice_id"
-          ],
-          "columnsTo": [
-            "invoice_id"
-          ],
+          "columnsFrom": ["invoice_id"],
+          "columnsTo": ["invoice_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2902,10 +2616,7 @@
       "compositePrimaryKeys": {
         "payment_invoices_payment_id_invoice_id_pk": {
           "name": "payment_invoices_payment_id_invoice_id_pk",
-          "columns": [
-            "payment_id",
-            "invoice_id"
-          ]
+          "columns": ["payment_id", "invoice_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2977,12 +2688,8 @@
           "name": "payment_methods_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "payment_methods",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3067,12 +2774,8 @@
           "name": "payments_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "payments",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3111,12 +2814,8 @@
           "name": "plan_add_on_types_plan_id_plans_plan_id_fk",
           "tableFrom": "plan_add_on_types",
           "tableTo": "plans",
-          "columnsFrom": [
-            "plan_id"
-          ],
-          "columnsTo": [
-            "plan_id"
-          ],
+          "columnsFrom": ["plan_id"],
+          "columnsTo": ["plan_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -3124,12 +2823,8 @@
           "name": "plan_add_on_types_add_on_type_id_add_on_types_add_on_type_id_fk",
           "tableFrom": "plan_add_on_types",
           "tableTo": "add_on_types",
-          "columnsFrom": [
-            "add_on_type_id"
-          ],
-          "columnsTo": [
-            "add_on_type_id"
-          ],
+          "columnsFrom": ["add_on_type_id"],
+          "columnsTo": ["add_on_type_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3137,10 +2832,7 @@
       "compositePrimaryKeys": {
         "plan_add_on_types_plan_id_add_on_type_id_pk": {
           "name": "plan_add_on_types_plan_id_add_on_type_id_pk",
-          "columns": [
-            "plan_id",
-            "add_on_type_id"
-          ]
+          "columns": ["plan_id", "add_on_type_id"]
         }
       },
       "uniqueConstraints": {},
@@ -3177,12 +2869,8 @@
           "name": "plan_features_plan_id_plans_plan_id_fk",
           "tableFrom": "plan_features",
           "tableTo": "plans",
-          "columnsFrom": [
-            "plan_id"
-          ],
-          "columnsTo": [
-            "plan_id"
-          ],
+          "columnsFrom": ["plan_id"],
+          "columnsTo": ["plan_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -3190,12 +2878,8 @@
           "name": "plan_features_feature_id_features_feature_id_fk",
           "tableFrom": "plan_features",
           "tableTo": "features",
-          "columnsFrom": [
-            "feature_id"
-          ],
-          "columnsTo": [
-            "feature_id"
-          ],
+          "columnsFrom": ["feature_id"],
+          "columnsTo": ["feature_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3203,10 +2887,7 @@
       "compositePrimaryKeys": {
         "plan_features_plan_id_feature_id_pk": {
           "name": "plan_features_plan_id_feature_id_pk",
-          "columns": [
-            "plan_id",
-            "feature_id"
-          ]
+          "columns": ["plan_id", "feature_id"]
         }
       },
       "uniqueConstraints": {},
@@ -3273,12 +2954,8 @@
           "name": "plan_meters_plan_id_plans_plan_id_fk",
           "tableFrom": "plan_meters",
           "tableTo": "plans",
-          "columnsFrom": [
-            "plan_id"
-          ],
-          "columnsTo": [
-            "plan_id"
-          ],
+          "columnsFrom": ["plan_id"],
+          "columnsTo": ["plan_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -3286,12 +2963,8 @@
           "name": "plan_meters_meter_id_meters_meter_id_fk",
           "tableFrom": "plan_meters",
           "tableTo": "meters",
-          "columnsFrom": [
-            "meter_id"
-          ],
-          "columnsTo": [
-            "meter_id"
-          ],
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3299,10 +2972,7 @@
       "compositePrimaryKeys": {
         "plan_meters_plan_id_meter_id_pk": {
           "name": "plan_meters_plan_id_meter_id_pk",
-          "columns": [
-            "plan_id",
-            "meter_id"
-          ]
+          "columns": ["plan_id", "meter_id"]
         }
       },
       "uniqueConstraints": {},
@@ -3352,12 +3022,8 @@
           "name": "plan_prices_plan_id_plans_plan_id_fk",
           "tableFrom": "plan_prices",
           "tableTo": "plans",
-          "columnsFrom": [
-            "plan_id"
-          ],
-          "columnsTo": [
-            "plan_id"
-          ],
+          "columnsFrom": ["plan_id"],
+          "columnsTo": ["plan_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -3365,12 +3031,8 @@
           "name": "plan_prices_cycle_id_cycles_cycle_id_fk",
           "tableFrom": "plan_prices",
           "tableTo": "cycles",
-          "columnsFrom": [
-            "cycle_id"
-          ],
-          "columnsTo": [
-            "cycle_id"
-          ],
+          "columnsFrom": ["cycle_id"],
+          "columnsTo": ["cycle_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -3378,12 +3040,8 @@
           "name": "plan_prices_value_id_values_value_id_fk",
           "tableFrom": "plan_prices",
           "tableTo": "values",
-          "columnsFrom": [
-            "value_id"
-          ],
-          "columnsTo": [
-            "value_id"
-          ],
+          "columnsFrom": ["value_id"],
+          "columnsTo": ["value_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3391,10 +3049,7 @@
       "compositePrimaryKeys": {
         "plan_prices_plan_id_cycle_id_pk": {
           "name": "plan_prices_plan_id_cycle_id_pk",
-          "columns": [
-            "plan_id",
-            "cycle_id"
-          ]
+          "columns": ["plan_id", "cycle_id"]
         }
       },
       "uniqueConstraints": {},
@@ -3475,12 +3130,8 @@
           "name": "plans_derived_from_plan_id_plans_plan_id_fk",
           "tableFrom": "plans",
           "tableTo": "plans",
-          "columnsFrom": [
-            "derived_from_plan_id"
-          ],
-          "columnsTo": [
-            "plan_id"
-          ],
+          "columnsFrom": ["derived_from_plan_id"],
+          "columnsTo": ["plan_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -3488,12 +3139,8 @@
           "name": "plans_minimum_payment_value_id_values_value_id_fk",
           "tableFrom": "plans",
           "tableTo": "values",
-          "columnsFrom": [
-            "minimum_payment_value_id"
-          ],
-          "columnsTo": [
-            "value_id"
-          ],
+          "columnsFrom": ["minimum_payment_value_id"],
+          "columnsTo": ["value_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3578,12 +3225,8 @@
           "name": "refunds_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "refunds",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -3591,12 +3234,8 @@
           "name": "refunds_by_team_member_id_team_members_team_member_id_fk",
           "tableFrom": "refunds",
           "tableTo": "team_members",
-          "columnsFrom": [
-            "by_team_member_id"
-          ],
-          "columnsTo": [
-            "team_member_id"
-          ],
+          "columnsFrom": ["by_team_member_id"],
+          "columnsTo": ["team_member_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -3604,12 +3243,8 @@
           "name": "refunds_value_id_values_value_id_fk",
           "tableFrom": "refunds",
           "tableTo": "values",
-          "columnsFrom": [
-            "value_id"
-          ],
-          "columnsTo": [
-            "value_id"
-          ],
+          "columnsFrom": ["value_id"],
+          "columnsTo": ["value_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3792,12 +3427,8 @@
           "name": "rule_runs_rule_id_rules_rule_id_fk",
           "tableFrom": "rule_runs",
           "tableTo": "rules",
-          "columnsFrom": [
-            "rule_id"
-          ],
-          "columnsTo": [
-            "rule_id"
-          ],
+          "columnsFrom": ["rule_id"],
+          "columnsTo": ["rule_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -3805,12 +3436,8 @@
           "name": "rule_runs_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "rule_runs",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3849,12 +3476,8 @@
           "name": "rule_scheduler_state_rule_id_rules_rule_id_fk",
           "tableFrom": "rule_scheduler_state",
           "tableTo": "rules",
-          "columnsFrom": [
-            "rule_id"
-          ],
-          "columnsTo": [
-            "rule_id"
-          ],
+          "columnsFrom": ["rule_id"],
+          "columnsTo": ["rule_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3990,12 +3613,8 @@
           "name": "task_types_default_assignee_team_member_id_team_members_team_member_id_fk",
           "tableFrom": "task_types",
           "tableTo": "team_members",
-          "columnsFrom": [
-            "default_assignee_team_member_id"
-          ],
-          "columnsTo": [
-            "team_member_id"
-          ],
+          "columnsFrom": ["default_assignee_team_member_id"],
+          "columnsTo": ["team_member_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -4119,12 +3738,8 @@
           "name": "tasks_task_type_id_task_types_task_type_id_fk",
           "tableFrom": "tasks",
           "tableTo": "task_types",
-          "columnsFrom": [
-            "task_type_id"
-          ],
-          "columnsTo": [
-            "task_type_id"
-          ],
+          "columnsFrom": ["task_type_id"],
+          "columnsTo": ["task_type_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4132,12 +3747,8 @@
           "name": "tasks_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "tasks",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4145,12 +3756,8 @@
           "name": "tasks_source_rule_id_rules_rule_id_fk",
           "tableFrom": "tasks",
           "tableTo": "rules",
-          "columnsFrom": [
-            "source_rule_id"
-          ],
-          "columnsTo": [
-            "rule_id"
-          ],
+          "columnsFrom": ["source_rule_id"],
+          "columnsTo": ["rule_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4158,12 +3765,8 @@
           "name": "tasks_assigned_to_team_member_id_team_members_team_member_id_fk",
           "tableFrom": "tasks",
           "tableTo": "team_members",
-          "columnsFrom": [
-            "assigned_to_team_member_id"
-          ],
-          "columnsTo": [
-            "team_member_id"
-          ],
+          "columnsFrom": ["assigned_to_team_member_id"],
+          "columnsTo": ["team_member_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -4250,12 +3853,8 @@
           "name": "taxation_amount_items_taxation_amount_id_taxation_amounts_taxation_amount_id_fk",
           "tableFrom": "taxation_amount_items",
           "tableTo": "taxation_amounts",
-          "columnsFrom": [
-            "taxation_amount_id"
-          ],
-          "columnsTo": [
-            "taxation_amount_id"
-          ],
+          "columnsFrom": ["taxation_amount_id"],
+          "columnsTo": ["taxation_amount_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4263,12 +3862,8 @@
           "name": "taxation_amount_items_item_id_items_item_id_fk",
           "tableFrom": "taxation_amount_items",
           "tableTo": "items",
-          "columnsFrom": [
-            "item_id"
-          ],
-          "columnsTo": [
-            "item_id"
-          ],
+          "columnsFrom": ["item_id"],
+          "columnsTo": ["item_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -4276,10 +3871,7 @@
       "compositePrimaryKeys": {
         "taxation_amount_items_taxation_amount_id_item_id_pk": {
           "name": "taxation_amount_items_taxation_amount_id_item_id_pk",
-          "columns": [
-            "taxation_amount_id",
-            "item_id"
-          ]
+          "columns": ["taxation_amount_id", "item_id"]
         }
       },
       "uniqueConstraints": {},
@@ -4328,12 +3920,8 @@
           "name": "taxation_amounts_invoice_id_invoices_invoice_id_fk",
           "tableFrom": "taxation_amounts",
           "tableTo": "invoices",
-          "columnsFrom": [
-            "invoice_id"
-          ],
-          "columnsTo": [
-            "invoice_id"
-          ],
+          "columnsFrom": ["invoice_id"],
+          "columnsTo": ["invoice_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4341,12 +3929,8 @@
           "name": "taxation_amounts_tax_id_taxes_tax_id_fk",
           "tableFrom": "taxation_amounts",
           "tableTo": "taxes",
-          "columnsFrom": [
-            "tax_id"
-          ],
-          "columnsTo": [
-            "tax_id"
-          ],
+          "columnsFrom": ["tax_id"],
+          "columnsTo": ["tax_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -4409,12 +3993,8 @@
           "name": "taxes_tax_type_id_tax_types_tax_type_id_fk",
           "tableFrom": "taxes",
           "tableTo": "tax_types",
-          "columnsFrom": [
-            "tax_type_id"
-          ],
-          "columnsTo": [
-            "tax_type_id"
-          ],
+          "columnsFrom": ["tax_type_id"],
+          "columnsTo": ["tax_type_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -4478,9 +4058,7 @@
         "team_members_email_unique": {
           "name": "team_members_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -4521,12 +4099,8 @@
           "name": "tenant_last_activity_tenant_id_tenants_tenant_id_fk",
           "tableFrom": "tenant_last_activity",
           "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "tenant_id"
-          ],
+          "columnsFrom": ["tenant_id"],
+          "columnsTo": ["tenant_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -4534,12 +4108,8 @@
           "name": "tenant_last_activity_meter_id_meters_meter_id_fk",
           "tableFrom": "tenant_last_activity",
           "tableTo": "meters",
-          "columnsFrom": [
-            "meter_id"
-          ],
-          "columnsTo": [
-            "meter_id"
-          ],
+          "columnsFrom": ["meter_id"],
+          "columnsTo": ["meter_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -4547,10 +4117,7 @@
       "compositePrimaryKeys": {
         "tenant_last_activity_tenant_id_meter_id_pk": {
           "name": "tenant_last_activity_tenant_id_meter_id_pk",
-          "columns": [
-            "tenant_id",
-            "meter_id"
-          ]
+          "columns": ["tenant_id", "meter_id"]
         }
       },
       "uniqueConstraints": {},
@@ -4659,36 +4226,22 @@
     "public.charged": {
       "name": "charged",
       "schema": "public",
-      "values": [
-        "upfront",
-        "arrears"
-      ]
+      "values": ["upfront", "arrears"]
     },
     "public.grantor_type": {
       "name": "grantor_type",
       "schema": "public",
-      "values": [
-        "team_member",
-        "tenant",
-        "reciprocal"
-      ]
+      "values": ["team_member", "tenant", "reciprocal"]
     },
     "public.meter_event_status": {
       "name": "meter_event_status",
       "schema": "public",
-      "values": [
-        "succeeded",
-        "insufficient_balance",
-        "unexpected_error"
-      ]
+      "values": ["succeeded", "insufficient_balance", "unexpected_error"]
     },
     "public.plan_kind": {
       "name": "plan_kind",
       "schema": "public",
-      "values": [
-        "standard",
-        "loan"
-      ]
+      "values": ["standard", "loan"]
     }
   },
   "schemas": {},
