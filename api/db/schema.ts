@@ -480,7 +480,7 @@ export const coupons = pgTable(
     /** Coupons are consumables, so they're deleted, not deprecated. */
     deletedAt: epochMs("deleted_at"),
     /** The template this coupon's definition was copied from, if any. */
-    templateId: text("template_id").references(
+    couponTemplateId: text("coupon_template_id").references(
       () => couponTemplates.couponTemplateId,
     ),
     grantableByTenants: boolean("grantable_by_tenants").notNull(),
@@ -740,7 +740,7 @@ export const loans = pgTable(
     createdAt: epochMs("created_at").notNull(),
     closedAt: epochMs("closed_at"),
     /** The template this loan's definition was copied from, if any. */
-    templateId: text("template_id").references(
+    loanTemplateId: text("loan_template_id").references(
       () => loanTemplates.loanTemplateId,
     ),
     principal: jsonb("principal").$type<CurrencyAmount>().notNull(),
