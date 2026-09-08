@@ -1,4 +1,5 @@
 package-lock.json
+api/db/migrations/meta/
 .turbo/
 web/dist/
 web/routeTree.gen.ts
