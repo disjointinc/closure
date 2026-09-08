@@ -108,7 +108,7 @@ export const couponSchema = z
     /** Coupons are consumables, so they're deleted, not deprecated. */
     deletedAt: epochMs.nullable(),
     /** The template this coupon's definition was copied from, if any. */
-    templateId: couponTemplateIdSchema.nullable(),
+    couponTemplateId: couponTemplateIdSchema.nullable(),
     grantableByTenants: z.boolean(),
     /** Only settable when grantableByTenants. Null means no limit. */
     limitPerGrantingTenant: z.number().int().positive().nullable(),
