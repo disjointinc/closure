@@ -4,6 +4,8 @@
  */
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import { z } from "zod";
+import { featureOptionSchema } from "../../schemas/feature-option.ts";
 import { featureSchema } from "../../schemas/feature.ts";
 import {
   createFeature,
@@ -12,11 +14,27 @@ import {
   listFeatures,
 } from "./service.ts";
 
+const featureOptionCreateSchema = featureOptionSchema.omit({
+  featureOptionId: true,
+});
+
+const featureCreateSchema = featureSchema
+  .omit({
+    createdAt: true,
+    deprecatedAt: true,
+    featureId: true,
+    options: true,
+  })
+  .extend({
+    /** If options is null, this is a boolean feature. */
+    options: z.array(featureOptionCreateSchema).min(1).nullable(),
+  });
+
+export type FeatureCreateBody = z.infer<typeof featureCreateSchema>;
+
 export const featureApp = new Hono()
-  .post("/", zValidator("json", featureSchema), async (c) => {
-    const body = c.req.valid("json");
-    await createFeature({ feature: body });
-    return c.json(body, 201);
+  .post("/", zValidator("json", featureCreateSchema), async (c) => {
+    return c.json(await createFeature({ feature: c.req.valid("json") }), 201);
   })
   .get("/", async (c) => {
     return c.json(await listFeatures());

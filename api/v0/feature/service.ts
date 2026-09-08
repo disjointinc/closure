@@ -5,7 +5,9 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import { featureOptions, features, featureTaxTypes } from "../../db/schema.ts";
+import { generateId } from "../../lib/id.ts";
 import type { Feature } from "../../schemas/feature.ts";
+import type { FeatureCreateBody } from "./routes.ts";
 
 export async function getFeature({
   featureId,
@@ -57,29 +59,30 @@ export async function listFeatures(): Promise<Feature[]> {
 export async function createFeature({
   feature,
 }: {
-  feature: Feature;
-}): Promise<void> {
+  feature: FeatureCreateBody;
+}): Promise<Feature> {
+  const featureId = generateId({ prefix: "feature" });
+  const createdAt = Date.now();
+  const options = feature.options
+    ? feature.options.map((option) => ({
+        ...option,
+        featureOptionId: generateId({ prefix: "feature_option" }),
+      }))
+    : null;
   await db
     .insert(features)
     .values({
-      featureId: feature.featureId,
-      createdAt: feature.createdAt,
-      deprecatedAt: feature.deprecatedAt,
+      featureId,
+      createdAt,
+      deprecatedAt: null,
       name: feature.name,
       description: feature.description,
     })
     .onConflictDoNothing();
-  if (feature.options) {
+  if (options) {
     await db
       .insert(featureOptions)
-      .values(
-        feature.options.map((option) => ({
-          featureOptionId: option.featureOptionId,
-          featureId: feature.featureId,
-          name: option.name,
-          description: option.description,
-        })),
-      )
+      .values(options.map((option) => ({ ...option, featureId })))
       .onConflictDoNothing();
   }
   if (feature.applicableTaxTypeIds) {
@@ -87,12 +90,13 @@ export async function createFeature({
       .insert(featureTaxTypes)
       .values(
         feature.applicableTaxTypeIds.map((taxTypeId) => ({
-          featureId: feature.featureId,
+          featureId,
           taxTypeId,
         })),
       )
       .onConflictDoNothing();
   }
+  return { ...feature, featureId, createdAt, deprecatedAt: null, options };
 }
 
 /** Deprecate the feature, or return null if no such feature exists. */
