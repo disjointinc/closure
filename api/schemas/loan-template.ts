@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { currencyAmountSchema, epochMs } from "./common.ts";
+import { epochMs } from "./common.ts";
 import { loanTemplateIdSchema } from "./ids.ts";
+import { loanDefinitionFields } from "./loan.ts";
 
 /**
  * A reusable loan definition. Templates are deprecated, never deleted:
@@ -12,7 +13,6 @@ export const loanTemplateSchema = z.object({
   deprecatedAt: epochMs.nullable(),
   name: z.string().min(1),
   description: z.string().nullable(),
-  principal: currencyAmountSchema,
-  interestPercentage: z.number().positive(),
+  ...loanDefinitionFields,
 });
 export type LoanTemplate = z.infer<typeof loanTemplateSchema>;

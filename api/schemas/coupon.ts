@@ -73,15 +73,40 @@ export const couponCreditsGrantedSchema = z
   )
   .nullable();
 
-/** Cross-field rules for a coupon (also reused by the API's create input). */
-export function checkCoupon(
+/**
+ * The definition shared by coupons and coupon templates: a template's
+ * definition is copied verbatim into coupons minted from it.
+ */
+export const couponDefinitionFields = {
+  grantableByTenants: z.boolean(),
+  /** Only settable when grantableByTenants. Null means no limit. */
+  limitPerGrantingTenant: z.number().int().positive().nullable(),
+  name: z.string().min(1),
+  description: z.string().nullable(),
+  defaultAward: awardSchema.nullable(),
+  featuresGranted: couponFeaturesGrantedSchema,
+  creditsGranted: couponCreditsGrantedSchema,
+};
+
+/**
+ * Cross-field granting rules shared by coupons and coupon templates:
+ * the limit and reciprocal benefit are only settable when tenants can
+ * grant. Coupons pass reciprocalBenefitCouponId; templates pass
+ * reciprocalBenefitCouponTemplateId.
+ */
+export function checkCouponGranting({
+  coupon,
+  reciprocalBenefit,
+  ctx,
+}: {
   coupon: {
     grantableByTenants: boolean;
     limitPerGrantingTenant: number | null;
-    reciprocalBenefitCouponId: string | null;
-  },
-  ctx: z.RefinementCtx,
-): void {
+  };
+  /** The reciprocal benefit field: its name (for the issue path) and value. */
+  reciprocalBenefit: { field: string; value: string | null };
+  ctx: z.RefinementCtx;
+}): void {
   if (coupon.grantableByTenants) {
     return;
   }
@@ -92,13 +117,32 @@ export function checkCoupon(
       message: "only settable when grantableByTenants",
     });
   }
-  if (coupon.reciprocalBenefitCouponId !== null) {
+  if (reciprocalBenefit.value !== null) {
     ctx.addIssue({
       code: "custom",
-      path: ["reciprocalBenefitCouponId"],
+      path: [reciprocalBenefit.field],
       message: "only settable when grantableByTenants",
     });
   }
+}
+
+/** Cross-field rules for a coupon (also reused by the API's create input). */
+export function checkCoupon(
+  coupon: {
+    grantableByTenants: boolean;
+    limitPerGrantingTenant: number | null;
+    reciprocalBenefitCouponId: string | null;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  checkCouponGranting({
+    coupon,
+    reciprocalBenefit: {
+      field: "reciprocalBenefitCouponId",
+      value: coupon.reciprocalBenefitCouponId,
+    },
+    ctx,
+  });
 }
 
 export const couponSchema = z
@@ -109,14 +153,7 @@ export const couponSchema = z
     deletedAt: epochMs.nullable(),
     /** The template this coupon's definition was copied from, if any. */
     couponTemplateId: couponTemplateIdSchema.nullable(),
-    grantableByTenants: z.boolean(),
-    /** Only settable when grantableByTenants. Null means no limit. */
-    limitPerGrantingTenant: z.number().int().positive().nullable(),
-    name: z.string().min(1),
-    description: z.string().nullable(),
-    defaultAward: awardSchema.nullable(),
-    featuresGranted: couponFeaturesGrantedSchema,
-    creditsGranted: couponCreditsGrantedSchema,
+    ...couponDefinitionFields,
     /** Only settable when grantableByTenants. */
     reciprocalBenefitCouponId: couponIdSchema.nullable(),
   })

@@ -1,14 +1,13 @@
 import { z } from "zod";
-import { currencyAmountSchema, epochMs } from "./common.ts";
+import { addOnSchema } from "./add-on.ts";
+import { epochMs } from "./common.ts";
 import {
-  addOnIdSchema,
-  addOnTypeIdSchema,
   assignmentIdSchema,
   cycleIdSchema,
   experimentIdSchema,
-  loanIdSchema,
   planIdSchema,
 } from "./ids.ts";
+import { loanSchema } from "./loan.ts";
 
 /** A tenant's assignment to a plan for a period of time. */
 export const assignmentSchema = z.object({
@@ -20,25 +19,13 @@ export const assignmentSchema = z.object({
   createdAt: epochMs,
   startsAt: epochMs,
   endsAt: epochMs.nullable(),
-  /** For loan plans: the loan to auto-create, keyed by id. */
-  loan: z
-    .object({
-      loanId: loanIdSchema,
-      principal: currencyAmountSchema,
-      /** Always explicit, even when copying the plan's default rate. */
-      interestPercentage: z.number().positive(),
-    })
+  /**
+   * For loan plans: the loan to auto-create, keyed by id. The rate is
+   * always explicit, even when copying the plan's default rate.
+   */
+  loan: loanSchema
+    .pick({ loanId: true, principal: true, interestPercentage: true })
     .nullable(),
-  addOns: z.array(
-    z.object({
-      addOnId: addOnIdSchema,
-      addOnTypeId: addOnTypeIdSchema,
-      createdAt: epochMs,
-      startsAt: epochMs,
-      endsAt: epochMs.nullable(),
-      /** Manually deleted ahead of the end, whether or not one is set. */
-      deletedAt: epochMs.nullable(),
-    }),
-  ),
+  addOns: z.array(addOnSchema.omit({ assignmentId: true })),
 });
 export type Assignment = z.infer<typeof assignmentSchema>;

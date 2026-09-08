@@ -1,13 +1,9 @@
 import { z } from "zod";
 import { epochMs } from "./common.ts";
-import {
-  awardSchema,
-  couponCreditsGrantedSchema,
-  couponFeaturesGrantedSchema,
-} from "./coupon.ts";
+import { checkCouponGranting, couponDefinitionFields } from "./coupon.ts";
 import { couponTemplateIdSchema } from "./ids.ts";
 
-/** Cross-field rules for a coupon template (mirrors checkCoupon). */
+/** Cross-field rules for a coupon template (reuses the coupon check). */
 export function checkCouponTemplate(
   template: {
     grantableByTenants: boolean;
@@ -16,23 +12,14 @@ export function checkCouponTemplate(
   },
   ctx: z.RefinementCtx,
 ): void {
-  if (template.grantableByTenants) {
-    return;
-  }
-  if (template.limitPerGrantingTenant !== null) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["limitPerGrantingTenant"],
-      message: "only settable when grantableByTenants",
-    });
-  }
-  if (template.reciprocalBenefitCouponTemplateId !== null) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["reciprocalBenefitCouponTemplateId"],
-      message: "only settable when grantableByTenants",
-    });
-  }
+  checkCouponGranting({
+    coupon: template,
+    reciprocalBenefit: {
+      field: "reciprocalBenefitCouponTemplateId",
+      value: template.reciprocalBenefitCouponTemplateId,
+    },
+    ctx,
+  });
 }
 
 /**
@@ -45,14 +32,7 @@ export const couponTemplateSchema = z
     couponTemplateId: couponTemplateIdSchema,
     createdAt: epochMs,
     deprecatedAt: epochMs.nullable(),
-    grantableByTenants: z.boolean(),
-    /** Only settable when grantableByTenants. Null means no limit. */
-    limitPerGrantingTenant: z.number().int().positive().nullable(),
-    name: z.string().min(1),
-    description: z.string().nullable(),
-    defaultAward: awardSchema.nullable(),
-    featuresGranted: couponFeaturesGrantedSchema,
-    creditsGranted: couponCreditsGrantedSchema,
+    ...couponDefinitionFields,
     /** Only settable when grantableByTenants. */
     reciprocalBenefitCouponTemplateId: couponTemplateIdSchema.nullable(),
   })
