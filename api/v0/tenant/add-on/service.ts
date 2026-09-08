@@ -54,20 +54,17 @@ export async function attachAddOn({
   if (!assignment) {
     return null;
   }
-  const addOnId = generateId({ prefix: "add_on" });
-  await db
-    .insert(assignmentAddOns)
-    .values({
-      addOnId,
-      assignmentId: assignment.assignmentId,
-      addOnTypeId: addOn.addOnTypeId,
-      createdAt: Date.now(),
-      startsAt: addOn.startsAt ?? Date.now(),
-      endsAt: addOn.endsAt,
-      deletedAt: null,
-    })
-    .onConflictDoNothing();
-  return getAddOn({ addOnId });
+  const created: AddOn = {
+    addOnId: generateId({ prefix: "add_on" }),
+    assignmentId: assignment.assignmentId,
+    addOnTypeId: addOn.addOnTypeId,
+    createdAt: Date.now(),
+    startsAt: addOn.startsAt ?? Date.now(),
+    endsAt: addOn.endsAt,
+    deletedAt: null,
+  };
+  await db.insert(assignmentAddOns).values(created).onConflictDoNothing();
+  return created;
 }
 
 /** Soft-delete an add-on, or return null if it is already deleted. */
