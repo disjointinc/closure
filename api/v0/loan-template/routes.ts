@@ -4,7 +4,9 @@
  */
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
-import type { z } from "zod";
+import { z } from "zod";
+import { loanTemplateIdSchema } from "../../schemas/ids.ts";
+import { loanDefinitionFields } from "../../schemas/loan.ts";
 import { loanTemplateSchema } from "../../schemas/loan-template.ts";
 import {
   createLoanTemplate,
@@ -13,11 +15,28 @@ import {
   listLoanTemplates,
 } from "./service.ts";
 
-const loanTemplateCreateSchema = loanTemplateSchema.omit({
-  loanTemplateId: true,
-  createdAt: true,
-  deprecatedAt: true,
-});
+const loanTemplateCreateSchema = loanTemplateSchema
+  .omit({
+    loanTemplateId: true,
+    createdAt: true,
+    deprecatedAt: true,
+  })
+  .extend(loanDefinitionFields)
+  .strict()
+  .refine((template) => {
+    const repayment = template.servicingTerms.repayment;
+    if (repayment.type !== "periodic_minimum") {
+      return true;
+    }
+    const amount =
+      repayment.minimum.type === "fixed"
+        ? repayment.minimum.amount
+        : repayment.minimum.floor;
+    return (
+      amount.currency === template.principal.currency &&
+      amount.unit === template.principal.unit
+    );
+  }, "minimum amount/floor must use the principal currency and unit");
 
 export type LoanTemplateCreateBody = z.infer<typeof loanTemplateCreateSchema>;
 
@@ -29,21 +48,29 @@ export const loanTemplateApp = new Hono()
   .get("/", async (c) => {
     return c.json(await listLoanTemplates());
   })
-  .get("/:loanTemplateId", async (c) => {
-    const template = await getLoanTemplate({
-      loanTemplateId: c.req.param("loanTemplateId"),
-    });
-    if (!template) {
-      return c.json({ error: "not found" }, 404);
-    }
-    return c.json(template);
-  })
-  .delete("/:loanTemplateId", async (c) => {
-    const template = await deprecateLoanTemplate({
-      loanTemplateId: c.req.param("loanTemplateId"),
-    });
-    if (!template) {
-      return c.json({ error: "not found" }, 404);
-    }
-    return c.json(template);
-  });
+  .get(
+    "/:loanTemplateId",
+    zValidator("param", z.object({ loanTemplateId: loanTemplateIdSchema })),
+    async (c) => {
+      const template = await getLoanTemplate({
+        loanTemplateId: c.req.param("loanTemplateId"),
+      });
+      if (!template) {
+        return c.json({ error: "not found" }, 404);
+      }
+      return c.json(template);
+    },
+  )
+  .delete(
+    "/:loanTemplateId",
+    zValidator("param", z.object({ loanTemplateId: loanTemplateIdSchema })),
+    async (c) => {
+      const template = await deprecateLoanTemplate({
+        loanTemplateId: c.req.param("loanTemplateId"),
+      });
+      if (!template) {
+        return c.json({ error: "not found" }, 404);
+      }
+      return c.json(template);
+    },
+  );
