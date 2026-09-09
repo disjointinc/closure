@@ -31,6 +31,7 @@ export async function getFeature({
     .where(eq(featureTaxTypes.featureId, featureId));
   return {
     featureId: row.featureId,
+    productLineId: row.productLineId,
     createdAt: row.createdAt,
     deprecatedAt: row.deprecatedAt,
     name: row.name,
@@ -73,6 +74,7 @@ export async function createFeature({
     .insert(features)
     .values({
       featureId,
+      productLineId: feature.productLineId,
       createdAt,
       deprecatedAt: null,
       name: feature.name,
