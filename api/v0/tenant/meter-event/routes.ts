@@ -1,17 +1,19 @@
 /**
- * v0/tenant/meter-event/routes.ts -- HTTP for /v0/tenant/:id/meter-event:
+ * v0/tenant/meter-event/routes.ts -- HTTP for /v0/tenant/:tenantId/meter-event:
  * request validation and wiring. Business logic lives in service.ts.
  */
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
-import { MeterBalanceUnavailableError } from "../../../cache/metering.ts";
+import { MeterBalanceUnavailableError } from "../../../cache/meter/index.ts";
 import { meterEventSchema } from "../../../schemas/meter-event.ts";
 import { listMeterEvents, recordEvent } from "./service.ts";
 
 const meterEventCreateSchema = meterEventSchema.omit({
-  tenant: true,
+  createdAt: true,
+  meterEventId: true,
   status: true,
+  tenantId: true,
 });
 
 export type MeterEventCreateBody = z.infer<typeof meterEventCreateSchema>;
@@ -21,14 +23,13 @@ export const meterEventApp = new Hono<{ Variables: { tenantId: string } }>()
     const tenantId = c.get("tenantId");
     const body = c.req.valid("json");
     try {
-      const { balanceMicrocredits, status } = await recordEvent({
+      const { balanceMicrocredits, event, status } = await recordEvent({
         event: body,
         tenantId,
       });
       return c.json(
         {
-          ...body,
-          tenant: tenantId,
+          ...event,
           status,
           balanceMicrocredits,
         },
@@ -40,8 +41,8 @@ export const meterEventApp = new Hono<{ Variables: { tenantId: string } }>()
         // (or can't be). Nothing was charged; retry shortly.
         console.error("meter balance unavailable for ingest", {
           error,
-          meter: error.meter,
-          tenant: error.tenant,
+          meterId: error.meterId,
+          tenantId: error.tenantId,
         });
         return c.json(
           { error: "meter balance temporarily unavailable; retry shortly" },
