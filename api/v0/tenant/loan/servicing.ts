@@ -92,12 +92,20 @@ async function transitionLoan({
   return result;
 }
 
-export async function serviceLoan(input: ServicingInput) {
+/** The full settlement: post-transition loan, obligations, and live installments. */
+export async function serviceLoanDetail(input: ServicingInput) {
   const result = await transitionLoan({
     ...input,
     action: { type: "service" },
   });
-  return result?.loan ?? null;
+  if (!result) {
+    return null;
+  }
+  return {
+    due: result.due,
+    installments: result.installments,
+    loan: result.loan,
+  };
 }
 
 export async function applyLoanPayment({

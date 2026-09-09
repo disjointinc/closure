@@ -1,5 +1,5 @@
 /** Fixed-principal origination and lifecycle; settlement lives in servicing.ts. */
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../../../db/index.ts";
 import {
   assignments,
@@ -17,7 +17,7 @@ import {
   calendarDeadline,
   type LoanDue,
 } from "./calculation.ts";
-import { LoanServicingError, serviceLoan } from "./servicing.ts";
+import { LoanServicingError, serviceLoanDetail } from "./servicing.ts";
 import type { LoanCreateBody } from "./routes.ts";
 
 export async function listLoans({
@@ -26,14 +26,38 @@ export async function listLoans({
   tenantId: string;
 }): Promise<Loan[]> {
   const rows = await db
-    .select({ loanId: loans.loanId })
+    .select()
     .from(loans)
     .where(eq(loans.tenantId, tenantId))
     .orderBy(desc(loans.createdAt));
-  const found = await Promise.all(
-    rows.map((row) => getLoan({ loanId: row.loanId, tenantId })),
-  );
-  return found.filter((loan) => loan !== null);
+  if (rows.length === 0) {
+    return [];
+  }
+  const installmentRows = await db
+    .select()
+    .from(loanInstallments)
+    .where(
+      and(
+        inArray(
+          loanInstallments.loanId,
+          rows.map((row) => row.loanId),
+        ),
+        isNull(loanInstallments.canceledAt),
+      ),
+    )
+    .orderBy(loanInstallments.dueAt, loanInstallments.createdAt);
+  const installmentsByLoan = new Map<string, typeof installmentRows>();
+  for (const installment of installmentRows) {
+    installmentsByLoan.set(installment.loanId, [
+      ...(installmentsByLoan.get(installment.loanId) ?? []),
+      installment,
+    ]);
+  }
+  return rows.map((row) => {
+    const installments = installmentsByLoan.get(row.loanId) ?? [];
+    const projected = projectLoan({ installments, loan: row });
+    return { ...projected.loan, due: projected.due, installments };
+  });
 }
 
 export async function getLoan({
@@ -237,40 +261,50 @@ export async function createLoan({
       };
     }
   }
+  const servicingState = {
+    checkpointAt: createdAt,
+    interestAmount: 0,
+    interestCarry: "0",
+    principalAmount: definition.principal.value,
+  };
+  const installmentRows = loan.installments.map((installment) => ({
+    allocatedAmount: 0,
+    amount: installment.amount,
+    createdAt,
+    canceledAt: null,
+    dueAt: installment.dueAt,
+    installmentId: generateId({ prefix: "installment" }),
+    loanId,
+    paidAt: null,
+  }));
+  const inserted = {
+    assignmentId: loan.assignmentId,
+    closedAt: null,
+    createdAt,
+    deletedAt: null,
+    endsAt,
+    loanId,
+    tenantId,
+    ...definition,
+    servicingState,
+  };
   await db.transaction(async (tx) => {
-    await tx.insert(loans).values({
-      assignmentId: loan.assignmentId,
-      closedAt: null,
-      createdAt,
-      deletedAt: null,
-      endsAt,
-      loanId,
-      tenantId,
-      ...definition,
-      servicingState: {
-        checkpointAt: createdAt,
-        interestAmount: 0,
-        interestCarry: "0",
-        principalAmount: definition.principal.value,
-      },
-    });
-    if (loan.installments.length === 0) {
-      return;
+    await tx.insert(loans).values(inserted);
+    if (installmentRows.length > 0) {
+      await tx.insert(loanInstallments).values(installmentRows);
     }
-    await tx.insert(loanInstallments).values(
-      loan.installments.map((installment) => ({
-        allocatedAmount: 0,
-        amount: installment.amount,
-        createdAt,
-        canceledAt: null,
-        dueAt: installment.dueAt,
-        installmentId: generateId({ prefix: "installment" }),
-        loanId,
-        paidAt: null,
-      })),
-    );
   });
-  return getLoan({ loanId, tenantId });
+  /* The write is deterministic: every column and id was minted above, and
+   * projectLoan derives the same obligations getLoan would re-read. */
+  const projected = projectLoan({
+    installments: installmentRows,
+    loan: inserted,
+  });
+  return {
+    ...projected.loan,
+    due: projected.due,
+    installments: installmentRows,
+  };
 }
 
 /** Closing never forgives debt; legacy balances cannot establish payoff. */
@@ -281,12 +315,13 @@ export async function closeLoan({
   loanId: string;
   tenantId: string;
 }): Promise<Loan | null> {
-  const found = await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const at = Date.now();
-    const row = await serviceLoan({ at, loanId, tenantId, tx });
-    if (!row) {
-      return false;
+    const settled = await serviceLoanDetail({ at, loanId, tenantId, tx });
+    if (!settled) {
+      return null;
     }
+    const row = settled.loan;
     if (
       !row.servicingState ||
       row.servicingState.principalAmount !== 0 ||
@@ -298,16 +333,20 @@ export async function closeLoan({
         message: "cannot close a loan with an outstanding balance",
       });
     }
+    const closedAt = row.closedAt ?? at;
     await tx
       .update(loans)
-      .set({ closedAt: row.closedAt ?? at })
+      .set({ closedAt })
       .where(and(eq(loans.loanId, loanId), eq(loans.tenantId, tenantId)));
-    return true;
+    /* The settlement result already holds the post-settlement row and live
+     * installments; only closedAt needed a stamp. */
+    return {
+      ...row,
+      closedAt,
+      due: settled.due,
+      installments: settled.installments,
+    };
   });
-  if (!found) {
-    return null;
-  }
-  return getLoan({ loanId, tenantId });
 }
 
 /** Archive only paid-off serviced loans; legacy rows may still be archived. */
@@ -318,14 +357,14 @@ export async function deleteLoan({
   loanId: string;
   tenantId: string;
 }): Promise<Loan | null> {
-  const found = await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const [row] = await tx
       .select()
       .from(loans)
       .where(and(eq(loans.loanId, loanId), eq(loans.tenantId, tenantId)))
       .for("update");
     if (!row || row.deletedAt !== null) {
-      return false;
+      return null;
     }
     if (
       row.servicingState &&
@@ -338,14 +377,30 @@ export async function deleteLoan({
         message: "only paid-off loans can be deleted",
       });
     }
+    const deletedAt = Date.now();
     await tx
       .update(loans)
-      .set({ deletedAt: Date.now() })
+      .set({ deletedAt })
       .where(and(eq(loans.loanId, loanId), eq(loans.tenantId, tenantId)));
-    return true;
+    const installmentRows = await tx
+      .select()
+      .from(loanInstallments)
+      .where(
+        and(
+          eq(loanInstallments.loanId, loanId),
+          isNull(loanInstallments.canceledAt),
+        ),
+      )
+      .orderBy(loanInstallments.dueAt, loanInstallments.createdAt);
+    /* Only deletedAt changed; the row and installments were already in hand. */
+    const projected = projectLoan({
+      installments: installmentRows,
+      loan: { ...row, deletedAt },
+    });
+    return {
+      ...projected.loan,
+      due: projected.due,
+      installments: installmentRows,
+    };
   });
-  if (!found) {
-    return null;
-  }
-  return getLoan({ loanId, tenantId });
 }
