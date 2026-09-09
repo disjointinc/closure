@@ -1,9 +1,9 @@
 /**
  * v0/tenant/service.ts -- tenant business logic: tenant CRUD (soft delete)
  * and the entitlement check (features + meter balances resolved from the
- * current assignment, add-ons, and overrides).
+ * open assignments, add-ons, and overrides).
  */
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, lte } from "drizzle-orm";
 import { getMeterBalance } from "../../cache/meter/index.ts";
 import { db } from "../../db/index.ts";
 import {
@@ -79,30 +79,52 @@ export async function deleteTenant({ tenantId }: { tenantId: string }) {
 }
 
 /**
- * Resolve what a tenant can do right now: the open assignment's plan
+ * Resolve what a tenant can do right now: every open assignment's plan
  * features, plus active add-on features, with the latest feature override
  * per feature winning; plan meters with the latest meter override per
- * meter, each with its live Redis balance.
+ * meter, each with its live Redis balance. A tenant may hold several open
+ * assignments: plans merge in startsAt order, so where two plans set the
+ * same feature or meter the later assignment wins (the same latest-wins
+ * rule overrides use).
  */
 export async function getEntitlements({ tenantId }: { tenantId: string }) {
-  const [assignment] = await db
+  const openAssignments = await db
     .select()
     .from(assignments)
-    .where(and(eq(assignments.tenantId, tenantId), isNull(assignments.endsAt)));
-  if (!assignment) {
-    return { tenantId, assignmentId: null, features: [], meters: [] };
+    .where(
+      and(
+        eq(assignments.tenantId, tenantId),
+        isNull(assignments.endsAt),
+        lte(assignments.startsAt, Date.now()),
+      ),
+    )
+    .orderBy(assignments.startsAt);
+  if (openAssignments.length === 0) {
+    return { tenantId, assignmentIds: [], features: [], meters: [] };
   }
 
   const now = Date.now();
 
-  const planFeatureRows = await db
-    .select()
-    .from(planFeatures)
-    .where(eq(planFeatures.planId, assignment.planId));
-  const assignmentAddOnRows = await db
-    .select()
-    .from(assignmentAddOns)
-    .where(eq(assignmentAddOns.assignmentId, assignment.assignmentId));
+  const planFeatureRows = (
+    await Promise.all(
+      openAssignments.map((assignment) =>
+        db
+          .select()
+          .from(planFeatures)
+          .where(eq(planFeatures.planId, assignment.planId)),
+      ),
+    )
+  ).flat();
+  const assignmentAddOnRows = (
+    await Promise.all(
+      openAssignments.map((assignment) =>
+        db
+          .select()
+          .from(assignmentAddOns)
+          .where(eq(assignmentAddOns.assignmentId, assignment.assignmentId)),
+      ),
+    )
+  ).flat();
   const activeAddOnTypeIds = assignmentAddOnRows
     .filter(
       (addOn) =>
@@ -142,10 +164,16 @@ export async function getEntitlements({ tenantId }: { tenantId: string }) {
     }
   }
 
-  const planMeterRows = await db
-    .select()
-    .from(planMeters)
-    .where(eq(planMeters.planId, assignment.planId));
+  const planMeterRows = (
+    await Promise.all(
+      openAssignments.map((assignment) =>
+        db
+          .select()
+          .from(planMeters)
+          .where(eq(planMeters.planId, assignment.planId)),
+      ),
+    )
+  ).flat();
   const meterOverrideRows = await db
     .select()
     .from(meterOverrides)
@@ -175,7 +203,7 @@ export async function getEntitlements({ tenantId }: { tenantId: string }) {
 
   return {
     tenantId,
-    assignmentId: assignment.assignmentId,
+    assignmentIds: openAssignments.map((assignment) => assignment.assignmentId),
     features: [...featureMap.entries()].map(([featureId, setTo]) => ({
       featureId,
       setTo,
