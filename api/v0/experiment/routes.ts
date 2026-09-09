@@ -6,7 +6,8 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import { experimentSchema } from "../../schemas/experiment.ts";
-import { planIdSchema } from "../../schemas/ids.ts";
+import { experimentIdSchema } from "../../schemas/ids.ts";
+import { treatmentSchema } from "../../schemas/treatment.ts";
 import {
   concludeExperiment,
   createExperiment,
@@ -14,15 +15,16 @@ import {
   listExperiments,
 } from "./service.ts";
 
-/* z.object(shape) because .omit() fails on schemas carrying refinements; the
-   treatment-percentage superRefine is re-applied below. */
-const experimentCreateSchema = z
-  .object(experimentSchema.shape)
+const experimentCreateSchema = experimentSchema
   .omit({
     concludedAt: true,
-    concludingPlanId: true,
+    concludingPlans: true,
     createdAt: true,
     experimentId: true,
+    treatments: true,
+  })
+  .extend({
+    treatments: z.array(treatmentSchema.omit({ treatmentId: true })).min(2),
   })
   .superRefine((experiment, ctx) => {
     const total = experiment.treatments.reduce(
@@ -41,38 +43,56 @@ const experimentCreateSchema = z
 export type ExperimentCreateBody = z.infer<typeof experimentCreateSchema>;
 
 const concludeSchema = z.object({
-  concludingPlanId: planIdSchema.nullable(),
+  concludingPlans: experimentSchema.shape.concludingPlans.unwrap(),
 });
 
 export type ConcludeExperimentBody = z.infer<typeof concludeSchema>;
 
+const experimentParamSchema = z.object({ experimentId: experimentIdSchema });
+
 export const experimentApp = new Hono()
   .post("/", zValidator("json", experimentCreateSchema), async (c) => {
     const body = c.req.valid("json");
-    return c.json(await createExperiment({ experiment: body }), 201);
+    const experiment = await createExperiment({ experiment: body });
+    if (!experiment) {
+      return c.json(
+        {
+          error:
+            "treatments must reference known plans and tenants, hold at most one plan per product line, touch the same lines, and assign each tenant at most once",
+        },
+        400,
+      );
+    }
+    return c.json(experiment, 201);
   })
   .get("/", async (c) => {
     return c.json(await listExperiments());
   })
-  .get("/:experimentId", async (c) => {
-    const experiment = await getExperiment({
-      experimentId: c.req.param("experimentId"),
-    });
-    if (!experiment) {
-      return c.json({ error: "not found" }, 404);
-    }
-    return c.json(experiment);
-  })
+  .get(
+    "/:experimentId",
+    zValidator("param", experimentParamSchema),
+    async (c) => {
+      const experiment = await getExperiment(c.req.valid("param"));
+      if (!experiment) {
+        return c.json({ error: "not found" }, 404);
+      }
+      return c.json(experiment);
+    },
+  )
   .post(
     "/:experimentId/conclude",
+    zValidator("param", experimentParamSchema),
     zValidator("json", concludeSchema),
     async (c) => {
       const experiment = await concludeExperiment({
         body: c.req.valid("json"),
-        experimentId: c.req.param("experimentId"),
+        experimentId: c.req.valid("param").experimentId,
       });
       if (!experiment) {
         return c.json({ error: "not found" }, 404);
+      }
+      if ("error" in experiment) {
+        return c.json(experiment, 400);
       }
       return c.json(experiment);
     },

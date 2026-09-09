@@ -1,17 +1,56 @@
 /**
  * v0/experiment/service.ts -- experiment business logic. Treatments are
- * passed inline on create. Experiments are concluded, never deleted.
+ * passed inline on create; their ids are server-minted. Experiments are
+ * concluded, never deleted.
  */
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import {
   experiments,
+  experimentTreatmentPlans,
   experimentTreatmentTenants,
   experimentTreatments,
+  plans,
+  tenants,
 } from "../../db/schema.ts";
 import { generateId } from "../../lib/id.ts";
 import type { Experiment } from "../../schemas/experiment.ts";
+import type { Treatment } from "../../schemas/treatment.ts";
 import type { ConcludeExperimentBody, ExperimentCreateBody } from "./routes.ts";
+
+async function listTreatments({
+  experimentId,
+}: {
+  experimentId: string;
+}): Promise<Treatment[]> {
+  const treatmentRows = await db
+    .select()
+    .from(experimentTreatments)
+    .where(eq(experimentTreatments.experimentId, experimentId));
+  const planRows = await db
+    .select()
+    .from(experimentTreatmentPlans)
+    .where(eq(experimentTreatmentPlans.experimentId, experimentId));
+  const tenantRows = await db
+    .select()
+    .from(experimentTreatmentTenants)
+    .where(eq(experimentTreatmentTenants.experimentId, experimentId));
+  return treatmentRows.map((treatment) => {
+    const assigned = tenantRows.filter(
+      (tenant) => tenant.treatmentId === treatment.treatmentId,
+    );
+    return {
+      treatmentId: treatment.treatmentId,
+      planIds: planRows
+        .filter((plan) => plan.treatmentId === treatment.treatmentId)
+        .map((plan) => plan.planId),
+      tenantPercentage: treatment.tenantPercentage,
+      assignedTenantIds: assigned.length
+        ? assigned.map((tenant) => tenant.tenantId)
+        : null,
+    };
+  });
+}
 
 export async function getExperiment({
   experimentId,
@@ -25,35 +64,15 @@ export async function getExperiment({
   if (!row) {
     return null;
   }
-  const treatmentRows = await db
-    .select()
-    .from(experimentTreatments)
-    .where(eq(experimentTreatments.experimentId, experimentId));
-  const tenantRows = await db
-    .select()
-    .from(experimentTreatmentTenants)
-    .where(eq(experimentTreatmentTenants.experimentId, experimentId));
+  const treatments = await listTreatments({ experimentId });
   return {
     experimentId: row.experimentId,
     createdAt: row.createdAt,
     concludedAt: row.concludedAt,
-    concludingPlanId: row.concludingPlanId,
+    concludingPlans: row.concludingPlans,
     name: row.name,
     description: row.description,
-    treatments: treatmentRows.map((treatment) => {
-      const assigned = tenantRows.filter(
-        (tenant) =>
-          tenant.experimentId === treatment.experimentId &&
-          tenant.planId === treatment.planId,
-      );
-      return {
-        planId: treatment.planId,
-        tenantPercentage: treatment.tenantPercentage,
-        assignedTenantIds: assigned.length
-          ? assigned.map((tenant) => tenant.tenantId)
-          : null,
-      };
-    }),
+    treatments,
   };
 }
 
@@ -65,66 +84,188 @@ export async function listExperiments(): Promise<Experiment[]> {
   return found.filter((experiment) => experiment !== null);
 }
 
+async function resolvePlanLines({
+  planIds,
+}: {
+  planIds: string[];
+}): Promise<Map<string, string> | null> {
+  if (planIds.length === 0) {
+    return new Map();
+  }
+  const rows = await db
+    .select()
+    .from(plans)
+    .where(inArray(plans.planId, planIds));
+  if (rows.length !== new Set(planIds).size) {
+    return null;
+  }
+  return new Map(rows.map((row) => [row.planId, row.productLineId]));
+}
+
+function linesPerTreatment({
+  planLines,
+  treatments,
+}: {
+  planLines: Map<string, string>;
+  treatments: { planIds: string[] }[];
+}): Set<string>[] | null {
+  const seen: Set<string>[] = [];
+  for (const treatment of treatments) {
+    if (new Set(treatment.planIds).size !== treatment.planIds.length) {
+      return null;
+    }
+    const lines = new Set<string>();
+    for (const planId of treatment.planIds) {
+      const line = planLines.get(planId);
+      if (line === undefined || lines.has(line)) {
+        return null;
+      }
+      lines.add(line);
+    }
+    seen.push(lines);
+  }
+  return seen;
+}
+
+function sameLines({
+  treatmentLines,
+}: {
+  treatmentLines: Set<string>[];
+}): boolean {
+  const [first, ...rest] = treatmentLines;
+  return rest.every(
+    (lines) =>
+      lines.size === first.size && [...lines].every((line) => first.has(line)),
+  );
+}
+
 export async function createExperiment({
   experiment,
 }: {
   experiment: ExperimentCreateBody;
 }): Promise<Experiment | null> {
+  const planLines = await resolvePlanLines({
+    planIds: experiment.treatments.flatMap((treatment) => treatment.planIds),
+  });
+  if (!planLines) {
+    return null;
+  }
+  const treatmentLines = linesPerTreatment({
+    planLines,
+    treatments: experiment.treatments,
+  });
+  if (!treatmentLines || !sameLines({ treatmentLines })) {
+    return null;
+  }
+  const tenantIds = experiment.treatments.flatMap(
+    (treatment) => treatment.assignedTenantIds ?? [],
+  );
+  if (new Set(tenantIds).size !== tenantIds.length) {
+    return null;
+  }
+  const tenantRows = tenantIds.length
+    ? await db
+        .select({ tenantId: tenants.tenantId })
+        .from(tenants)
+        .where(inArray(tenants.tenantId, tenantIds))
+    : [];
+  if (tenantRows.length !== tenantIds.length) {
+    return null;
+  }
   const experimentId = generateId({ prefix: "experiment" });
-  await db
-    .insert(experiments)
-    .values({
+  await db.transaction(async (tx) => {
+    await tx.insert(experiments).values({
       experimentId,
       createdAt: Date.now(),
       concludedAt: null,
-      concludingPlanId: null,
+      concludingPlans: null,
       name: experiment.name,
       description: experiment.description,
-    })
-    .onConflictDoNothing();
-  for (const treatment of experiment.treatments) {
-    await db
-      .insert(experimentTreatments)
-      .values({
+    });
+    for (const treatment of experiment.treatments) {
+      const treatmentId = generateId({ prefix: "treatment" });
+      await tx.insert(experimentTreatments).values({
         experimentId,
-        planId: treatment.planId,
+        treatmentId,
         tenantPercentage: treatment.tenantPercentage,
-      })
-      .onConflictDoNothing();
-    if (treatment.assignedTenantIds) {
-      await db
-        .insert(experimentTreatmentTenants)
-        .values(
-          treatment.assignedTenantIds.map((tenantId) => ({
-            experimentId,
-            planId: treatment.planId,
-            tenantId,
-          })),
-        )
-        .onConflictDoNothing();
+      });
+      await tx.insert(experimentTreatmentPlans).values(
+        treatment.planIds.map((planId) => ({
+          experimentId,
+          treatmentId,
+          planId,
+        })),
+      );
+      if (!treatment.assignedTenantIds?.length) {
+        continue;
+      }
+      await tx.insert(experimentTreatmentTenants).values(
+        treatment.assignedTenantIds.map((tenantId) => ({
+          experimentId,
+          treatmentId,
+          tenantId,
+        })),
+      );
     }
-  }
+  });
   return getExperiment({ experimentId });
 }
 
-/** Conclude the experiment, or return null if no such experiment exists. */
 export async function concludeExperiment({
   body,
   experimentId,
 }: {
   body: ConcludeExperimentBody;
   experimentId: string;
-}): Promise<Experiment | null> {
-  const updated = await db
+}): Promise<Experiment | null | { error: string }> {
+  const experiment = await getExperiment({ experimentId });
+  if (!experiment) {
+    return null;
+  }
+  const planLines = await resolvePlanLines({
+    planIds: experiment.treatments.flatMap((treatment) => treatment.planIds),
+  });
+  if (!planLines) {
+    return { error: "treatments must reference known plans" };
+  }
+  const touchedLines = new Set(planLines.values());
+  const conclusionLines = body.concludingPlans.map(
+    (conclusion) => conclusion.productLineId,
+  );
+  if (
+    new Set(conclusionLines).size !== conclusionLines.length ||
+    conclusionLines.length !== touchedLines.size ||
+    !conclusionLines.every((line) => touchedLines.has(line))
+  ) {
+    return {
+      error:
+        "conclusion must name each product line the treatments touched exactly once",
+    };
+  }
+  const conclusionPlanLines = await resolvePlanLines({
+    planIds: body.concludingPlans
+      .map((conclusion) => conclusion.planId)
+      .filter((planId): planId is string => planId !== null),
+  });
+  if (
+    !conclusionPlanLines ||
+    !body.concludingPlans.every(
+      (conclusion) =>
+        conclusion.planId === null ||
+        conclusionPlanLines.get(conclusion.planId) === conclusion.productLineId,
+    )
+  ) {
+    return {
+      error:
+        "concluding plans must exist and belong to the named product lines",
+    };
+  }
+  await db
     .update(experiments)
     .set({
       concludedAt: Date.now(),
-      concludingPlanId: body.concludingPlanId,
+      concludingPlans: body.concludingPlans,
     })
-    .where(eq(experiments.experimentId, experimentId))
-    .returning();
-  if (updated.length === 0) {
-    return null;
-  }
+    .where(eq(experiments.experimentId, experimentId));
   return getExperiment({ experimentId });
 }
