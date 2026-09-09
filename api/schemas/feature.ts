@@ -1,10 +1,16 @@
 import { z } from "zod";
 import { epochMs } from "./common.ts";
-import { featureIdSchema, taxTypeIdSchema } from "./ids.ts";
+import {
+  featureIdSchema,
+  productLineIdSchema,
+  taxTypeIdSchema,
+} from "./ids.ts";
 import { featureOptionSchema } from "./feature-option.ts";
 
 export const featureSchema = z.object({
   featureId: featureIdSchema,
+  /** Hard lock: a feature belongs to exactly one product line. */
+  productLineId: productLineIdSchema,
   createdAt: epochMs,
   deprecatedAt: epochMs.nullable(),
   name: z.string().min(1),

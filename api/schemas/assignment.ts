@@ -6,12 +6,15 @@ import {
   cycleIdSchema,
   experimentIdSchema,
   planIdSchema,
+  productLineIdSchema,
 } from "./ids.ts";
 
 /** A tenant's assignment to a plan for a period of time. */
 export const assignmentSchema = z.object({
   assignmentId: assignmentIdSchema,
   planId: planIdSchema,
+  /** Denormalized from the plan: one open assignment per tenant and line. */
+  productLineId: productLineIdSchema,
   /** Set when the assignment came from an experiment treatment. */
   experimentId: experimentIdSchema.nullable(),
   cycleId: cycleIdSchema,

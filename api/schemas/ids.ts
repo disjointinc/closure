@@ -21,10 +21,12 @@ export const idSuffixLengths = {
   loan_template: 20,
   meter: 20,
   plan: 20,
+  product_line: 20,
   rule: 20,
   tax: 20,
   tax_type: 20,
   task_type: 20,
+  treatment: 20,
   value: 20,
   // tenants: 1e12
   tenant: 22,
@@ -39,6 +41,7 @@ export const idSuffixLengths = {
   meter_override: 24,
   // tenant-scoped, ~1e3 per tenant -> ~1e15
   credit_grant: 25,
+  installment: 25,
   invoice: 25,
   payment: 25,
   task: 25,
@@ -86,6 +89,7 @@ export const experimentIdSchema = prefixedId("experiment");
 export const featureIdSchema = prefixedId("feature");
 export const featureOptionIdSchema = prefixedId("feature_option");
 export const featureOverrideIdSchema = prefixedId("feature_override");
+export const installmentIdSchema = prefixedId("installment");
 export const invoiceIdSchema = prefixedId("invoice");
 export const itemIdSchema = prefixedId("item");
 export const loanIdSchema = prefixedId("loan");
@@ -96,6 +100,7 @@ export const meterOverrideIdSchema = prefixedId("meter_override");
 export const paymentIdSchema = prefixedId("payment");
 export const paymentMethodIdSchema = prefixedId("payment_method");
 export const planIdSchema = prefixedId("plan");
+export const productLineIdSchema = prefixedId("product_line");
 export const refundIdSchema = prefixedId("refund");
 export const ruleIdSchema = prefixedId("rule");
 export const ruleRunIdSchema = prefixedId("rule_run");
@@ -106,4 +111,5 @@ export const teamMemberIdSchema = prefixedId("team_member");
 export const tenantIdSchema = prefixedId("tenant");
 export const taskIdSchema = prefixedId("task");
 export const taskTypeIdSchema = prefixedId("task_type");
+export const treatmentIdSchema = prefixedId("treatment");
 export const valueIdSchema = prefixedId("value");

@@ -11,7 +11,7 @@ import {
   featureIdSchema,
   meterIdSchema,
   planIdSchema,
-  valueIdSchema,
+  productLineIdSchema,
 } from "./ids.ts";
 
 /** A feature entry as embedded in a plan (or add-on, or feature override). */
@@ -151,74 +151,19 @@ export function checkPlanMeter(
 
 export const planMeterSchema = planMeterObject.superRefine(checkPlanMeter);
 
-export const planKindSchema = z.enum(["standard", "loan"]);
-export type PlanKind = z.infer<typeof planKindSchema>;
-
-/**
- * The subset of a plan the kind cross-field check reads. Structural (rather
- * than Plan) so the API's create input -- where prices may carry inline
- * values -- can reuse the same check.
- */
-export interface PlanCheckInput {
-  kind: PlanKind;
-  defaultInterestPercentage: number | null;
-  minimumPaymentValueId: string | null;
-  prices: unknown[];
-}
-
-/** Cross-field rules for a plan's kind: loan terms vs. standard pricing. */
-export function checkPlan(plan: PlanCheckInput, ctx: z.RefinementCtx): void {
-  if (plan.kind === "standard") {
-    if (plan.defaultInterestPercentage !== null) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["defaultInterestPercentage"],
-        message: "defaultInterestPercentage is only settable on loan plans",
-      });
-    }
-    if (plan.minimumPaymentValueId !== null) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["minimumPaymentValueId"],
-        message: "minimumPaymentValueId is only settable on loan plans",
-      });
-    }
-    return;
-  }
-  if (plan.minimumPaymentValueId === null) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["minimumPaymentValueId"],
-      message: "loan plans require a minimumPaymentValueId",
-    });
-  }
-  if (plan.prices.length > 0) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["prices"],
-      message: "loan plans carry no monetary prices",
-    });
-  }
-}
-
-export const planSchema = z
-  .object({
-    planId: planIdSchema,
-    /** The plan this version was derived from, if any. */
-    derivedFromPlanId: planIdSchema.nullable(),
-    createdAt: epochMs,
-    deprecatedAt: epochMs.nullable(),
-    kind: planKindSchema,
-    /** Suggested rate for loans on this plan; loans set theirs explicitly. */
-    defaultInterestPercentage: z.number().positive().nullable(),
-    /** The minimum payment due each cycle on loan plans. */
-    minimumPaymentValueId: valueIdSchema.nullable(),
-    name: z.string().min(1),
-    description: z.string().nullable(),
-    prices: z.array(priceSchema),
-    features: z.array(planFeatureSchema).nullable(),
-    meters: z.array(planMeterSchema).nullable(),
-    addOnTypeIds: z.array(addOnTypeIdSchema).nullable(),
-  })
-  .superRefine(checkPlan);
+export const planSchema = z.object({
+  planId: planIdSchema,
+  /** Hard lock: a plan sells its own product line's features and meters. */
+  productLineId: productLineIdSchema,
+  /** The plan this version was derived from, if any. */
+  derivedFromPlanId: planIdSchema.nullable(),
+  createdAt: epochMs,
+  deprecatedAt: epochMs.nullable(),
+  name: z.string().min(1),
+  description: z.string().nullable(),
+  prices: z.array(priceSchema),
+  features: z.array(planFeatureSchema).nullable(),
+  meters: z.array(planMeterSchema).nullable(),
+  addOnTypeIds: z.array(addOnTypeIdSchema).nullable(),
+});
 export type Plan = z.infer<typeof planSchema>;
