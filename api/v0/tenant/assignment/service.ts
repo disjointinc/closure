@@ -170,21 +170,17 @@ export async function createAssignment({
       endsAt: assignment.endsAt,
     })
     .onConflictDoNothing();
-  if (assignment.addOns.length > 0) {
-    await db
-      .insert(assignmentAddOns)
-      .values(
-        assignment.addOns.map((addOn) => ({
-          addOnId: generateId({ prefix: "add_on" }),
-          assignmentId,
-          addOnTypeId: addOn.addOnTypeId,
-          createdAt,
-          startsAt: addOn.startsAt,
-          endsAt: addOn.endsAt,
-          deletedAt: null,
-        })),
-      )
-      .onConflictDoNothing();
+  const addOns = assignment.addOns.map((addOn) => ({
+    addOnId: generateId({ prefix: "add_on" }),
+    assignmentId,
+    addOnTypeId: addOn.addOnTypeId,
+    createdAt,
+    startsAt: addOn.startsAt,
+    endsAt: addOn.endsAt,
+    deletedAt: null,
+  }));
+  if (addOns.length > 0) {
+    await db.insert(assignmentAddOns).values(addOns).onConflictDoNothing();
   }
   // Initialize meter balances from the plan's default allocations.
   const meterRows = await db
@@ -198,7 +194,19 @@ export async function createAssignment({
       tenantId,
     });
   }
-  return getAssignment({ assignmentId });
+  /* Every column was supplied above (no DB defaults, freshly minted ids), so
+   * the stored rows are exactly what was written; construct, don't re-read. */
+  return {
+    assignmentId,
+    planId: assignment.planId,
+    productLineId: planRow.productLineId,
+    experimentId: assignment.experimentId,
+    cycleId: assignment.cycleId,
+    createdAt,
+    startsAt: assignment.startsAt,
+    endsAt: assignment.endsAt,
+    addOns,
+  };
 }
 
 /** End the assignment now, or return null if no such assignment exists. */
