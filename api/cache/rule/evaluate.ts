@@ -275,28 +275,26 @@ export async function resolveWatchSet({
     : null;
 
   // Initial allocation: the plan meter's default, with the latest override
-  // winning (the same resolution entitlements use). A meter spanning several
-  // of the tenant's lines takes the latest assignment that configures it.
-  let initialAllocationMicrocredits: number | null = null;
-  for (const assignment of openAssignments) {
-    if (!meterRow?.productLineIds.includes(assignment.productLineId)) {
-      continue;
-    }
-    const [planMeter] = await db
-      .select()
-      .from(planMeters)
-      .where(
-        and(
-          eq(planMeters.planId, assignment.planId),
-          eq(planMeters.meterId, meterId),
-        ),
-      )
-      .limit(1);
-    if (planMeter) {
-      initialAllocationMicrocredits = planMeter.defaultMicrocredits;
-      break;
-    }
-  }
+  // winning (the same resolution entitlements use). One join: the latest
+  // open assignment in one of the meter's lines that configures it.
+  const [planMeter] = meterRow
+    ? await db
+        .select({ defaultMicrocredits: planMeters.defaultMicrocredits })
+        .from(planMeters)
+        .innerJoin(assignments, eq(planMeters.planId, assignments.planId))
+        .where(
+          and(
+            eq(assignments.tenantId, tenantId),
+            isNull(assignments.endsAt),
+            lte(assignments.startsAt, Date.now()),
+            inArray(assignments.productLineId, meterRow.productLineIds),
+            eq(planMeters.meterId, meterId),
+          ),
+        )
+        .orderBy(desc(assignments.startsAt))
+        .limit(1)
+    : [];
+  let initialAllocationMicrocredits = planMeter?.defaultMicrocredits ?? null;
   const [override] = await db
     .select()
     .from(meterOverrides)
