@@ -27,6 +27,7 @@ export async function getMeter({
     .where(eq(meterTaxTypes.meterId, meterId));
   return {
     meterId: row.meterId,
+    productLineIds: row.productLineIds,
     createdAt: row.createdAt,
     deprecatedAt: row.deprecatedAt,
     name: row.name,
@@ -56,6 +57,7 @@ export async function createMeter({
     .insert(meters)
     .values({
       meterId,
+      productLineIds: meter.productLineIds,
       createdAt,
       deprecatedAt: null,
       name: meter.name,
