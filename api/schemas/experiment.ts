@@ -1,35 +1,25 @@
 import { z } from "zod";
 import { epochMs } from "./common.ts";
-import { experimentIdSchema, planIdSchema, tenantIdSchema } from "./ids.ts";
+import {
+  experimentIdSchema,
+  planIdSchema,
+  productLineIdSchema,
+} from "./ids.ts";
+import { treatmentSchema } from "./treatment.ts";
 
-const treatmentSchema = z.object({
-  planId: planIdSchema,
-  tenantPercentage: z.number().min(0).max(100),
-  assignedTenantIds: z.array(tenantIdSchema).nullable(),
+const concludingPlanSchema = z.object({
+  productLineId: productLineIdSchema,
+  /** Null ends the tenant's assignment in the line with no replacement. */
+  planId: planIdSchema.nullable(),
 });
-export type Treatment = z.infer<typeof treatmentSchema>;
 
-export const experimentSchema = z
-  .object({
-    experimentId: experimentIdSchema,
-    createdAt: epochMs,
-    concludedAt: epochMs.nullable(),
-    concludingPlanId: planIdSchema.nullable(),
-    name: z.string().min(1),
-    description: z.string().nullable(),
-    treatments: z.array(treatmentSchema).min(2),
-  })
-  .superRefine((experiment, ctx) => {
-    const total = experiment.treatments.reduce(
-      (sum, treatment) => sum + treatment.tenantPercentage,
-      0,
-    );
-    if (Math.abs(total - 100) > 1e-9) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["treatments"],
-        message: "treatment percentages must sum to 100",
-      });
-    }
-  });
+export const experimentSchema = z.object({
+  experimentId: experimentIdSchema,
+  createdAt: epochMs,
+  concludedAt: epochMs.nullable(),
+  concludingPlans: z.array(concludingPlanSchema).nullable(),
+  name: z.string().min(1),
+  description: z.string().nullable(),
+  treatments: z.array(treatmentSchema).min(2),
+});
 export type Experiment = z.infer<typeof experimentSchema>;
