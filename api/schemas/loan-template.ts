@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { epochMs } from "./common.ts";
+import { currencyAmountSchema, durationSchema, epochMs } from "./common.ts";
 import { loanTemplateIdSchema } from "./ids.ts";
 import { loanDefinitionFields } from "./loan.ts";
 
@@ -14,5 +14,9 @@ export const loanTemplateSchema = z.object({
   name: z.string().min(1),
   description: z.string().nullable(),
   ...loanDefinitionFields,
+  principal: currencyAmountSchema,
+  annualInterestPercentage: z.number(),
+  duration: durationSchema,
+  servicingTerms: loanDefinitionFields.servicingTerms.nullable(),
 });
 export type LoanTemplate = z.infer<typeof loanTemplateSchema>;
