@@ -217,9 +217,16 @@ async function evaluateLifecycle(): Promise<void> {
       rule.scope.kind === "global"
         ? null
         : await scopeCandidateTenants({ rule });
-    /* Cycle-aligned windows anchor to the rule scope's product line; the
-     * write-time check guarantees a cycle-windowed lifecycle rule is
-     * plan-scoped on a single line. Other rules never read the cycle. */
+    /* A billing_cycle_end window counts firings per billing period, so it
+     * needs each candidate's current period boundary ("anchor"). Period
+     * boundaries exist only per product line -- a tenant holds at most one
+     * open assignment per line -- and two upstream checks pin this rule to
+     * one line: createRule rejects cycle-windowed lifecycle rules whose
+     * scope plans span lines, and scopeCandidateTenants surfaced exactly
+     * the tenants with an open assignment on those plans. So every
+     * candidate has an open assignment in the anchor line, and this one
+     * lookup covers them all. Rules with rolling/permanent windows never
+     * read the cycle. */
     let anchorProductLineId: string | null = null;
     if (rule.scope.kind === "plan") {
       const planRows = await db
