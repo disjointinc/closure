@@ -58,26 +58,26 @@ async function resolveTopUp(
   if (topUps === null) {
     return null;
   }
-  return Promise.all(
-    topUps.map(async (tier) => ({
-      startingAt: tier.startingAt,
-      prices: await Promise.all(
-        tier.prices.map(async (price) => {
-          const value = {
-            ...price.value,
-            valueId: generateId({ prefix: "value" }),
-            createdAt: Date.now(),
-            deprecatedAt: null,
-          };
-          await db.insert(values).values(value).onConflictDoNothing();
-          return {
-            cycleId: price.cycleId,
-            value,
-          };
-        }),
-      ),
+  const createdAt = Date.now();
+  const resolved = topUps.map((tier) => ({
+    startingAt: tier.startingAt,
+    prices: tier.prices.map((price) => ({
+      cycleId: price.cycleId,
+      value: {
+        ...price.value,
+        valueId: generateId({ prefix: "value" }),
+        createdAt,
+        deprecatedAt: null,
+      },
     })),
+  }));
+  const valueRows = resolved.flatMap((tier) =>
+    tier.prices.map((price) => price.value),
   );
+  if (valueRows.length > 0) {
+    await db.insert(values).values(valueRows).onConflictDoNothing();
+  }
+  return resolved;
 }
 
 /** The db-stored top-up: value ids in place of the full objects. */
