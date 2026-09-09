@@ -235,10 +235,15 @@ export async function createPlan({
    * lines, so the plan's line only needs to be one of the meter's. */
   if (![...featureRows, ...addOnTypeRows].every(sameLine)) {
     return {
-      error: "a referenced feature or add-on type belongs to another product line",
+      error:
+        "a referenced feature or add-on type belongs to another product line",
     };
   }
-  if (!meterRows.every((meter) => meter.productLineIds.includes(plan.productLineId))) {
+  if (
+    !meterRows.every((meter) =>
+      meter.productLineIds.includes(plan.productLineId),
+    )
+  ) {
     return {
       error: "a referenced meter does not apply to the plan's product line",
     };
