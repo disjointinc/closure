@@ -1,9 +1,10 @@
 /**
- * v0/tenant/payment-method/routes.ts -- HTTP for /v0/tenant/:id/payment-method:
+ * v0/tenant/payment-method/routes.ts -- HTTP for /v0/tenant/:tenantId/payment-method:
  * request validation and wiring. Business logic lives in service.ts.
  */
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import { z } from "zod";
 import { paymentMethodSchema } from "../../../schemas/payment-method.ts";
 import {
   createPaymentMethod,
@@ -12,19 +13,32 @@ import {
   setDefaultPaymentMethod,
 } from "./service.ts";
 
+/** The tenant is the one in the path. */
+const paymentMethodCreateSchema = paymentMethodSchema.omit({
+  createdAt: true,
+  deletedAt: true,
+  isDefault: true,
+  paymentMethodId: true,
+  tenantId: true,
+});
+
+export type PaymentMethodCreateBody = z.infer<typeof paymentMethodCreateSchema>;
+
 export const paymentMethodApp = new Hono<{ Variables: { tenantId: string } }>()
-  .post("/", zValidator("json", paymentMethodSchema), async (c) => {
+  .post("/", zValidator("json", paymentMethodCreateSchema), async (c) => {
     const tenantId = c.get("tenantId");
     const body = c.req.valid("json");
-    await createPaymentMethod({ paymentMethod: body, tenantId });
-    return c.json(body, 201);
+    return c.json(
+      await createPaymentMethod({ paymentMethod: body, tenantId }),
+      201,
+    );
   })
   .get("/", async (c) => {
     return c.json(await listPaymentMethods({ tenantId: c.get("tenantId") }));
   })
-  .post("/:payment_method_id/default", async (c) => {
+  .post("/:paymentMethodId/default", async (c) => {
     const paymentMethod = await setDefaultPaymentMethod({
-      paymentMethodId: c.req.param("payment_method_id"),
+      paymentMethodId: c.req.param("paymentMethodId"),
       tenantId: c.get("tenantId"),
     });
     if (!paymentMethod) {
@@ -32,9 +46,9 @@ export const paymentMethodApp = new Hono<{ Variables: { tenantId: string } }>()
     }
     return c.json(paymentMethod);
   })
-  .delete("/:payment_method_id", async (c) => {
+  .delete("/:paymentMethodId", async (c) => {
     const paymentMethod = await deletePaymentMethod({
-      paymentMethodId: c.req.param("payment_method_id"),
+      paymentMethodId: c.req.param("paymentMethodId"),
       tenantId: c.get("tenantId"),
     });
     if (!paymentMethod) {
