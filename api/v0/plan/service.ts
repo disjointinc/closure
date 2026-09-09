@@ -186,7 +186,7 @@ export async function createPlan({
   plan,
 }: {
   plan: PlanCreateBody;
-}): Promise<PlanApi | null> {
+}): Promise<PlanApi | { error: string }> {
   /* Hard lock: a plan sells its own product line only, so every referenced
    * feature, meter, and add-on type must belong to plan.productLineId. */
   const [lineRow] = await db
@@ -194,7 +194,7 @@ export async function createPlan({
     .from(productLines)
     .where(eq(productLines.productLineId, plan.productLineId));
   if (!lineRow) {
-    return null;
+    return { error: "product line not found" };
   }
   const referencedFeatureIds = (plan.features ?? []).map(
     (feature) => feature.featureId,
@@ -220,20 +220,28 @@ export async function createPlan({
           .where(inArray(addOnTypes.addOnTypeId, plan.addOnTypeIds))
       : [],
   ]);
+  if (featureRows.length !== referencedFeatureIds.length) {
+    return { error: "a referenced feature does not exist" };
+  }
+  if (meterRows.length !== referencedMeterIds.length) {
+    return { error: "a referenced meter does not exist" };
+  }
+  if (addOnTypeRows.length !== (plan.addOnTypeIds ?? []).length) {
+    return { error: "a referenced add-on type does not exist" };
+  }
   const sameLine = (row: { productLineId: string }) =>
     row.productLineId === plan.productLineId;
   /* Features and add-on types are hard-locked to one line; a meter may span
    * lines, so the plan's line only needs to be one of the meter's. */
-  if (
-    featureRows.length !== referencedFeatureIds.length ||
-    meterRows.length !== referencedMeterIds.length ||
-    addOnTypeRows.length !== (plan.addOnTypeIds ?? []).length ||
-    ![...featureRows, ...addOnTypeRows].every(sameLine) ||
-    !meterRows.every((meter) =>
-      meter.productLineIds.includes(plan.productLineId),
-    )
-  ) {
-    return null;
+  if (![...featureRows, ...addOnTypeRows].every(sameLine)) {
+    return {
+      error: "a referenced feature or add-on type belongs to another product line",
+    };
+  }
+  if (!meterRows.every((meter) => meter.productLineIds.includes(plan.productLineId))) {
+    return {
+      error: "a referenced meter does not apply to the plan's product line",
+    };
   }
   const planId = generateId({ prefix: "plan" });
   await db
@@ -300,7 +308,8 @@ export async function createPlan({
       )
       .onConflictDoNothing();
   }
-  return getPlan({ planId });
+  // The plan row always exists once its id is stored.
+  return getPlan({ planId }) as Promise<PlanApi>;
 }
 
 /** Deprecate the plan, or return null if no such plan exists. */

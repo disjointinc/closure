@@ -54,14 +54,8 @@ export const planApp = new Hono()
   .post("/", zValidator("json", planCreateSchema), async (c) => {
     const body = c.req.valid("json");
     const plan = await createPlan({ plan: body });
-    if (!plan) {
-      return c.json(
-        {
-          error:
-            "product line not found, or a referenced feature/meter/add-on type belongs to another line",
-        },
-        400,
-      );
+    if ("error" in plan) {
+      return c.json(plan, 400);
     }
     return c.json(plan, 201);
   })
