@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { epochMs } from "./common.ts";
 import {
+  paymentIdSchema,
   refundIdSchema,
   teamMemberIdSchema,
   tenantIdSchema,
@@ -9,6 +10,9 @@ import {
 
 export const refundSchema = z.object({
   refundId: refundIdSchema,
+  paymentId: paymentIdSchema.nullable(),
+  loanPrincipalAmount: z.number().int().nonnegative().nullable(),
+  loanInterestAmount: z.number().int().nonnegative().nullable(),
   tenantId: tenantIdSchema,
   createdAt: epochMs,
   startedProcessingAt: epochMs.nullable(),
