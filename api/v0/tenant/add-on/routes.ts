@@ -6,12 +6,14 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import { epochMs } from "../../../schemas/common.ts";
-import { addOnTypeIdSchema } from "../../../schemas/ids.ts";
+import { addOnTypeIdSchema, assignmentIdSchema } from "../../../schemas/ids.ts";
 import { attachAddOn, deleteAddOn, getAddOn, listAddOns } from "./service.ts";
 
-/** The attach targets the tenant's open assignment, inferred from the path. */
+/* A tenant may hold several open assignments, so the attach target is
+ * explicit. */
 const addOnCreateSchema = z.object({
   addOnTypeId: addOnTypeIdSchema,
+  assignmentId: assignmentIdSchema,
   startsAt: epochMs.nullable(),
   endsAt: epochMs.nullable(),
 });

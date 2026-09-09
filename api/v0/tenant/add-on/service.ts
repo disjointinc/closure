@@ -39,7 +39,7 @@ export async function getAddOn({
   return row ?? null;
 }
 
-/** Attach an add-on to the tenant's open assignment, or null if none. */
+/** Attach an add-on to an open assignment of the tenant's, or null if none. */
 export async function attachAddOn({
   addOn,
   tenantId,
@@ -50,7 +50,13 @@ export async function attachAddOn({
   const [assignment] = await db
     .select()
     .from(assignments)
-    .where(and(eq(assignments.tenantId, tenantId), isNull(assignments.endsAt)));
+    .where(
+      and(
+        eq(assignments.assignmentId, addOn.assignmentId),
+        eq(assignments.tenantId, tenantId),
+        isNull(assignments.endsAt),
+      ),
+    );
   if (!assignment) {
     return null;
   }
