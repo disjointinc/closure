@@ -71,10 +71,49 @@ export async function listPayments({
     .from(payments)
     .where(eq(payments.tenantId, tenantId))
     .orderBy(desc(payments.createdAt));
-  const found = await Promise.all(
-    rows.map((row) => getPayment({ paymentId: row.paymentId, tenantId })),
-  );
-  return found.filter((payment) => payment !== null);
+  if (rows.length === 0) {
+    return [];
+  }
+  const paymentIds = rows.map((row) => row.paymentId);
+  const [invoiceRows, loanRows] = await Promise.all([
+    db
+      .select()
+      .from(paymentInvoices)
+      .where(inArray(paymentInvoices.paymentId, paymentIds)),
+    db
+      .select()
+      .from(paymentLoans)
+      .where(inArray(paymentLoans.paymentId, paymentIds)),
+  ]);
+  const invoiceIdsByPayment = new Map<string, string[]>();
+  for (const invoice of invoiceRows) {
+    invoiceIdsByPayment.set(invoice.paymentId, [
+      ...(invoiceIdsByPayment.get(invoice.paymentId) ?? []),
+      invoice.invoiceId,
+    ]);
+  }
+  // payment_loans.payment_id is unique: at most one loan per payment.
+  const loanByPayment = new Map(loanRows.map((loan) => [loan.paymentId, loan]));
+  return rows.map((row) => {
+    const loanRow = loanByPayment.get(row.paymentId);
+    return {
+      paymentId: row.paymentId,
+      loan: loanRow
+        ? {
+            loanId: loanRow.loanId,
+            amount: loanRow.amount,
+            principalAmount: loanRow.principalAmount,
+            interestAmount: loanRow.interestAmount,
+          }
+        : null,
+      createdAt: row.createdAt,
+      startedProcessingAt: row.startedProcessingAt,
+      succeededAt: row.succeededAt,
+      failedAt: row.failedAt,
+      providerInternals: row.providerInternals,
+      invoiceIds: invoiceIdsByPayment.get(row.paymentId) ?? [],
+    };
+  });
 }
 
 export async function createPayment({
