@@ -9,7 +9,7 @@
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../../db/index.ts";
-import { rules, values } from "../../db/schema.ts";
+import { meters, plans, rules, values } from "../../db/schema.ts";
 import { generateId } from "../../lib/id.ts";
 import { taskTypeIdSchema, teamMemberIdSchema } from "../../schemas/ids.ts";
 import {
@@ -19,6 +19,7 @@ import {
   ruleSchema,
 } from "../../schemas/rule.ts";
 import { type Value, valueCreateSchema } from "../../schemas/value.ts";
+import { areLinesSynchronized } from "../product-line/service.ts";
 
 /** Call-surface rule actions: add_invoice_item carries an inline value create-input. */
 const ruleActionApiSchema = z.discriminatedUnion("type", [
@@ -155,15 +156,91 @@ export async function getRule({
   return expandRule(row);
 }
 
+/**
+ * Why a rule can't be created, when it can't. Cycle-derived triggers need a
+ * single billing-cycle anchor:
+ *
+ *   - Meter triggers whose evaluation derives from billing_cycle_end
+ *     (a cycle-aligned recurrence window, or a microcredits_spent trigger,
+ *     whose spend window is the current cycle) anchor to the meter's lines.
+ *     A meter spanning several lines anchors only when all those lines are
+ *     billing-cycle-synchronized.
+ *   - Lifecycle triggers anchor to their plan scope's line, so a
+ *     cycle-aligned window requires a plan scope in a single line.
+ */
+async function ruleCreateError({
+  rule,
+}: {
+  rule: RuleCreateBody;
+}): Promise<string | null> {
+  const trigger = rule.trigger;
+  if (
+    trigger.type === "microcredits_remaining" ||
+    trigger.type === "microcredits_spent" ||
+    trigger.type === "inactive_for"
+  ) {
+    const needsSync =
+      trigger.type === "microcredits_spent" ||
+      rule.recurrence.window === "billing_cycle_end";
+    if (!needsSync) {
+      return null;
+    }
+    const [meter] = await db
+      .select()
+      .from(meters)
+      .where(eq(meters.meterId, trigger.meterId))
+      .limit(1);
+    if (!meter) {
+      return `meter ${trigger.meterId} not found`;
+    }
+    if (
+      !(await areLinesSynchronized({ productLineIds: meter.productLineIds }))
+    ) {
+      return (
+        `a meter can only trigger tasks on billing cycle end if all the ` +
+        `product lines using that meter have synchronized billing cycles; ` +
+        `meter ${meter.meterId} applies to ${meter.productLineIds.join(", ")}, ` +
+        `which are not all synchronized`
+      );
+    }
+    return null;
+  }
+  if (rule.recurrence.window !== "billing_cycle_end") {
+    return null;
+  }
+  if (rule.scope.kind !== "plan") {
+    return (
+      "a billing_cycle_end window on a lifecycle rule needs a plan scope " +
+      "whose plans share one product line"
+    );
+  }
+  const planRows = await db
+    .select()
+    .from(plans)
+    .where(inArray(plans.planId, rule.scope.planIds));
+  const lines = new Set(planRows.map((plan) => plan.productLineId));
+  if (lines.size !== 1) {
+    return (
+      "a billing_cycle_end window on a lifecycle rule needs a plan scope " +
+      "whose plans share one product line"
+    );
+  }
+  return null;
+}
+
 /** Create a rule, minting its id and storing add_invoice_item fee values as ids. */
 export async function createRule({
   rule,
 }: {
   rule: RuleCreateBody;
-}): Promise<RuleApi | null> {
+}): Promise<RuleApi | { error: string }> {
+  const error = await ruleCreateError({ rule });
+  if (error !== null) {
+    return { error };
+  }
   const stored = await resolveRule(rule);
   await db.insert(rules).values(stored).onConflictDoNothing();
-  return getRule({ ruleId: stored.ruleId });
+  return expandRule(stored);
 }
 
 /** Deprecate the rule, or return null if no such rule exists. */

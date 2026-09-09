@@ -15,7 +15,11 @@ import {
 export const ruleApp = new Hono()
   .post("/", zValidator("json", ruleApiSchema), async (c) => {
     const body = c.req.valid("json");
-    return c.json(await createRule({ rule: body }), 201);
+    const rule = await createRule({ rule: body });
+    if ("error" in rule) {
+      return c.json(rule, 400);
+    }
+    return c.json(rule, 201);
   })
   .get("/", async (c) => {
     return c.json(await listRules());
