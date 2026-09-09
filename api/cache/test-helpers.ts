@@ -15,6 +15,7 @@ import {
   meterEvents,
   meters,
   plans,
+  productLines,
   rules,
   teamMembers,
   tenants,
@@ -33,6 +34,7 @@ export function suffix({ length }: { length: number }): string {
 
 export const newTenantId = () => `tenant_${suffix({ length: 22 })}`;
 export const newMeterId = () => `meter_${suffix({ length: 20 })}`;
+export const newProductLineId = () => `product_line_${suffix({ length: 20 })}`;
 export const newMeterEventId = () => `meter_event_${suffix({ length: 37 })}`;
 export const newCreditGrantId = () => `credit_grant_${suffix({ length: 25 })}`;
 export const newRuleId = () => `rule_${suffix({ length: 20 })}`;
@@ -54,12 +56,29 @@ export async function makeTenant({
   return resolvedTenantId;
 }
 
+export async function makeProductLine({
+  productLineId,
+}: { productLineId?: string } = {}): Promise<string> {
+  const resolvedProductLineId = productLineId ?? newProductLineId();
+  await db.insert(productLines).values({
+    productLineId: resolvedProductLineId,
+    createdAt: Date.now(),
+    deprecatedAt: null,
+    forceBillingCycleSynchronizationWithProductLineIds: [],
+    name: "Test product line",
+    description: null,
+  });
+  return resolvedProductLineId;
+}
+
 export async function makeMeter({
   meterId,
-}: { meterId?: string } = {}): Promise<string> {
+  productLineId,
+}: { meterId?: string; productLineId?: string } = {}): Promise<string> {
   const resolvedMeterId = meterId ?? newMeterId();
   await db.insert(meters).values({
     meterId: resolvedMeterId,
+    productLineIds: [productLineId ?? (await makeProductLine())],
     createdAt: Date.now(),
     deprecatedAt: null,
     name: "Test meter",
@@ -85,16 +104,16 @@ export async function makeCycle(): Promise<string> {
   return cycleId;
 }
 
-export async function makePlan(): Promise<string> {
+export async function makePlan({
+  productLineId,
+}: { productLineId?: string } = {}): Promise<string> {
   const planId = newPlanId();
   await db.insert(plans).values({
     planId,
+    productLineId: productLineId ?? (await makeProductLine()),
     derivedFromPlanId: null,
     createdAt: Date.now(),
     deprecatedAt: null,
-    kind: "standard",
-    defaultInterestPercentage: null,
-    minimumPaymentValueId: null,
     name: "Test plan",
     description: null,
   });
@@ -114,10 +133,12 @@ export async function makeAssignment({
 }): Promise<string> {
   const assignmentId = newAssignmentId();
   const cycleId = await makeCycle();
+  const [plan] = await db.select().from(plans).where(eq(plans.planId, planId));
   await db.insert(assignments).values({
     assignmentId,
     tenantId,
     planId,
+    productLineId: plan.productLineId,
     experimentId: null,
     cycleId,
     createdAt: Date.now(),
