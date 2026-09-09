@@ -1,27 +1,32 @@
 /**
  * v0/tenant/credit-grant/service.ts -- credit grant business logic. Each grant is
  * recorded in pg first (durable), then applied to the Redis balance exactly
- * once via the mgrant: marker, and finally stamped with applied_at so
+ * once via the mgrant: marker, and finally stamped with applied_at_micros so
  * balance rebuilds can replay it. A crash anywhere in that sequence is
- * safe: the reconciler applies any grant whose applied_at is still NULL.
+ * safe: the reconciler applies any grant whose applied_at_micros is still
+ * NULL.
  */
 import { desc, eq } from "drizzle-orm";
 import {
   applyCreditGrant,
   stampGrantApplied,
-} from "../../../cache/metering.ts";
+} from "../../../cache/meter/index.ts";
 import { db } from "../../../db/index.ts";
 import { creditGrants } from "../../../db/schema.ts";
+import { generateId } from "../../../lib/id.ts";
 import type { CreditGrant } from "../../../schemas/credit-grant.ts";
+import type { CreditGrantCreateBody } from "./routes.ts";
 
+// The row carries reconciler state (applied_at_micros) that isn't part of the
+// wire shape, so it can't pass through directly.
 function rowToCreditGrant(row: typeof creditGrants.$inferSelect): CreditGrant {
   return {
-    uniqueId: row.uniqueId,
-    meter: row.meter,
-    on: row.on,
-    by: row.byTeamMember,
+    creditGrantId: row.creditGrantId,
+    meterId: row.meterId,
+    grantedAt: row.grantedAt,
+    byTeamMemberId: row.byTeamMemberId,
     reason: row.reason,
-    amount: row.amountMicrocredits,
+    amountMicrocredits: row.amountMicrocredits,
   };
 }
 
@@ -33,8 +38,8 @@ export async function listCreditGrants({
   const rows = await db
     .select()
     .from(creditGrants)
-    .where(eq(creditGrants.tenant, tenantId))
-    .orderBy(desc(creditGrants.on));
+    .where(eq(creditGrants.tenantId, tenantId))
+    .orderBy(desc(creditGrants.grantedAt));
   return rows.map(rowToCreditGrant);
 }
 
@@ -47,28 +52,23 @@ export async function createCreditGrant({
   grant,
   tenantId,
 }: {
-  grant: CreditGrant;
+  grant: CreditGrantCreateBody;
   tenantId: string;
-}): Promise<void> {
+}): Promise<CreditGrant> {
+  const creditGrantId = generateId({ prefix: "credit_grant" });
+  const grantedAt = Date.now();
   await db
     .insert(creditGrants)
-    .values({
-      uniqueId: grant.uniqueId,
-      tenant: tenantId,
-      meter: grant.meter,
-      on: grant.on,
-      byTeamMember: grant.by,
-      reason: grant.reason,
-      amountMicrocredits: grant.amount,
-    })
+    .values({ ...grant, creditGrantId, grantedAt, tenantId })
     .onConflictDoNothing();
   await applyCreditGrant({
     grant: {
-      amount: grant.amount,
-      meter: grant.meter,
-      tenant: tenantId,
-      uniqueId: grant.uniqueId,
+      amount: grant.amountMicrocredits,
+      creditGrantId,
+      meterId: grant.meterId,
+      tenantId,
     },
   });
-  await stampGrantApplied({ grantId: grant.uniqueId });
+  await stampGrantApplied({ creditGrantId });
+  return { ...grant, creditGrantId, grantedAt };
 }

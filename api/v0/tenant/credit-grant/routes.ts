@@ -1,27 +1,36 @@
 /**
- * v0/tenant/credit-grant/routes.ts -- HTTP for /v0/tenant/:id/credit-grant:
+ * v0/tenant/credit-grant/routes.ts -- HTTP for /v0/tenant/:tenantId/credit-grant:
  * request validation and wiring. Business logic lives in service.ts.
  */
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
-import { MeterBalanceUnavailableError } from "../../../cache/metering.ts";
+import { z } from "zod";
+import { MeterBalanceUnavailableError } from "../../../cache/meter/index.ts";
 import { creditGrantSchema } from "../../../schemas/credit-grant.ts";
 import { createCreditGrant, listCreditGrants } from "./service.ts";
 
+const creditGrantCreateSchema = creditGrantSchema.omit({
+  creditGrantId: true,
+  grantedAt: true,
+});
+
+export type CreditGrantCreateBody = z.infer<typeof creditGrantCreateSchema>;
+
 export const creditGrantApp = new Hono<{ Variables: { tenantId: string } }>()
-  .post("/", zValidator("json", creditGrantSchema), async (c) => {
+  .post("/", zValidator("json", creditGrantCreateSchema), async (c) => {
     const tenantId = c.get("tenantId");
     const body = c.req.valid("json");
     try {
-      await createCreditGrant({ grant: body, tenantId });
+      return c.json(await createCreditGrant({ grant: body, tenantId }), 201);
     } catch (error) {
       if (error instanceof MeterBalanceUnavailableError) {
-        // The grant is durable in pg with applied_at NULL; the reconciler
-        // will apply it. Retrying this request is safe (idempotent marker).
+        // The grant is durable in pg with applied_at_micros NULL; the
+        // reconciler will apply it. Retrying this request is safe
+        // (idempotent marker).
         console.error("meter balance unavailable for credit grant", {
           error,
-          meter: error.meter,
-          tenant: error.tenant,
+          meterId: error.meterId,
+          tenantId: error.tenantId,
         });
         return c.json(
           {
@@ -33,7 +42,6 @@ export const creditGrantApp = new Hono<{ Variables: { tenantId: string } }>()
       }
       throw error;
     }
-    return c.json(body, 201);
   })
   .get("/", async (c) => {
     return c.json(await listCreditGrants({ tenantId: c.get("tenantId") }));
