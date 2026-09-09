@@ -2,20 +2,35 @@
  * v0/experiment/service.ts -- experiment business logic. Treatments are
  * passed inline on create; their ids are server-minted. Experiments are
  * concluded, never deleted.
+ *
+ * Creating an experiment with assigned tenants enrolls them on the
+ * treatment plans server-side (one assignment per tenant and plan, tagged
+ * with the experimentId); concluding rolls every assigned tenant onto the
+ * concluding plans, re-anchoring their whole billing-cycle-synchronized
+ * group so the shared startsAt/cycleId invariant holds.
  */
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
+import { setMeterBalance } from "../../cache/meter/index.ts";
 import { db } from "../../db/index.ts";
 import {
+  assignmentAddOns,
+  assignments,
   experiments,
   experimentTreatmentPlans,
   experimentTreatmentTenants,
   experimentTreatments,
+  planMeters,
   plans,
   tenants,
 } from "../../db/schema.ts";
 import { generateId } from "../../lib/id.ts";
 import type { Experiment } from "../../schemas/experiment.ts";
 import type { Treatment } from "../../schemas/treatment.ts";
+import { getSynchronizedLineIds } from "../product-line/service.ts";
+import {
+  createAssignment,
+  validateAssignmentTerms,
+} from "../tenant/assignment/service.ts";
 import type { ConcludeExperimentBody, ExperimentCreateBody } from "./routes.ts";
 
 async function listTreatments({
@@ -36,7 +51,7 @@ async function listTreatments({
     .from(experimentTreatmentTenants)
     .where(eq(experimentTreatmentTenants.experimentId, experimentId));
   return treatmentRows.map((treatment) => {
-    const assigned = tenantRows.filter(
+    const assignedTenantRows = tenantRows.filter(
       (tenant) => tenant.treatmentId === treatment.treatmentId,
     );
     return {
@@ -45,8 +60,8 @@ async function listTreatments({
         .filter((plan) => plan.treatmentId === treatment.treatmentId)
         .map((plan) => plan.planId),
       tenantPercentage: treatment.tenantPercentage,
-      assignedTenantIds: assigned.length
-        ? assigned.map((tenant) => tenant.tenantId)
+      assignedTenantIds: assignedTenantRows.length
+        ? assignedTenantRows.map((tenant) => tenant.tenantId)
         : null,
     };
   });
@@ -84,7 +99,11 @@ export async function listExperiments(): Promise<Experiment[]> {
   return found.filter((experiment) => experiment !== null);
 }
 
-async function resolvePlanLines({
+/**
+ * Map each plan id to the product line it belongs to. Returns null when any
+ * plan id is unknown, so callers can reject bad references up front.
+ */
+async function resolveProductLineByPlanId({
   planIds,
 }: {
   planIds: string[];
@@ -102,40 +121,47 @@ async function resolvePlanLines({
   return new Map(rows.map((row) => [row.planId, row.productLineId]));
 }
 
-function linesPerTreatment({
-  planLines,
+/**
+ * The set of product lines each treatment holds plans in, one set per
+ * treatment. Returns null when a treatment repeats a plan id or holds two
+ * plans in the same line.
+ */
+function lineIdsPerTreatment({
+  productLineByPlanId,
   treatments,
 }: {
-  planLines: Map<string, string>;
+  productLineByPlanId: Map<string, string>;
   treatments: { planIds: string[] }[];
 }): Set<string>[] | null {
-  const seen: Set<string>[] = [];
+  const lineIdsPerTreatment: Set<string>[] = [];
   for (const treatment of treatments) {
     if (new Set(treatment.planIds).size !== treatment.planIds.length) {
       return null;
     }
-    const lines = new Set<string>();
+    const treatmentLineIds = new Set<string>();
     for (const planId of treatment.planIds) {
-      const line = planLines.get(planId);
-      if (line === undefined || lines.has(line)) {
+      const lineId = productLineByPlanId.get(planId);
+      if (lineId === undefined || treatmentLineIds.has(lineId)) {
         return null;
       }
-      lines.add(line);
+      treatmentLineIds.add(lineId);
     }
-    seen.push(lines);
+    lineIdsPerTreatment.push(treatmentLineIds);
   }
-  return seen;
+  return lineIdsPerTreatment;
 }
 
-function sameLines({
-  treatmentLines,
+/** Whether every treatment holds plans in exactly the same product lines. */
+function sameLineIdsAcrossTreatments({
+  treatmentLineIds,
 }: {
-  treatmentLines: Set<string>[];
+  treatmentLineIds: Set<string>[];
 }): boolean {
-  const [first, ...rest] = treatmentLines;
-  return rest.every(
-    (lines) =>
-      lines.size === first.size && [...lines].every((line) => first.has(line)),
+  const [firstTreatmentLineIds, ...otherTreatmentLineIds] = treatmentLineIds;
+  return otherTreatmentLineIds.every(
+    (lineIds) =>
+      lineIds.size === firstTreatmentLineIds.size &&
+      [...lineIds].every((lineId) => firstTreatmentLineIds.has(lineId)),
   );
 }
 
@@ -144,22 +170,22 @@ export async function createExperiment({
 }: {
   experiment: ExperimentCreateBody;
 }): Promise<Experiment | { error: string }> {
-  const planLines = await resolvePlanLines({
+  const productLineByPlanId = await resolveProductLineByPlanId({
     planIds: experiment.treatments.flatMap((treatment) => treatment.planIds),
   });
-  if (!planLines) {
+  if (!productLineByPlanId) {
     return { error: "treatments must reference known plans" };
   }
-  const treatmentLines = linesPerTreatment({
-    planLines,
+  const treatmentLineIds = lineIdsPerTreatment({
+    productLineByPlanId,
     treatments: experiment.treatments,
   });
-  if (!treatmentLines) {
+  if (!treatmentLineIds) {
     return {
       error: "each treatment must hold at most one plan per product line",
     };
   }
-  if (!sameLines({ treatmentLines })) {
+  if (!sameLineIdsAcrossTreatments({ treatmentLineIds })) {
     return { error: "treatments must touch the same product lines" };
   }
   const tenantIds = experiment.treatments.flatMap(
@@ -176,6 +202,34 @@ export async function createExperiment({
     : [];
   if (tenantRows.length !== tenantIds.length) {
     return { error: "treatments must reference known tenants" };
+  }
+  const enrollments = experiment.treatments.flatMap((treatment) =>
+    (treatment.assignedTenantIds ?? []).flatMap((tenantId) =>
+      treatment.planIds.map((planId) => ({ planId, tenantId })),
+    ),
+  );
+  if (enrollments.length > 0) {
+    if (experiment.assignmentTerms === null) {
+      return {
+        error: "assignment terms are required when treatments assign tenants",
+      };
+    }
+    const assignmentTerms = experiment.assignmentTerms;
+    for (const { planId, tenantId } of enrollments) {
+      const productLineId = productLineByPlanId.get(planId);
+      if (productLineId === undefined) {
+        return { error: "treatments must reference known plans" };
+      }
+      const invalid = await validateAssignmentTerms({
+        cycleId: assignmentTerms.cycleId,
+        productLineId,
+        startsAt: assignmentTerms.startsAt,
+        tenantId,
+      });
+      if (invalid !== null) {
+        return { error: invalid };
+      }
+    }
   }
   const experimentId = generateId({ prefix: "experiment" });
   await db.transaction(async (tx) => {
@@ -213,6 +267,32 @@ export async function createExperiment({
       );
     }
   });
+  if (experiment.assignmentTerms !== null) {
+    const assignmentTerms = experiment.assignmentTerms;
+    for (const { planId, tenantId } of enrollments) {
+      const assignment = await createAssignment({
+        assignment: {
+          addOns: [],
+          cycleId: assignmentTerms.cycleId,
+          endsAt: assignmentTerms.endsAt,
+          experimentId,
+          planId,
+          startsAt: assignmentTerms.startsAt,
+        },
+        tenantId,
+      });
+      /* Pre-validated above, so a failure here means the tenant's
+       * assignments changed mid-request. */
+      if (assignment === null || "error" in assignment) {
+        console.error("experiment enrollment failed", {
+          assignment,
+          experimentId,
+          planId,
+          tenantId,
+        });
+      }
+    }
+  }
   // The experiment row always exists once its id is stored.
   return getExperiment({ experimentId }) as Promise<Experiment>;
 }
@@ -228,37 +308,39 @@ export async function concludeExperiment({
   if (!experiment) {
     return null;
   }
-  const planLines = await resolvePlanLines({
+  const productLineByPlanId = await resolveProductLineByPlanId({
     planIds: experiment.treatments.flatMap((treatment) => treatment.planIds),
   });
-  if (!planLines) {
+  if (!productLineByPlanId) {
     return { error: "treatments must reference known plans" };
   }
-  const touchedLines = new Set(planLines.values());
-  const conclusionLines = body.concludingPlans.map(
+  // Every product line the experiment's treatments hold a plan in.
+  const experimentLineIds = new Set(productLineByPlanId.values());
+  const concludingLineIds = body.concludingPlans.map(
     (conclusion) => conclusion.productLineId,
   );
   if (
-    new Set(conclusionLines).size !== conclusionLines.length ||
-    conclusionLines.length !== touchedLines.size ||
-    !conclusionLines.every((line) => touchedLines.has(line))
+    new Set(concludingLineIds).size !== concludingLineIds.length ||
+    concludingLineIds.length !== experimentLineIds.size ||
+    !concludingLineIds.every((lineId) => experimentLineIds.has(lineId))
   ) {
     return {
       error:
         "conclusion must name each product line the treatments touched exactly once",
     };
   }
-  const conclusionPlanLines = await resolvePlanLines({
+  const productLineByConcludingPlanId = await resolveProductLineByPlanId({
     planIds: body.concludingPlans
       .map((conclusion) => conclusion.planId)
       .filter((planId): planId is string => planId !== null),
   });
   if (
-    !conclusionPlanLines ||
+    !productLineByConcludingPlanId ||
     !body.concludingPlans.every(
       (conclusion) =>
         conclusion.planId === null ||
-        conclusionPlanLines.get(conclusion.planId) === conclusion.productLineId,
+        productLineByConcludingPlanId.get(conclusion.planId) ===
+          conclusion.productLineId,
     )
   ) {
     return {
@@ -266,10 +348,249 @@ export async function concludeExperiment({
         "concluding plans must exist and belong to the named product lines",
     };
   }
+  const now = Date.now();
+  const concludingPlanIdByLineId = new Map(
+    body.concludingPlans.map((conclusion) => [
+      conclusion.productLineId,
+      conclusion.planId,
+    ]),
+  );
+  /* Group the experiment's lines into billing-cycle-synchronized components
+   * (connected components of the synchronization graph, which can include
+   * lines the experiment itself never touched). This grouping is
+   * tenant-independent: every open assignment inside one component shares a
+   * single startsAt/cycleId anchor, so concluding anything in a component
+   * re-anchors that component as a whole. */
+  const lineIdsAlreadyGrouped = new Set<string>();
+  const synchronizedLineGroups: Set<string>[] = [];
+  for (const lineId of experimentLineIds) {
+    if (lineIdsAlreadyGrouped.has(lineId)) {
+      continue;
+    }
+    const synchronizedLineIds = await getSynchronizedLineIds({
+      productLineId: lineId,
+    });
+    for (const groupedLineId of synchronizedLineIds) {
+      lineIdsAlreadyGrouped.add(groupedLineId);
+    }
+    synchronizedLineGroups.push(synchronizedLineIds);
+  }
+  const assignedTenantIds = [
+    ...new Set(
+      experiment.treatments.flatMap(
+        (treatment) => treatment.assignedTenantIds ?? [],
+      ),
+    ),
+  ];
+  /* Roll every assigned tenant onto the concluding plans. Untouched lines in
+   * a group keep their plan, add-ons, and meter balances under the new
+   * anchor; experiment lines get the concluding plan (fresh balances), or
+   * just end when the concluding planId is null. The roll is batched: one
+   * read of every open assignment in play, a pure pass building the row
+   * changes, then one update or insert per row kind. */
+  const groupIndexByLineId = new Map<string, number>();
+  synchronizedLineGroups.forEach((lineIds, index) => {
+    for (const lineId of lineIds) {
+      groupIndexByLineId.set(lineId, index);
+    }
+  });
+  type AssignmentRow = typeof assignments.$inferSelect;
+  // Every open assignment any assigned tenant holds in any grouped line.
+  const openAssignmentRows: AssignmentRow[] =
+    assignedTenantIds.length > 0 && groupIndexByLineId.size > 0
+      ? await db
+          .select()
+          .from(assignments)
+          .where(
+            and(
+              inArray(assignments.tenantId, assignedTenantIds),
+              inArray(assignments.productLineId, [
+                ...groupIndexByLineId.keys(),
+              ]),
+              isNull(assignments.endsAt),
+            ),
+          )
+      : [];
+  /* Bucket the rows by tenant and group: one bucket is one tenant's open
+   * assignments inside one synchronized group, all sharing that group's
+   * current anchor. */
+  const openAssignmentsByTenantAndGroup = new Map<
+    string,
+    Map<number, AssignmentRow[]>
+  >();
+  for (const row of openAssignmentRows) {
+    const groupIndex = groupIndexByLineId.get(row.productLineId);
+    if (groupIndex === undefined) {
+      continue;
+    }
+    const rowsByGroupIndex =
+      openAssignmentsByTenantAndGroup.get(row.tenantId) ??
+      new Map<number, AssignmentRow[]>();
+    const groupOpenAssignments = rowsByGroupIndex.get(groupIndex) ?? [];
+    groupOpenAssignments.push(row);
+    rowsByGroupIndex.set(groupIndex, groupOpenAssignments);
+    openAssignmentsByTenantAndGroup.set(row.tenantId, rowsByGroupIndex);
+  }
+  /* Build the row changes without touching the database:
+   * - assignmentIdsToEnd: every open assignment in play ends now, whether it
+   *   is recreated (untouched line), replaced (concluding plan), or simply
+   *   ended (concluding planId is null).
+   * - untouchedLineRecreations: lines the experiment never touched keep
+   *   their plan and experimentId under the group's new anchor. Recreate
+   *   rather than update in place: startsAt is assignment history, and the
+   *   ended row records when the re-anchor happened.
+   * - concludingAssignments: fresh assignments onto the concluding plans,
+   *   tagged with the experimentId. */
+  const assignmentIdsToEnd: string[] = [];
+  const untouchedLineRecreations: {
+    sourceAssignmentId: string;
+    recreatedAssignment: typeof assignments.$inferInsert;
+  }[] = [];
+  const concludingAssignments: (typeof assignments.$inferInsert)[] = [];
+  for (const rowsByGroupIndex of openAssignmentsByTenantAndGroup.values()) {
+    for (const groupOpenAssignments of rowsByGroupIndex.values()) {
+      /* Every row in the bucket shares the group's anchor (enforced at
+       * assignment create), so any row provides the cycleId the group keeps
+       * as it re-anchors to now. */
+      const [anchorAssignment] = groupOpenAssignments;
+      if (anchorAssignment === undefined) {
+        continue;
+      }
+      const newGroupAnchor = {
+        cycleId: anchorAssignment.cycleId,
+        startsAt: now,
+      };
+      for (const openAssignment of groupOpenAssignments) {
+        assignmentIdsToEnd.push(openAssignment.assignmentId);
+        if (!experimentLineIds.has(openAssignment.productLineId)) {
+          untouchedLineRecreations.push({
+            sourceAssignmentId: openAssignment.assignmentId,
+            recreatedAssignment: {
+              assignmentId: generateId({ prefix: "assignment" }),
+              tenantId: openAssignment.tenantId,
+              planId: openAssignment.planId,
+              productLineId: openAssignment.productLineId,
+              experimentId: openAssignment.experimentId,
+              cycleId: newGroupAnchor.cycleId,
+              createdAt: now,
+              startsAt: newGroupAnchor.startsAt,
+              endsAt: null,
+            },
+          });
+          continue;
+        }
+        const concludingPlanId = concludingPlanIdByLineId.get(
+          openAssignment.productLineId,
+        );
+        // Null means "end in this line with no replacement".
+        if (concludingPlanId === null || concludingPlanId === undefined) {
+          continue;
+        }
+        concludingAssignments.push({
+          assignmentId: generateId({ prefix: "assignment" }),
+          tenantId: openAssignment.tenantId,
+          planId: concludingPlanId,
+          productLineId: openAssignment.productLineId,
+          experimentId,
+          cycleId: newGroupAnchor.cycleId,
+          createdAt: now,
+          startsAt: newGroupAnchor.startsAt,
+          endsAt: null,
+        });
+      }
+    }
+  }
+  /* End every open assignment first: the one-open-per-line unique index must
+   * be clear before the recreations and concluding assignments insert. */
+  if (assignmentIdsToEnd.length > 0) {
+    await db
+      .update(assignments)
+      .set({ endsAt: now })
+      .where(inArray(assignments.assignmentId, assignmentIdsToEnd));
+  }
+  if (untouchedLineRecreations.length > 0) {
+    // Add-ons live on the ended rows; carry them onto the recreations.
+    const carriedAddOnRows = await db
+      .select()
+      .from(assignmentAddOns)
+      .where(
+        and(
+          inArray(
+            assignmentAddOns.assignmentId,
+            untouchedLineRecreations.map(
+              (recreation) => recreation.sourceAssignmentId,
+            ),
+          ),
+          isNull(assignmentAddOns.deletedAt),
+        ),
+      );
+    await db
+      .insert(assignments)
+      .values(
+        untouchedLineRecreations.map(
+          (recreation) => recreation.recreatedAssignment,
+        ),
+      );
+    const recreatedIdBySourceId = new Map(
+      untouchedLineRecreations.map((recreation) => [
+        recreation.sourceAssignmentId,
+        recreation.recreatedAssignment.assignmentId,
+      ]),
+    );
+    const carriedAddOnInserts: (typeof assignmentAddOns.$inferInsert)[] =
+      carriedAddOnRows.flatMap((addOn) => {
+        const assignmentId = recreatedIdBySourceId.get(addOn.assignmentId);
+        if (assignmentId === undefined) {
+          return [];
+        }
+        return [
+          {
+            addOnId: generateId({ prefix: "add_on" }),
+            assignmentId,
+            addOnTypeId: addOn.addOnTypeId,
+            createdAt: now,
+            startsAt: addOn.startsAt,
+            endsAt: addOn.endsAt,
+            deletedAt: null,
+          },
+        ];
+      });
+    if (carriedAddOnInserts.length > 0) {
+      await db.insert(assignmentAddOns).values(carriedAddOnInserts);
+    }
+  }
+  if (concludingAssignments.length > 0) {
+    await db.insert(assignments).values(concludingAssignments);
+    const concludingPlanMeters = await db
+      .select()
+      .from(planMeters)
+      .where(
+        inArray(planMeters.planId, [
+          ...new Set(
+            concludingAssignments.map((assignment) => assignment.planId),
+          ),
+        ]),
+      );
+    /* Moving onto a new plan starts its meters fresh from the plan's default
+     * allocations (same as any assignment create). Redis balances are
+     * per-key, so these stay individual writes. */
+    for (const concludingAssignment of concludingAssignments) {
+      for (const planMeter of concludingPlanMeters) {
+        if (planMeter.planId !== concludingAssignment.planId) {
+          continue;
+        }
+        await setMeterBalance({
+          balanceMicrocredits: planMeter.defaultMicrocredits,
+          meterId: planMeter.meterId,
+          tenantId: concludingAssignment.tenantId,
+        });
+      }
+    }
+  }
   await db
     .update(experiments)
     .set({
-      concludedAt: Date.now(),
+      concludedAt: now,
       concludingPlans: body.concludingPlans,
     })
     .where(eq(experiments.experimentId, experimentId));
