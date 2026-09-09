@@ -39,6 +39,8 @@ import { db } from "../../db/index.ts";
 import {
   assignments,
   invoices,
+  meters,
+  plans,
   rules,
   ruleSchedulerState,
 } from "../../db/schema.ts";
@@ -62,17 +64,15 @@ const LIFECYCLE_CHUNK_SIZE = 1_000;
 const MAX_CHUNKS_PER_TICK = 10;
 
 /**
- * The open-assignment tenants a rule applies to, with each tenant's plan.
- * One indexed query; the scope filter folds into it so there is no separate
- * assignments probe per candidate. Global and tenant scopes don't need the
- * plan map (tenant scope is a single explicit tenant), but fetching it is
- * one row per tenant and keeps the call sites uniform.
+ * The open-assignment tenants a rule applies to. One indexed query; the
+ * scope filter folds into it so there is no separate assignments probe per
+ * candidate. A tenant with several open assignments is one candidate.
  */
-async function scopeCandidatePlans({
+async function scopeCandidateTenants({
   rule,
 }: {
   rule: Rule;
-}): Promise<Map<string, string>> {
+}): Promise<Set<string>> {
   const scope = rule.scope;
   const conditions = [
     isNull(assignments.endsAt),
@@ -85,10 +85,10 @@ async function scopeCandidatePlans({
     conditions.push(inArray(assignments.planId, scope.planIds));
   }
   const rows = await db
-    .select({ tenantId: assignments.tenantId, planId: assignments.planId })
+    .select({ tenantId: assignments.tenantId })
     .from(assignments)
     .where(and(...conditions));
-  return new Map(rows.map((row) => [row.tenantId, row.planId]));
+  return new Set(rows.map((row) => row.tenantId));
 }
 
 /** Fire inactive_for rules: no meter event within the inactivity duration. */
@@ -114,11 +114,11 @@ async function evaluateInactive(): Promise<void> {
      * day-long one. */
     /* Candidates are tenants with an open assignment in scope: one indexed
      * query that scales with open subscriptions, not the event history. */
-    const candidates = await scopeCandidatePlans({ rule });
+    const candidates = await scopeCandidateTenants({ rule });
     if (candidates.size === 0) {
       continue;
     }
-    const tenantIds = [...candidates.keys()];
+    const tenantIds = [...candidates];
     const cutoffMicros = (Date.now() - windowMs) * 1000;
     /* Staleness from the last-activity read model: one MGET plus a single
      * tenant_last_activity query for the misses, so a tick does O(1) round
@@ -132,10 +132,21 @@ async function evaluateInactive(): Promise<void> {
     if (staleIds.length === 0) {
       continue;
     }
-    /* One query for every stale tenant's billing cycle; the firing key is
-     * anchored to the last-seen timestamp so a fresh event opens a new
-     * inactivity window. */
-    const cyclesByTenant = await getBillingCycles({ tenantIds: staleIds });
+    /* One query for every stale tenant's billing cycle in the meter's
+     * product line; the firing key is anchored to the last-seen timestamp so
+     * a fresh event opens a new inactivity window. */
+    const [meterRow] = await db
+      .select()
+      .from(meters)
+      .where(eq(meters.meterId, meterId))
+      .limit(1);
+    if (!meterRow) {
+      continue;
+    }
+    const cyclesByTenant = await getBillingCycles({
+      productLineIds: meterRow.productLineIds,
+      tenantIds: staleIds,
+    });
     for (const tenantId of staleIds) {
       const lastAt = activityByTenant.get(tenantId) ?? 0;
       const triggerKey = await firingKey({
@@ -201,9 +212,23 @@ async function evaluateLifecycle(): Promise<void> {
     let cursorAt = stateRow?.evaluatedThroughMs ?? 0;
     let cursorId = "";
     /* Scope lookup once per rule. Global rules skip it entirely: the open-
-     * assignment map would be loaded and then ignored for every chunk. */
+     * assignment set would be loaded and then ignored for every chunk. */
     const candidates =
-      rule.scope.kind === "global" ? null : await scopeCandidatePlans({ rule });
+      rule.scope.kind === "global"
+        ? null
+        : await scopeCandidateTenants({ rule });
+    /* Cycle-aligned windows anchor to the rule scope's product line; the
+     * write-time check guarantees a cycle-windowed lifecycle rule is
+     * plan-scoped on a single line. Other rules never read the cycle. */
+    let anchorProductLineId: string | null = null;
+    if (rule.scope.kind === "plan") {
+      const planRows = await db
+        .select()
+        .from(plans)
+        .where(inArray(plans.planId, rule.scope.planIds));
+      const lines = new Set(planRows.map((plan) => plan.productLineId));
+      anchorProductLineId = lines.size === 1 ? [...lines][0] : null;
+    }
     for (let chunk = 0; chunk < MAX_CHUNKS_PER_TICK; chunk++) {
       const due = await db
         .select()
@@ -232,9 +257,12 @@ async function evaluateLifecycle(): Promise<void> {
         }
         return candidates.has(invoice.tenantId);
       });
-      const cyclesByTenant = await getBillingCycles({
-        tenantIds: inScope.map((invoice) => invoice.tenantId),
-      });
+      const cyclesByTenant = anchorProductLineId
+        ? await getBillingCycles({
+            productLineIds: [anchorProductLineId],
+            tenantIds: inScope.map((invoice) => invoice.tenantId),
+          })
+        : new Map();
       for (const invoice of due) {
         if (invoice.closedAt === null) {
           continue;
