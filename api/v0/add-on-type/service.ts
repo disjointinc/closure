@@ -9,6 +9,7 @@ import {
   addOnTypeFeatures,
   addOnTypePrices,
   addOnTypes,
+  features,
   values,
 } from "../../db/schema.ts";
 import { generateId } from "../../lib/id.ts";
@@ -46,6 +47,7 @@ export async function getAddOnType({
   const valueById = new Map(valueRows.map((value) => [value.valueId, value]));
   return {
     addOnTypeId: row.addOnTypeId,
+    productLineId: row.productLineId,
     createdAt: row.createdAt,
     deprecatedAt: row.deprecatedAt,
     name: row.name,
@@ -77,11 +79,27 @@ export async function createAddOnType({
 }: {
   addOnType: AddOnTypeCreateBody;
 }): Promise<AddOnTypeApi | null> {
+  /* Hard lock: an add-on type extends its own line's plans, so every
+   * referenced feature must belong to the same line. */
+  const featureIds = addOnType.features.map((feature) => feature.featureId);
+  const featureRows = featureIds.length
+    ? await db
+        .select()
+        .from(features)
+        .where(inArray(features.featureId, featureIds))
+    : [];
+  if (
+    featureRows.length !== featureIds.length ||
+    !featureRows.every((row) => row.productLineId === addOnType.productLineId)
+  ) {
+    return null;
+  }
   const addOnTypeId = generateId({ prefix: "add_on_type" });
   await db
     .insert(addOnTypes)
     .values({
       addOnTypeId,
+      productLineId: addOnType.productLineId,
       createdAt: Date.now(),
       deprecatedAt: null,
       name: addOnType.name,

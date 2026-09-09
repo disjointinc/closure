@@ -38,7 +38,14 @@ export type AddOnTypeCreateBody = z.infer<typeof addOnTypeCreateSchema>;
 export const addOnTypeApp = new Hono()
   .post("/", zValidator("json", addOnTypeCreateSchema), async (c) => {
     const body = c.req.valid("json");
-    return c.json(await createAddOnType({ addOnType: body }), 201);
+    const addOnType = await createAddOnType({ addOnType: body });
+    if (!addOnType) {
+      return c.json(
+        { error: "a referenced feature belongs to another product line" },
+        400,
+      );
+    }
+    return c.json(addOnType, 201);
   })
   .get("/", async (c) => {
     return c.json(await listAddOnTypes());
