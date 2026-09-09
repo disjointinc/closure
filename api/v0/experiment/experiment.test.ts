@@ -28,6 +28,7 @@ import {
   planMeters,
   productLines,
 } from "../../db/schema.ts";
+import { PRESERVE_CONCLUDING_PLAN } from "../../schemas/experiment.ts";
 import { createAssignment } from "../tenant/assignment/service.ts";
 import type { ExperimentCreateBody } from "./routes.ts";
 import { concludeExperiment, createExperiment } from "./service.ts";
@@ -401,5 +402,113 @@ describe("experiment conclusion", () => {
     expect(lineBOpen?.cycleId).toBe(cycleId);
     // ...and its meter balance is untouched.
     expect(await getMeterBalance({ meterId: meterB, tenantId })).toBe(123_456);
+  });
+
+  it("leaves assignments untouched when every line is preserved", async () => {
+    const lineA = await makeProductLine();
+    const planA1 = await makePlan({ productLineId: lineA });
+    const planA2 = await makePlan({ productLineId: lineA });
+    const tenantId = await makeTenant();
+    const created = await createExperiment({
+      experiment: createBody({
+        assignmentTerms: {
+          cycleId: await makeCycle(),
+          startsAt: Date.now() - 60_000,
+          endsAt: null,
+        },
+        treatments: [
+          {
+            planIds: [planA1],
+            tenantPercentage: 50,
+            assignedTenantIds: [tenantId],
+          },
+          { planIds: [planA2], tenantPercentage: 50, assignedTenantIds: null },
+        ],
+      }),
+    });
+    if ("error" in created) {
+      throw new Error(created.error);
+    }
+    const [before] = await openAssignments({ tenantId });
+
+    const concluded = await concludeExperiment({
+      body: {
+        concludingPlans: [
+          { productLineId: lineA, planId: PRESERVE_CONCLUDING_PLAN },
+        ],
+      },
+      experimentId: created.experimentId,
+    });
+    if (concluded === null || "error" in concluded) {
+      throw new Error(concluded === null ? "not found" : concluded.error);
+    }
+    expect(concluded.concludedAt).not.toBeNull();
+
+    // Bit-for-bit unchanged: same assignment row, same anchor.
+    const [after] = await openAssignments({ tenantId });
+    expect(after?.assignmentId).toBe(before?.assignmentId);
+    expect(after?.startsAt).toBe(before?.startsAt);
+    expect(after?.planId).toBe(planA1);
+  });
+
+  it("re-anchors a preserved line only when a synchronized sibling concludes", async () => {
+    const lineA = await makeSynchronizedLine();
+    const lineB = await makeSynchronizedLine({ synchronizedWith: lineA });
+    const planA1 = await makePlan({ productLineId: lineA });
+    const planA2 = await makePlan({ productLineId: lineA });
+    const planB1 = await makePlan({ productLineId: lineB });
+    const planB2 = await makePlan({ productLineId: lineB });
+    const winner = await makePlan({ productLineId: lineA });
+    const tenantId = await makeTenant();
+    const cycleId = await makeCycle();
+    const startsAt = Date.now() - 60_000;
+    const created = await createExperiment({
+      experiment: createBody({
+        assignmentTerms: { cycleId, startsAt, endsAt: null },
+        treatments: [
+          {
+            planIds: [planA1, planB1],
+            tenantPercentage: 50,
+            assignedTenantIds: [tenantId],
+          },
+          {
+            planIds: [planA2, planB2],
+            tenantPercentage: 50,
+            assignedTenantIds: null,
+          },
+        ],
+      }),
+    });
+    if ("error" in created) {
+      throw new Error(created.error);
+    }
+    const openBefore = await openAssignments({ tenantId });
+    const lineBBefore = openBefore.find((row) => row.productLineId === lineB);
+
+    const concluded = await concludeExperiment({
+      body: {
+        concludingPlans: [
+          { productLineId: lineA, planId: winner },
+          { productLineId: lineB, planId: PRESERVE_CONCLUDING_PLAN },
+        ],
+      },
+      experimentId: created.experimentId,
+    });
+    if (concluded === null || "error" in concluded) {
+      throw new Error(concluded === null ? "not found" : concluded.error);
+    }
+
+    const open = await openAssignments({ tenantId });
+    expect(open.length).toBe(2);
+    const lineAOpen = open.find((row) => row.productLineId === lineA);
+    const lineBOpen = open.find((row) => row.productLineId === lineB);
+    expect(lineAOpen?.planId).toBe(winner);
+    /* B kept its plan and experiment attribution, but shares the roll's
+     * anchor because its synchronized sibling changed. */
+    expect(lineBOpen?.planId).toBe(planB1);
+    expect(lineBOpen?.assignmentId).not.toBe(lineBBefore?.assignmentId);
+    expect(lineBOpen?.startsAt).toBe(lineAOpen?.startsAt);
+    expect(lineBOpen?.cycleId).toBe(cycleId);
+    expect(lineBOpen?.experimentId).toBe(created.experimentId);
   });
 });

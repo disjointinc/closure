@@ -7,7 +7,9 @@
  * treatment plans server-side (one assignment per tenant and plan, tagged
  * with the experimentId); concluding rolls every assigned tenant onto the
  * concluding plans, re-anchoring their whole billing-cycle-synchronized
- * group so the shared startsAt/cycleId invariant holds.
+ * group so the shared startsAt/cycleId invariant holds. A concluding planId
+ * of PRESERVE_CONCLUDING_PLAN instead leaves the line's tenants on whatever
+ * they are currently assigned.
  */
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { setMeterBalance } from "../../cache/meter/index.ts";
@@ -24,7 +26,10 @@ import {
   tenants,
 } from "../../db/schema.ts";
 import { generateId } from "../../lib/id.ts";
-import type { Experiment } from "../../schemas/experiment.ts";
+import {
+  PRESERVE_CONCLUDING_PLAN,
+  type Experiment,
+} from "../../schemas/experiment.ts";
 import type { Treatment } from "../../schemas/treatment.ts";
 import { getSynchronizedLineIds } from "../product-line/service.ts";
 import {
@@ -329,16 +334,21 @@ export async function concludeExperiment({
         "conclusion must name each product line the treatments touched exactly once",
     };
   }
+  // Only real plan ids resolve; PRESERVE_CONCLUDING_PLAN names no plan.
   const productLineByConcludingPlanId = await resolveProductLineByPlanId({
     planIds: body.concludingPlans
       .map((conclusion) => conclusion.planId)
-      .filter((planId): planId is string => planId !== null),
+      .filter(
+        (planId): planId is string =>
+          planId !== null && planId !== PRESERVE_CONCLUDING_PLAN,
+      ),
   });
   if (
     !productLineByConcludingPlanId ||
     !body.concludingPlans.every(
       (conclusion) =>
         conclusion.planId === null ||
+        conclusion.planId === PRESERVE_CONCLUDING_PLAN ||
         productLineByConcludingPlanId.get(conclusion.planId) ===
           conclusion.productLineId,
     )
@@ -384,10 +394,11 @@ export async function concludeExperiment({
   ];
   /* Roll every assigned tenant onto the concluding plans. Untouched lines in
    * a group keep their plan, add-ons, and meter balances under the new
-   * anchor; experiment lines get the concluding plan (fresh balances), or
-   * just end when the concluding planId is null. The roll is batched: one
-   * read of every open assignment in play, a pure pass building the row
-   * changes, then one update or insert per row kind. */
+   * anchor; experiment lines get the concluding plan (fresh balances), end
+   * when the concluding planId is null, or stay as-is when it is
+   * PRESERVE_CONCLUDING_PLAN. The roll is batched: one read of every open
+   * assignment in play, a pure pass building the row changes, then one
+   * update or insert per row kind. */
   const groupIndexByLineId = new Map<string, number>();
   synchronizedLineGroups.forEach((lineIds, index) => {
     for (const lineId of lineIds) {
@@ -433,12 +444,13 @@ export async function concludeExperiment({
   }
   /* Build the row changes without touching the database:
    * - assignmentIdsToEnd: every open assignment in play ends now, whether it
-   *   is recreated (untouched line), replaced (concluding plan), or simply
-   *   ended (concluding planId is null).
-   * - untouchedLineRecreations: lines the experiment never touched keep
-   *   their plan and experimentId under the group's new anchor. Recreate
-   *   rather than update in place: startsAt is assignment history, and the
-   *   ended row records when the re-anchor happened.
+   *   is recreated (untouched or preserved line), replaced (concluding
+   *   plan), or simply ended (concluding planId is null).
+   * - untouchedLineRecreations: lines the experiment never touched, plus
+   *   lines concluded with PRESERVE_CONCLUDING_PLAN, keep their plan and
+   *   experimentId under the group's new anchor. Recreate rather than
+   *   update in place: startsAt is assignment history, and the ended row
+   *   records when the re-anchor happened.
    * - concludingAssignments: fresh assignments onto the concluding plans,
    *   tagged with the experimentId. */
   const assignmentIdsToEnd: string[] = [];
@@ -449,6 +461,18 @@ export async function concludeExperiment({
   const concludingAssignments: (typeof assignments.$inferInsert)[] = [];
   for (const rowsByGroupIndex of openAssignmentsByTenantAndGroup.values()) {
     for (const groupOpenAssignments of rowsByGroupIndex.values()) {
+      /* A bucket with no active experiment-line rows (every experiment line
+       * preserved, or none present) is left completely untouched: no ends,
+       * no re-anchor, no new rows. */
+      const hasActiveExperimentLine = groupOpenAssignments.some(
+        (openAssignment) =>
+          experimentLineIds.has(openAssignment.productLineId) &&
+          concludingPlanIdByLineId.get(openAssignment.productLineId) !==
+            PRESERVE_CONCLUDING_PLAN,
+      );
+      if (!hasActiveExperimentLine) {
+        continue;
+      }
       /* Every row in the bucket shares the group's anchor (enforced at
        * assignment create), so any row provides the cycleId the group keeps
        * as it re-anchors to now. */
@@ -462,7 +486,13 @@ export async function concludeExperiment({
       };
       for (const openAssignment of groupOpenAssignments) {
         assignmentIdsToEnd.push(openAssignment.assignmentId);
-        if (!experimentLineIds.has(openAssignment.productLineId)) {
+        /* The line's outcome: PRESERVE_CONCLUDING_PLAN for untouched lines
+         * and lines concluded with preserve, null to end with no
+         * replacement, otherwise the concluding plan id. */
+        const outcome = experimentLineIds.has(openAssignment.productLineId)
+          ? (concludingPlanIdByLineId.get(openAssignment.productLineId) ?? null)
+          : PRESERVE_CONCLUDING_PLAN;
+        if (outcome === PRESERVE_CONCLUDING_PLAN) {
           untouchedLineRecreations.push({
             sourceAssignmentId: openAssignment.assignmentId,
             recreatedAssignment: {
@@ -479,17 +509,13 @@ export async function concludeExperiment({
           });
           continue;
         }
-        const concludingPlanId = concludingPlanIdByLineId.get(
-          openAssignment.productLineId,
-        );
-        // Null means "end in this line with no replacement".
-        if (concludingPlanId === null || concludingPlanId === undefined) {
+        if (outcome === null) {
           continue;
         }
         concludingAssignments.push({
           assignmentId: generateId({ prefix: "assignment" }),
           tenantId: openAssignment.tenantId,
-          planId: concludingPlanId,
+          planId: outcome,
           productLineId: openAssignment.productLineId,
           experimentId,
           cycleId: newGroupAnchor.cycleId,

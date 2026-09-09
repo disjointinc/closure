@@ -7,10 +7,19 @@ import {
 } from "./ids.ts";
 import { treatmentSchema } from "./treatment.ts";
 
+/**
+ * Concluding-plan outcome that leaves the tenant's current assignment in the
+ * line as-is (re-anchored only when a synchronized sibling line changes).
+ */
+export const PRESERVE_CONCLUDING_PLAN = "preserve";
+
 const concludingPlanSchema = z.object({
   productLineId: productLineIdSchema,
-  /** Null ends the tenant's assignment in the line with no replacement. */
-  planId: planIdSchema.nullable(),
+  /* Null ends the tenant's assignment in the line with no replacement;
+   * PRESERVE_CONCLUDING_PLAN keeps it. */
+  planId: z
+    .union([planIdSchema, z.literal(PRESERVE_CONCLUDING_PLAN)])
+    .nullable(),
 });
 
 export const experimentSchema = z.object({
