@@ -74,7 +74,6 @@ const topUpCreditPackSizes = (name: string) =>
   jsonb(name).$type<PlanMeter["topUpCreditPackSizes"]>();
 
 export const chargedEnum = pgEnum("charged", ["upfront", "arrears"]);
-export const planKindEnum = pgEnum("plan_kind", ["standard", "loan"]);
 export const meterEventStatusEnum = pgEnum("meter_event_status", [
   "succeeded",
   "insufficient_balance",
@@ -182,10 +181,33 @@ export const taxes = pgTable(
   (t) => [idFormatCheck("tax", t.taxId)],
 );
 
+export const productLines = pgTable(
+  "product_lines",
+  {
+    productLineId: text("product_line_id").primaryKey(),
+    createdAt: epochMs("created_at").notNull(),
+    deprecatedAt: epochMs("deprecated_at"),
+    /* Line ids this one's billing cycle is forced into sync with. Array
+     * elements can't FK in Postgres; targets are validated in the service. */
+    forceBillingCycleSynchronizationWithProductLineIds: text(
+      "force_billing_cycle_synchronization_with_product_line_ids",
+    )
+      .array()
+      .notNull()
+      .default([]),
+    name: text("name").notNull(),
+    description: text("description"),
+  },
+  (t) => [idFormatCheck("product_line", t.productLineId)],
+);
+
 export const features = pgTable(
   "features",
   {
     featureId: text("feature_id").primaryKey(),
+    productLineId: text("product_line_id")
+      .notNull()
+      .references(() => productLines.productLineId),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     name: text("name").notNull(),
@@ -225,6 +247,9 @@ export const meters = pgTable(
   "meters",
   {
     meterId: text("meter_id").primaryKey(),
+    /* The lines this meter applies to. Array elements can't FK in Postgres;
+     * line membership is validated in the service. */
+    productLineIds: text("product_line_ids").array().notNull(),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     name: text("name").notNull(),
@@ -251,31 +276,19 @@ export const plans = pgTable(
   "plans",
   {
     planId: text("plan_id").primaryKey(),
+    productLineId: text("product_line_id")
+      .notNull()
+      .references(() => productLines.productLineId),
     /** The plan this version was derived from, if any. */
     derivedFromPlanId: text("derived_from_plan_id").references(
       (): AnyPgColumn => plans.planId,
     ),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
-    kind: planKindEnum("kind").notNull().default("standard"),
-    /** Suggested rate for loans on this plan; loans set theirs explicitly. */
-    defaultInterestPercentage: doublePrecision("default_interest_percentage"),
-    /** The minimum payment due each cycle on loan plans. */
-    minimumPaymentValueId: text("minimum_payment_value_id").references(
-      () => values.valueId,
-    ),
     name: text("name").notNull(),
     description: text("description"),
   },
-  (t) => [
-    idFormatCheck("plan", t.planId),
-    // Standard plans carry no loan terms; loan plans require them.
-    check(
-      "plans_kind_variant",
-      sql`(kind = 'standard' and default_interest_percentage is null and minimum_payment_value_id is null)
-       or (kind = 'loan' and minimum_payment_value_id is not null)`,
-    ),
-  ],
+  (t) => [idFormatCheck("plan", t.planId)],
 );
 
 export const planPrices = pgTable(
@@ -361,6 +374,9 @@ export const addOnTypes = pgTable(
   "add_on_types",
   {
     addOnTypeId: text("add_on_type_id").primaryKey(),
+    productLineId: text("product_line_id")
+      .notNull()
+      .references(() => productLines.productLineId),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     name: text("name").notNull(),
@@ -564,30 +580,60 @@ export const experiments = pgTable(
     experimentId: text("experiment_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
     concludedAt: epochMs("concluded_at"),
-    concludingPlanId: text("concluding_plan_id").references(() => plans.planId),
+    /** The plan to set per product line on conclusion (planId null = end). */
+    concludingPlans:
+      jsonb("concluding_plans").$type<
+        { productLineId: string; planId: string | null }[]
+      >(),
     name: text("name").notNull(),
     description: text("description"),
   },
   (t) => [idFormatCheck("experiment", t.experimentId)],
 );
 
+/**
+ * One bucket of an experiment: a set of plans (at most one per product
+ * line), so a treatment can span lines. The plan set is relational so the
+ * plan FK is enforced.
+ */
 export const experimentTreatments = pgTable(
   "experiment_treatments",
   {
     experimentId: text("experiment_id")
       .notNull()
       .references(() => experiments.experimentId),
-    planId: text("plan_id")
-      .notNull()
-      .references(() => plans.planId),
+    treatmentId: text("treatment_id").notNull(),
     tenantPercentage: doublePrecision("tenant_percentage").notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.experimentId, t.planId] }),
+    primaryKey({ columns: [t.experimentId, t.treatmentId] }),
+    idFormatCheck("treatment", t.treatmentId),
     check(
       "experiment_treatments_percentage_range",
       sql`tenant_percentage >= 0 and tenant_percentage <= 100`,
     ),
+  ],
+);
+
+/** treatment.plans, relational so the FK is enforced. */
+export const experimentTreatmentPlans = pgTable(
+  "experiment_treatment_plans",
+  {
+    experimentId: text("experiment_id").notNull(),
+    treatmentId: text("treatment_id").notNull(),
+    planId: text("plan_id")
+      .notNull()
+      .references(() => plans.planId),
+  },
+  (t) => [
+    primaryKey({ columns: [t.experimentId, t.treatmentId, t.planId] }),
+    foreignKey({
+      columns: [t.experimentId, t.treatmentId],
+      foreignColumns: [
+        experimentTreatments.experimentId,
+        experimentTreatments.treatmentId,
+      ],
+    }),
   ],
 );
 
@@ -600,7 +646,7 @@ export const experimentTreatmentTenants = pgTable(
   "experiment_treatment_tenants",
   {
     experimentId: text("experiment_id").notNull(),
-    planId: text("plan_id").notNull(),
+    treatmentId: text("treatment_id").notNull(),
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.tenantId),
@@ -608,10 +654,10 @@ export const experimentTreatmentTenants = pgTable(
   (t) => [
     primaryKey({ columns: [t.experimentId, t.tenantId] }),
     foreignKey({
-      columns: [t.experimentId, t.planId],
+      columns: [t.experimentId, t.treatmentId],
       foreignColumns: [
         experimentTreatments.experimentId,
-        experimentTreatments.planId,
+        experimentTreatments.treatmentId,
       ],
     }),
     index("experiment_treatment_tenants_tenant").on(t.tenantId),
@@ -694,6 +740,11 @@ export const assignments = pgTable(
     cycleId: text("cycle_id")
       .notNull()
       .references(() => cycles.cycleId),
+    /* Denormalized from the plan (checked at create) so the one-open-per-line
+     * index lives here without a join. */
+    productLineId: text("product_line_id")
+      .notNull()
+      .references(() => productLines.productLineId),
     createdAt: epochMs("created_at").notNull(),
     startsAt: epochMs("starts_at").notNull(),
     endsAt: epochMs("ends_at"),
@@ -701,9 +752,10 @@ export const assignments = pgTable(
   (t) => [
     idFormatCheck("assignment", t.assignmentId),
     index("assignments_tenant").on(t.tenantId),
-    // At most one open assignment per tenant.
-    uniqueIndex("assignments_one_open")
-      .on(t.tenantId)
+    /* A tenant may hold several open assignments, but at most one per product
+     * line: overlapping lines would make meters and cycles ambiguous. */
+    uniqueIndex("assignments_one_open_per_line")
+      .on(t.tenantId, t.productLineId)
       .where(sql`${t.endsAt} is null`),
   ],
 );
@@ -734,13 +786,16 @@ export const loans = pgTable(
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.tenantId),
-    assignmentId: text("assignment_id")
-      .notNull()
-      .references(() => assignments.assignmentId),
+    /** Set when the loan funds an assignment (e.g. BNPL); null when standalone. */
+    assignmentId: text("assignment_id").references(
+      () => assignments.assignmentId,
+    ),
     createdAt: epochMs("created_at").notNull(),
     closedAt: epochMs("closed_at"),
     /** When repayment is due: created_at + duration, stamped at creation. */
     endsAt: epochMs("ends_at").notNull(),
+    /** Removed ahead of resolution, whether or not one is set. */
+    deletedAt: epochMs("deleted_at"),
     /** The template this loan's definition was copied from, if any. */
     loanTemplateId: text("loan_template_id").references(
       () => loanTemplates.loanTemplateId,
@@ -752,6 +807,25 @@ export const loans = pgTable(
   (t) => [
     idFormatCheck("loan", t.loanId),
     index("loans_tenant").on(t.tenantId),
+  ],
+);
+
+/** A loan's materialized repayment schedule (BNPL installments). */
+export const loanInstallments = pgTable(
+  "loan_installments",
+  {
+    installmentId: text("installment_id").primaryKey(),
+    loanId: text("loan_id")
+      .notNull()
+      .references(() => loans.loanId),
+    createdAt: epochMs("created_at").notNull(),
+    dueAt: epochMs("due_at").notNull(),
+    amount: jsonb("amount").$type<CurrencyAmount>().notNull(),
+    paidAt: epochMs("paid_at"),
+  },
+  (t) => [
+    idFormatCheck("installment", t.installmentId),
+    index("loan_installments_loan").on(t.loanId),
   ],
 );
 
