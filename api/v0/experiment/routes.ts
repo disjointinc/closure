@@ -54,14 +54,8 @@ export const experimentApp = new Hono()
   .post("/", zValidator("json", experimentCreateSchema), async (c) => {
     const body = c.req.valid("json");
     const experiment = await createExperiment({ experiment: body });
-    if (!experiment) {
-      return c.json(
-        {
-          error:
-            "treatments must reference known plans and tenants, hold at most one plan per product line, touch the same lines, and assign each tenant at most once",
-        },
-        400,
-      );
+    if ("error" in experiment) {
+      return c.json(experiment, 400);
     }
     return c.json(experiment, 201);
   })

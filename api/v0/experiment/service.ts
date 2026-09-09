@@ -143,25 +143,30 @@ export async function createExperiment({
   experiment,
 }: {
   experiment: ExperimentCreateBody;
-}): Promise<Experiment | null> {
+}): Promise<Experiment | { error: string }> {
   const planLines = await resolvePlanLines({
     planIds: experiment.treatments.flatMap((treatment) => treatment.planIds),
   });
   if (!planLines) {
-    return null;
+    return { error: "treatments must reference known plans" };
   }
   const treatmentLines = linesPerTreatment({
     planLines,
     treatments: experiment.treatments,
   });
-  if (!treatmentLines || !sameLines({ treatmentLines })) {
-    return null;
+  if (!treatmentLines) {
+    return {
+      error: "each treatment must hold at most one plan per product line",
+    };
+  }
+  if (!sameLines({ treatmentLines })) {
+    return { error: "treatments must touch the same product lines" };
   }
   const tenantIds = experiment.treatments.flatMap(
     (treatment) => treatment.assignedTenantIds ?? [],
   );
   if (new Set(tenantIds).size !== tenantIds.length) {
-    return null;
+    return { error: "each tenant must be assigned at most once" };
   }
   const tenantRows = tenantIds.length
     ? await db
@@ -170,7 +175,7 @@ export async function createExperiment({
         .where(inArray(tenants.tenantId, tenantIds))
     : [];
   if (tenantRows.length !== tenantIds.length) {
-    return null;
+    return { error: "treatments must reference known tenants" };
   }
   const experimentId = generateId({ prefix: "experiment" });
   await db.transaction(async (tx) => {
@@ -208,7 +213,8 @@ export async function createExperiment({
       );
     }
   });
-  return getExperiment({ experimentId });
+  // The experiment row always exists once its id is stored.
+  return getExperiment({ experimentId }) as Promise<Experiment>;
 }
 
 export async function concludeExperiment({
