@@ -5,8 +5,9 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
+import { epochMs } from "../../schemas/common.ts";
 import { experimentSchema } from "../../schemas/experiment.ts";
-import { experimentIdSchema } from "../../schemas/ids.ts";
+import { cycleIdSchema, experimentIdSchema } from "../../schemas/ids.ts";
 import { treatmentSchema } from "../../schemas/treatment.ts";
 import {
   concludeExperiment,
@@ -14,6 +15,15 @@ import {
   getExperiment,
   listExperiments,
 } from "./service.ts";
+
+/* The cycle/timing terms every auto-created assignment uses: creating an
+ * experiment with assigned tenants enrolls them on the treatment plans
+ * server-side, so the terms ride along on the create body. */
+const assignmentTermsSchema = z.object({
+  cycleId: cycleIdSchema,
+  startsAt: epochMs,
+  endsAt: epochMs.nullable(),
+});
 
 const experimentCreateSchema = experimentSchema
   .omit({
@@ -24,6 +34,7 @@ const experimentCreateSchema = experimentSchema
     treatments: true,
   })
   .extend({
+    assignmentTerms: assignmentTermsSchema.nullable(),
     treatments: z.array(treatmentSchema.omit({ treatmentId: true })).min(2),
   })
   .superRefine((experiment, ctx) => {
@@ -36,6 +47,16 @@ const experimentCreateSchema = experimentSchema
         code: "custom",
         path: ["treatments"],
         message: "treatment percentages must sum to 100",
+      });
+    }
+    const assignsTenants = experiment.treatments.some(
+      (treatment) => treatment.assignedTenantIds?.length,
+    );
+    if (assignsTenants && experiment.assignmentTerms === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["assignmentTerms"],
+        message: "assignment terms are required when treatments assign tenants",
       });
     }
   });

@@ -8,7 +8,6 @@ import { z } from "zod";
 import { microcredits } from "../../schemas/common.ts";
 import { cycleIdSchema } from "../../schemas/ids.ts";
 import {
-  checkPlan,
   checkPlanMeter,
   planMeterFields,
   planSchema,
@@ -42,27 +41,11 @@ const planCreateSchema = z
     planId: true,
     createdAt: true,
     deprecatedAt: true,
-    minimumPaymentValueId: true,
   })
   .extend({
-    /* Loan plans own their minimum payment value inline, like prices do:
-     * no standalone value route exists for a client to reference. */
-    minimumPaymentValue: valueCreateSchema.nullable(),
     prices: z.array(priceInputSchema),
     meters: z.array(planMeterInputSchema).nullable(),
-  })
-  /* checkPlan reads minimumPaymentValueId; the wire carries the value
-   * inline, so feed the check a null-ness stub. */
-  .superRefine((plan, ctx) =>
-    checkPlan(
-      {
-        ...plan,
-        minimumPaymentValueId:
-          plan.minimumPaymentValue === null ? null : "value_pending",
-      },
-      ctx,
-    ),
-  );
+  });
 
 export type PlanMeterInput = z.infer<typeof planMeterInputSchema>;
 export type PlanCreateBody = z.infer<typeof planCreateSchema>;
@@ -70,7 +53,17 @@ export type PlanCreateBody = z.infer<typeof planCreateSchema>;
 export const planApp = new Hono()
   .post("/", zValidator("json", planCreateSchema), async (c) => {
     const body = c.req.valid("json");
-    return c.json(await createPlan({ plan: body }), 201);
+    const plan = await createPlan({ plan: body });
+    if (!plan) {
+      return c.json(
+        {
+          error:
+            "product line not found, or a referenced feature/meter/add-on type belongs to another line",
+        },
+        400,
+      );
+    }
+    return c.json(plan, 201);
   })
   .get("/", async (c) => {
     return c.json(await listPlans());

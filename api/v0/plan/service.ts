@@ -7,11 +7,15 @@
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import {
+  addOnTypes,
+  features,
+  meters,
   planAddOnTypes,
   planFeatures,
   planMeters,
   planPrices,
   plans,
+  productLines,
   values,
 } from "../../db/schema.ts";
 import { generateId } from "../../lib/id.ts";
@@ -127,7 +131,6 @@ export async function getPlan({
     .where(eq(planAddOnTypes.planId, planId));
   const valueIds = [
     ...priceRows.map((price) => price.valueId),
-    ...(row.minimumPaymentValueId === null ? [] : [row.minimumPaymentValueId]),
     ...meterRows.flatMap((meter) => topUpValueIds(meter.topUpPricesPerCredit)),
   ];
   const valueRows = valueIds.length
@@ -140,13 +143,10 @@ export async function getPlan({
     valueById.get(valueId) as Value;
   return {
     planId: row.planId,
+    productLineId: row.productLineId,
     derivedFromPlanId: row.derivedFromPlanId,
     createdAt: row.createdAt,
     deprecatedAt: row.deprecatedAt,
-    kind: row.kind,
-    duration: row.duration,
-    defaultInterestPercentage: row.defaultInterestPercentage,
-    minimumPaymentValueId: row.minimumPaymentValueId,
     name: row.name,
     description: row.description,
     prices: priceRows.map((price) => ({
@@ -187,22 +187,63 @@ export async function createPlan({
 }: {
   plan: PlanCreateBody;
 }): Promise<PlanApi | null> {
+  /* Hard lock: a plan sells its own product line only, so every referenced
+   * feature, meter, and add-on type must belong to plan.productLineId. */
+  const [lineRow] = await db
+    .select()
+    .from(productLines)
+    .where(eq(productLines.productLineId, plan.productLineId));
+  if (!lineRow) {
+    return null;
+  }
+  const referencedFeatureIds = (plan.features ?? []).map(
+    (feature) => feature.featureId,
+  );
+  const referencedMeterIds = (plan.meters ?? []).map((meter) => meter.meterId);
+  const [featureRows, meterRows, addOnTypeRows] = await Promise.all([
+    referencedFeatureIds.length
+      ? db
+          .select()
+          .from(features)
+          .where(inArray(features.featureId, referencedFeatureIds))
+      : [],
+    referencedMeterIds.length
+      ? db
+          .select()
+          .from(meters)
+          .where(inArray(meters.meterId, referencedMeterIds))
+      : [],
+    plan.addOnTypeIds?.length
+      ? db
+          .select()
+          .from(addOnTypes)
+          .where(inArray(addOnTypes.addOnTypeId, plan.addOnTypeIds))
+      : [],
+  ]);
+  const sameLine = (row: { productLineId: string }) =>
+    row.productLineId === plan.productLineId;
+  /* Features and add-on types are hard-locked to one line; a meter may span
+   * lines, so the plan's line only needs to be one of the meter's. */
+  if (
+    featureRows.length !== referencedFeatureIds.length ||
+    meterRows.length !== referencedMeterIds.length ||
+    addOnTypeRows.length !== (plan.addOnTypeIds ?? []).length ||
+    ![...featureRows, ...addOnTypeRows].every(sameLine) ||
+    !meterRows.every((meter) =>
+      meter.productLineIds.includes(plan.productLineId),
+    )
+  ) {
+    return null;
+  }
   const planId = generateId({ prefix: "plan" });
-  const minimumPaymentValueId =
-    plan.minimumPaymentValue === null
-      ? null
-      : await insertValue({ value: plan.minimumPaymentValue });
   await db
     .insert(plans)
     .values({
       planId,
+      productLineId: plan.productLineId,
       derivedFromPlanId: plan.derivedFromPlanId,
       createdAt: Date.now(),
       deprecatedAt: null,
-      kind: plan.kind,
-      duration: plan.duration,
-      defaultInterestPercentage: plan.defaultInterestPercentage,
-      minimumPaymentValueId,
       name: plan.name,
       description: plan.description,
     })
