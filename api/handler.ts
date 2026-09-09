@@ -28,6 +28,7 @@ import { featureApp } from "./v0/feature/routes.ts";
 import { loanTemplateApp } from "./v0/loan-template/routes.ts";
 import { meterApp } from "./v0/meter/routes.ts";
 import { planApp } from "./v0/plan/routes.ts";
+import { productLineApp } from "./v0/product-line/routes.ts";
 import { ruleApp } from "./v0/rule/routes.ts";
 import { taxApp } from "./v0/tax/routes.ts";
 import { taxTypeApp } from "./v0/tax-type/routes.ts";
@@ -56,6 +57,7 @@ const app = new Hono()
   .route("/v0/loan-template", loanTemplateApp)
   .route("/v0/meter", meterApp)
   .route("/v0/plan", planApp)
+  .route("/v0/product-line", productLineApp)
   .route("/v0/rule", ruleApp)
   .route("/v0/task-type", taskTypeApp)
   .route("/v0/tax", taxApp)
