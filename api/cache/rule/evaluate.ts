@@ -37,6 +37,7 @@ import {
   assignments,
   cycles,
   meterOverrides,
+  meters,
   planMeters,
   ruleRuns,
   rules,
@@ -61,9 +62,10 @@ export type WatchedRule = {
 };
 
 /**
- * The tenant's billing-cycle anchor, for "billing_cycle_end" recurrence
- * windows: the open assignment's startsAt and the cycle's length in ms.
- * Null when the tenant has no repeating cycle (no assignment / one_time).
+ * A tenant's billing-cycle anchor within one product line, for
+ * "billing_cycle_end" recurrence windows: the line's open assignment's
+ * startsAt and the cycle's length in ms. Null when the tenant has no
+ * repeating cycle in the line (no assignment / one_time).
  */
 export type BillingCycle = { anchorMs: number; windowMs: number } | null;
 
@@ -77,14 +79,18 @@ export function durationToMs(duration: Duration): number {
 }
 
 /**
- * The tenant's billing-cycle anchor: the open assignment's start plus the
- * cycle's length. Null for one-time cycles and tenants with no open
- * assignment (none at all, or only future-dated ones).
- * Shared by resolveWatchSet (event-time) and the scheduler.
+ * The tenant's billing-cycle anchor within a product line: the line's open
+ * assignment's start plus the cycle's length. Null for one-time cycles and
+ * tenants with no open assignment in the line (none at all, or only
+ * future-dated ones). Well-defined because a tenant holds at most one open
+ * assignment per line. Shared by resolveWatchSet (event-time) and the
+ * scheduler.
  */
 export async function getBillingCycle({
+  productLineId,
   tenantId,
 }: {
+  productLineId: string;
   tenantId: string;
 }): Promise<BillingCycle> {
   const [assignment] = await db
@@ -93,10 +99,12 @@ export async function getBillingCycle({
     .where(
       and(
         eq(assignments.tenantId, tenantId),
+        eq(assignments.productLineId, productLineId),
         isNull(assignments.endsAt),
         lte(assignments.startsAt, Date.now()),
       ),
-    );
+    )
+    .limit(1);
   if (!assignment) {
     return null;
   }
@@ -115,20 +123,26 @@ export async function getBillingCycle({
 }
 
 /**
- * The billing-cycle anchor for many tenants in one query: the open
- * assignment's start plus the cycle's length, keyed by tenant. Tenants with
- * no open assignment or a one-time cycle are absent from the map. Used by the
- * scheduler so a tick does one pg round-trip, not one per candidate.
+ * The billing-cycle anchors for many tenants within one product line, in one
+ * query: each tenant's open assignment in the line, keyed by tenant. Tenants
+ * with no open assignment in the line or a one-time cycle are absent from
+ * the map. Used by the scheduler so a tick does one pg round-trip, not one
+ * per candidate.
  */
 export async function getBillingCycles({
+  productLineIds,
   tenantIds,
 }: {
+  productLineIds: string[];
   tenantIds: string[];
 }): Promise<Map<string, NonNullable<BillingCycle>>> {
   const result = new Map<string, NonNullable<BillingCycle>>();
-  if (tenantIds.length === 0) {
+  if (tenantIds.length === 0 || productLineIds.length === 0) {
     return result;
   }
+  /* Several lines per tenant only arise under synchronization, which forces
+   * identical anchors -- so the first open assignment found per tenant is
+   * the tenant's anchor for the whole set. */
   const rows = await db
     .select({
       tenantId: assignments.tenantId,
@@ -140,12 +154,13 @@ export async function getBillingCycles({
     .where(
       and(
         inArray(assignments.tenantId, tenantIds),
+        inArray(assignments.productLineId, productLineIds),
         isNull(assignments.endsAt),
         lte(assignments.startsAt, Date.now()),
       ),
     );
   for (const row of rows) {
-    if (row.cycleLength === "one_time") {
+    if (row.cycleLength === "one_time" || result.has(row.tenantId)) {
       continue;
     }
     result.set(row.tenantId, {
@@ -163,17 +178,19 @@ export type WatchSet = {
 };
 
 /**
- * Does this rule apply to the tenant, given their current plan (null when
- * they have no assignment)? Scopes are additive: global applies everywhere,
- * plan applies to tenants on that plan, tenant applies to that one tenant.
+ * Does this rule apply to the tenant, given their current plans (empty when
+ * they have no open assignment)? Scopes are additive: global applies
+ * everywhere, plan applies to tenants with an open assignment on that plan,
+ * tenant applies to that one tenant.
+ *
  * Shared by resolveWatchSet (event-time) and the scheduler.
  */
 export function ruleAppliesToTenant({
-  currentPlanId,
+  currentPlanIds,
   rule,
   tenantId,
 }: {
-  currentPlanId: string | null;
+  currentPlanIds: string[];
   rule: Rule;
   tenantId: string;
 }): boolean {
@@ -181,14 +198,14 @@ export function ruleAppliesToTenant({
     return true;
   }
   if (rule.scope.kind === "plan") {
-    return currentPlanId !== null && rule.scope.planIds.includes(currentPlanId);
+    return rule.scope.planIds.some((planId) => currentPlanIds.includes(planId));
   }
   return rule.scope.tenantId === tenantId;
 }
 
 /**
  * Resolve the rules that apply to a tenant+meter into a watch set: all
- * applicable scopes (global, the tenant's current plan, the tenant itself),
+ * applicable scopes (global, the tenant's current plans, the tenant itself),
  * with percentage amounts converted to absolute microcredits against the
  * initial allocation (effective defaultMicrocredits, override wins). Also
  * resolves the tenant's billing-cycle anchor for "billing_cycle_end"
@@ -207,8 +224,10 @@ export async function resolveWatchSet({
     .from(rules)
     .where(isNull(rules.deprecatedAt));
 
-  // The tenant's open assignment, for plan-scoped rules and the meter config.
-  const [assignment] = await db
+  // The tenant's open assignments, for plan-scoped rules. Ordered by
+  // startsAt so a meter spanning several of the tenant's lines resolves its
+  // plan config deterministically (degenerate double-config: latest wins).
+  const openAssignments = await db
     .select()
     .from(assignments)
     .where(
@@ -217,28 +236,52 @@ export async function resolveWatchSet({
         isNull(assignments.endsAt),
         lte(assignments.startsAt, Date.now()),
       ),
-    );
+    )
+    .orderBy(desc(assignments.startsAt));
 
   // Scope filtering happens in TypeScript, not the SQL query: the rules
   // table is small (team-configured, not tenant-scale), this runs at most
   // once per WATCH_SET_TTL_MS per tenant+meter (cached in Redis), and the
-  // plan-scope branch needs the assignment row fetched above anyway. Pushing
-  // jsonb path predicates (scope->>'kind', trigger->>'meterId') into SQL
-  // would be harder to read for no hot-path win.
+  // plan-scope branch needs the assignment rows fetched above anyway.
+  // Pushing jsonb path predicates (scope->>'kind', trigger->>'meterId')
+  // into SQL would be harder to read for no hot-path win.
   const applicable = allRules.filter((rule) =>
     ruleAppliesToTenant({
-      currentPlanId: assignment?.planId ?? null,
+      currentPlanIds: openAssignments.map((assignment) => assignment.planId),
       rule,
       tenantId,
     }),
   );
 
-  const cycle = await getBillingCycle({ tenantId });
+  /* The meter's product lines pin everything line-scoped: the tenant's open
+   * assignment in any of those lines can configure the meter and anchor the
+   * billing cycle. Several lines only co-anchor under synchronization,
+   * which forces identical anchors, so the first match wins. */
+  const [meterRow] = await db
+    .select()
+    .from(meters)
+    .where(eq(meters.meterId, meterId))
+    .limit(1);
+  const lineAssignment = meterRow
+    ? (openAssignments.find((assignment) =>
+        meterRow.productLineIds.includes(assignment.productLineId),
+      ) ?? null)
+    : null;
+  const cycle = lineAssignment
+    ? await getBillingCycle({
+        productLineId: lineAssignment.productLineId,
+        tenantId,
+      })
+    : null;
 
   // Initial allocation: the plan meter's default, with the latest override
-  // winning (the same resolution entitlements use).
+  // winning (the same resolution entitlements use). A meter spanning several
+  // of the tenant's lines takes the latest assignment that configures it.
   let initialAllocationMicrocredits: number | null = null;
-  if (assignment) {
+  for (const assignment of openAssignments) {
+    if (!meterRow?.productLineIds.includes(assignment.productLineId)) {
+      continue;
+    }
     const [planMeter] = await db
       .select()
       .from(planMeters)
@@ -249,7 +292,10 @@ export async function resolveWatchSet({
         ),
       )
       .limit(1);
-    initialAllocationMicrocredits = planMeter?.defaultMicrocredits ?? null;
+    if (planMeter) {
+      initialAllocationMicrocredits = planMeter.defaultMicrocredits;
+      break;
+    }
   }
   const [override] = await db
     .select()
