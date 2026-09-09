@@ -69,6 +69,58 @@ export type InvoiceApi =
       items: InvoiceItemApi[];
     });
 
+/**
+ * Assemble the call-surface invoice from already-fetched rows. Items and
+ * taxation amounts must belong to the invoice; valueById covers their
+ * perUnitValueIds, and taxItemIdsByTax each taxation amount's item links.
+ */
+function expandInvoice({
+  row,
+  itemRows,
+  taxRows,
+  valueById,
+  taxItemIdsByTax,
+}: {
+  row: typeof invoices.$inferSelect;
+  itemRows: (typeof items.$inferSelect)[];
+  taxRows: (typeof taxationAmounts.$inferSelect)[];
+  valueById: Map<string, Value>;
+  taxItemIdsByTax: Map<string, string[]>;
+}): InvoiceApi {
+  const base = {
+    invoiceId: row.invoiceId,
+    createdAt: row.createdAt,
+    closedAt: row.closedAt,
+    closedReason: row.closedReason,
+    items: itemRows.map((item) => ({
+      itemId: item.itemId,
+      // items.per_unit_value_id FKs values, so the row always exists.
+      perUnitValue: valueById.get(item.perUnitValueId) as Value,
+      units: item.units,
+      name: item.name,
+      description: item.description,
+    })),
+    taxationAmounts: taxRows.map((tax) => ({
+      taxationAmountId: tax.taxationAmountId,
+      taxId: tax.taxId,
+      appliesToItemIds: taxItemIdsByTax.get(tax.taxationAmountId) ?? null,
+      description: tax.description,
+      amount: tax.amount,
+    })),
+  };
+  if (row.charged === "upfront") {
+    return { ...base, charged: "upfront", cycleLength: row.cycleLength };
+  }
+  // The charging check constraint guarantees the arrears fields are set.
+  return {
+    ...base,
+    charged: "arrears",
+    cycleLength: row.cycleLength as Duration,
+    creditPeriod: row.creditPeriod as Duration,
+    gracePeriod: row.gracePeriod,
+  };
+}
+
 export async function getInvoice({
   invoiceId,
 }: {
@@ -101,50 +153,25 @@ export async function getInvoice({
         )
     : [];
   const valueById = new Map(valueRows.map((value) => [value.valueId, value]));
-  const base = {
-    invoiceId: row.invoiceId,
-    createdAt: row.createdAt,
-    closedAt: row.closedAt,
-    closedReason: row.closedReason,
-    items: itemRows.map((item) => ({
-      itemId: item.itemId,
-      // items.per_unit_value_id FKs values, so the row always exists.
-      perUnitValue: valueById.get(item.perUnitValueId) as Value,
-      units: item.units,
-      name: item.name,
-      description: item.description,
-    })),
-    taxationAmounts: await Promise.all(
-      taxRows.map(async (tax) => {
-        const appliesTo = await db
-          .select()
-          .from(taxationAmountItems)
-          .where(
-            eq(taxationAmountItems.taxationAmountId, tax.taxationAmountId),
-          );
-        return {
-          taxationAmountId: tax.taxationAmountId,
-          taxId: tax.taxId,
-          appliesToItemIds: appliesTo.length
-            ? appliesTo.map((item) => item.itemId)
-            : null,
-          description: tax.description,
-          amount: tax.amount,
-        };
-      }),
-    ),
-  };
-  if (row.charged === "upfront") {
-    return { ...base, charged: "upfront", cycleLength: row.cycleLength };
+  const taxItemRows = taxRows.length
+    ? await db
+        .select()
+        .from(taxationAmountItems)
+        .where(
+          inArray(
+            taxationAmountItems.taxationAmountId,
+            taxRows.map((tax) => tax.taxationAmountId),
+          ),
+        )
+    : [];
+  const taxItemIdsByTax = new Map<string, string[]>();
+  for (const link of taxItemRows) {
+    taxItemIdsByTax.set(link.taxationAmountId, [
+      ...(taxItemIdsByTax.get(link.taxationAmountId) ?? []),
+      link.itemId,
+    ]);
   }
-  // The charging check constraint guarantees the arrears fields are set.
-  return {
-    ...base,
-    charged: "arrears",
-    cycleLength: row.cycleLength as Duration,
-    creditPeriod: row.creditPeriod as Duration,
-    gracePeriod: row.gracePeriod,
-  };
+  return expandInvoice({ row, itemRows, taxRows, valueById, taxItemIdsByTax });
 }
 
 export async function listInvoices({
@@ -157,10 +184,71 @@ export async function listInvoices({
     .from(invoices)
     .where(eq(invoices.tenantId, tenantId))
     .orderBy(desc(invoices.createdAt));
-  const found = await Promise.all(
-    rows.map((row) => getInvoice({ invoiceId: row.invoiceId })),
+  if (rows.length === 0) {
+    return [];
+  }
+  const invoiceIds = rows.map((row) => row.invoiceId);
+  const itemRows = await db
+    .select()
+    .from(items)
+    .where(inArray(items.invoiceId, invoiceIds));
+  const taxRows = await db
+    .select()
+    .from(taxationAmounts)
+    .where(inArray(taxationAmounts.invoiceId, invoiceIds));
+  const valueRows = itemRows.length
+    ? await db
+        .select()
+        .from(values)
+        .where(
+          inArray(
+            values.valueId,
+            itemRows.map((item) => item.perUnitValueId),
+          ),
+        )
+    : [];
+  const valueById = new Map(valueRows.map((value) => [value.valueId, value]));
+  const taxItemRows = taxRows.length
+    ? await db
+        .select()
+        .from(taxationAmountItems)
+        .where(
+          inArray(
+            taxationAmountItems.taxationAmountId,
+            taxRows.map((tax) => tax.taxationAmountId),
+          ),
+        )
+    : [];
+  const taxItemIdsByTax = new Map<string, string[]>();
+  for (const link of taxItemRows) {
+    taxItemIdsByTax.set(link.taxationAmountId, [
+      ...(taxItemIdsByTax.get(link.taxationAmountId) ?? []),
+      link.itemId,
+    ]);
+  }
+  const itemsByInvoice = new Map<string, typeof itemRows>();
+  for (const item of itemRows) {
+    itemsByInvoice.set(item.invoiceId, [
+      ...(itemsByInvoice.get(item.invoiceId) ?? []),
+      item,
+    ]);
+  }
+  const taxesByInvoice = new Map<string, typeof taxRows>();
+  for (const tax of taxRows) {
+    taxesByInvoice.set(tax.invoiceId, [
+      ...(taxesByInvoice.get(tax.invoiceId) ?? []),
+      tax,
+    ]);
+  }
+  return rows.map((row) =>
+    expandInvoice({
+      row,
+      itemRows: itemsByInvoice.get(row.invoiceId) ?? [],
+      taxRows: taxesByInvoice.get(row.invoiceId) ?? [],
+      valueById,
+      taxItemIdsByTax,
+    }),
   );
-  return found.filter((invoice) => invoice !== null);
 }
 
 export async function createInvoice({
