@@ -5,51 +5,34 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "../../../db/index.ts";
 import { featureOverrides } from "../../../db/schema.ts";
+import { generateId } from "../../../lib/id.ts";
 import type { FeatureOverride } from "../../../schemas/feature-override.ts";
-
-function rowToFeatureOverride(
-  row: typeof featureOverrides.$inferSelect,
-): FeatureOverride {
-  return {
-    uniqueId: row.uniqueId,
-    feature: row.feature,
-    setTo: row.setTo,
-    on: row.on,
-    by: row.byTeamMember,
-    reason: row.reason,
-  };
-}
+import type { FeatureOverrideCreateBody } from "./routes.ts";
 
 export async function listFeatureOverrides({
   tenantId,
 }: {
   tenantId: string;
 }): Promise<FeatureOverride[]> {
-  const rows = await db
+  return db
     .select()
     .from(featureOverrides)
-    .where(eq(featureOverrides.tenant, tenantId))
-    .orderBy(desc(featureOverrides.on));
-  return rows.map(rowToFeatureOverride);
+    .where(eq(featureOverrides.tenantId, tenantId))
+    .orderBy(desc(featureOverrides.createdAt));
 }
 
 export async function createFeatureOverride({
   override,
   tenantId,
 }: {
-  override: FeatureOverride;
+  override: FeatureOverrideCreateBody;
   tenantId: string;
-}): Promise<void> {
+}): Promise<FeatureOverride> {
+  const featureOverrideId = generateId({ prefix: "feature_override" });
+  const createdAt = Date.now();
   await db
     .insert(featureOverrides)
-    .values({
-      uniqueId: override.uniqueId,
-      tenant: tenantId,
-      feature: override.feature,
-      setTo: override.setTo,
-      on: override.on,
-      byTeamMember: override.by,
-      reason: override.reason,
-    })
+    .values({ ...override, featureOverrideId, createdAt, tenantId })
     .onConflictDoNothing();
+  return { ...override, featureOverrideId, createdAt, tenantId };
 }
