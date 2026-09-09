@@ -615,7 +615,7 @@ export const experimentTreatments = pgTable(
   ],
 );
 
-/** treatment.plans, relational so the FK is enforced. */
+/** treatment.planIds, relational so the FK is enforced. */
 export const experimentTreatmentPlans = pgTable(
   "experiment_treatment_plans",
   {
