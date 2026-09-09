@@ -36,6 +36,10 @@ import {
 import type { CurrencyAmount, Duration } from "../schemas/common.ts";
 import type { Award } from "../schemas/coupon.ts";
 import { idSuffixLengths, type IdPrefix } from "../schemas/ids.ts";
+import type {
+  LoanServicingState,
+  LoanServicingTerms,
+} from "../schemas/loan-servicing.ts";
 import type { Payment } from "../schemas/payment.ts";
 import type { PaymentMethod } from "../schemas/payment-method.ts";
 import type { PlanMeter } from "../schemas/plan.ts";
@@ -55,6 +59,17 @@ const epochMs = (name: string) => bigint(name, { mode: "number" });
 
 /** Integer microcredits, as stored in the db. */
 const microcredits = (name: string) => bigint(name, { mode: "number" });
+
+/* Number.MAX_SAFE_INTEGER, inlined as a literal: check constraints can't take
+ * parameters. Bounds jsonb-stored amounts, which lose precision past this. */
+const jsonbSafeInteger = sql.raw("9007199254740991");
+
+/** Numeric value of a CurrencyAmount jsonb column. */
+const amountValue = (column: SQLWrapper) => sql`(${column}->>'value')::numeric`;
+
+/** Column holds an integer within the jsonb-safe amount range. */
+const jsonbSafeAmount = (column: SQLWrapper) =>
+  sql`${column} between 0 and ${jsonbSafeInteger}`;
 
 /** A length of time: durationSchema, or a literal like "one_time". */
 const duration = (name: string) => jsonb(name).$type<Duration>();
@@ -567,7 +582,10 @@ export const loanTemplates = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     principal: jsonb("principal").$type<CurrencyAmount>().notNull(),
-    interestPercentage: doublePrecision("interest_percentage").notNull(),
+    annualInterestPercentage: doublePrecision(
+      "annual_interest_percentage",
+    ).notNull(),
+    servicingTerms: jsonb("servicing_terms").$type<LoanServicingTerms>(),
     /** Fixed term: a loan minted from this template is due created_at + duration. */
     duration: duration("duration").notNull(),
   },
@@ -801,13 +819,24 @@ export const loans = pgTable(
       () => loanTemplates.loanTemplateId,
     ),
     principal: jsonb("principal").$type<CurrencyAmount>().notNull(),
-    interestPercentage: doublePrecision("interest_percentage").notNull(),
+    annualInterestPercentage: doublePrecision(
+      "annual_interest_percentage",
+    ).notNull(),
+    servicingTerms: jsonb("servicing_terms").$type<LoanServicingTerms>(),
+    servicingState: jsonb("servicing_state").$type<LoanServicingState>(),
     duration: duration("duration").notNull(),
   },
-  (t) => [
-    idFormatCheck("loan", t.loanId),
-    index("loans_tenant").on(t.tenantId),
-  ],
+  (t) => {
+    /* Servicing is all-or-nothing: unserviced loans carry no servicing
+     * columns; serviced loans require terms and a state checkpoint. */
+    const unserviced = sql`${t.servicingTerms} is null and ${t.servicingState} is null`;
+    const serviced = sql`${t.servicingTerms} is not null and ${t.servicingState} is not null`;
+    return [
+      idFormatCheck("loan", t.loanId),
+      index("loans_tenant").on(t.tenantId),
+      check("loans_servicing_enabled", sql`(${unserviced}) or (${serviced})`),
+    ];
+  },
 );
 
 /** A loan's materialized repayment schedule (BNPL installments). */
@@ -822,10 +851,21 @@ export const loanInstallments = pgTable(
     dueAt: epochMs("due_at").notNull(),
     amount: jsonb("amount").$type<CurrencyAmount>().notNull(),
     paidAt: epochMs("paid_at"),
+    allocatedAmount: bigint("allocated_amount", { mode: "number" }),
+    canceledAt: epochMs("canceled_at"),
   },
   (t) => [
     idFormatCheck("installment", t.installmentId),
     index("loan_installments_loan").on(t.loanId),
+    index("loan_installments_open")
+      .on(t.loanId, t.dueAt)
+      .where(
+        sql`${t.canceledAt} is null and ${t.allocatedAmount} < ${amountValue(t.amount)}`,
+      ),
+    check(
+      "loan_installments_allocation",
+      sql`${t.allocatedAmount} is null or (${t.allocatedAmount} >= 0 and ${t.allocatedAmount} <= ${amountValue(t.amount)})`,
+    ),
   ],
 );
 
@@ -947,7 +987,45 @@ export const payments = pgTable(
   (t) => [
     idFormatCheck("payment", t.paymentId),
     index("payments_tenant").on(t.tenantId),
+    uniqueIndex("payments_provider").on(
+      t.tenantId,
+      sql`(${t.providerInternals}->>'provider')`,
+      sql`(${t.providerInternals}->>'paymentId')`,
+    ),
   ],
+);
+
+/* Loan repayments: at most one per payment, recording the interest/principal
+ * split once the payment succeeds. Mirrors payment_invoices for loan targets. */
+export const paymentLoans = pgTable(
+  "payment_loans",
+  {
+    paymentId: text("payment_id")
+      .primaryKey()
+      .references(() => payments.paymentId),
+    loanId: text("loan_id")
+      .notNull()
+      .references(() => loans.loanId),
+    amount: jsonb("amount").$type<CurrencyAmount>().notNull(),
+    principalAmount: bigint("principal_amount", { mode: "number" }),
+    interestAmount: bigint("interest_amount", { mode: "number" }),
+  },
+  (t) => {
+    /* `is true` rejects the null-propagation cases the OR leaves over. */
+    const unallocated = sql`${t.principalAmount} is null and ${t.interestAmount} is null`;
+    const allocated = sql`${jsonbSafeAmount(t.principalAmount)} and ${jsonbSafeAmount(t.interestAmount)} and ${t.principalAmount} + ${t.interestAmount} = ${amountValue(t.amount)}`;
+    return [
+      index("payment_loans_loan").on(t.loanId),
+      check(
+        "payment_loans_amount",
+        sql`${amountValue(t.amount)} between 1 and ${jsonbSafeInteger}`,
+      ),
+      check(
+        "payment_loans_allocation",
+        sql`((${unallocated}) or (${allocated})) is true`,
+      ),
+    ];
+  },
 );
 
 export const paymentInvoices = pgTable(
@@ -967,6 +1045,9 @@ export const refunds = pgTable(
   "refunds",
   {
     refundId: text("refund_id").primaryKey(),
+    paymentId: text("payment_id").references(() => payments.paymentId),
+    loanPrincipalAmount: bigint("loan_principal_amount", { mode: "number" }),
+    loanInterestAmount: bigint("loan_interest_amount", { mode: "number" }),
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.tenantId),
@@ -982,7 +1063,20 @@ export const refunds = pgTable(
       .references(() => values.valueId),
     reason: text("reason"),
   },
-  (t) => [idFormatCheck("refund", t.refundId)],
+  (t) => {
+    /* Loan refunds restore the original payment's split once settled.
+     * `is true` rejects the null-propagation cases the OR leaves over. */
+    const unallocated = sql`${t.loanPrincipalAmount} is null and ${t.loanInterestAmount} is null`;
+    const allocated = sql`${t.paymentId} is not null and ${t.succeededAt} is not null and ${t.failedAt} is null and ${jsonbSafeAmount(t.loanPrincipalAmount)} and ${jsonbSafeAmount(t.loanInterestAmount)} and ${t.loanPrincipalAmount} + ${t.loanInterestAmount} > 0`;
+    return [
+      idFormatCheck("refund", t.refundId),
+      index("refunds_payment").on(t.paymentId),
+      check(
+        "refunds_loan_allocation",
+        sql`((${unallocated}) or (${allocated})) is true`,
+      ),
+    ];
+  },
 );
 
 export const featureOverrides = pgTable(
