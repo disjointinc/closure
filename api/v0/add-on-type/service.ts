@@ -78,7 +78,7 @@ export async function createAddOnType({
   addOnType,
 }: {
   addOnType: AddOnTypeCreateBody;
-}): Promise<AddOnTypeApi | null> {
+}): Promise<AddOnTypeApi | { error: string }> {
   /* Hard lock: an add-on type extends its own line's plans, so every
    * referenced feature must belong to the same line. */
   const featureIds = addOnType.features.map((feature) => feature.featureId);
@@ -88,11 +88,13 @@ export async function createAddOnType({
         .from(features)
         .where(inArray(features.featureId, featureIds))
     : [];
+  if (featureRows.length !== featureIds.length) {
+    return { error: "a referenced feature does not exist" };
+  }
   if (
-    featureRows.length !== featureIds.length ||
     !featureRows.every((row) => row.productLineId === addOnType.productLineId)
   ) {
-    return null;
+    return { error: "a referenced feature belongs to another product line" };
   }
   const addOnTypeId = generateId({ prefix: "add_on_type" });
   await db
@@ -138,7 +140,8 @@ export async function createAddOnType({
       )
       .onConflictDoNothing();
   }
-  return getAddOnType({ addOnTypeId });
+  // The add-on type row always exists once its id is stored.
+  return getAddOnType({ addOnTypeId }) as Promise<AddOnTypeApi>;
 }
 
 /**
