@@ -1,17 +1,12 @@
 /**
  * v0/tenant/coupon-receipt/routes.ts -- HTTP for
- * /v0/tenant/:id/coupon-receipt: request validation and wiring. Business
+ * /v0/tenant/:tenantId/coupon-receipt: request validation and wiring. Business
  * logic lives in service.ts.
  */
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
-import { epochMs } from "../../../schemas/common.ts";
-import {
-  couponIdSchema,
-  couponReceiptIdSchema,
-  teamMemberIdSchema,
-} from "../../../schemas/ids.ts";
+import { couponIdSchema, teamMemberIdSchema } from "../../../schemas/ids.ts";
 import {
   createCouponReceipt,
   listCouponReceipts,
@@ -19,11 +14,9 @@ import {
 } from "./service.ts";
 
 const receiptCreateSchema = z.object({
-  uniqueId: couponReceiptIdSchema,
-  coupon: couponIdSchema,
-  on: epochMs,
+  couponId: couponIdSchema,
   /** The team member granting the coupon. */
-  by: teamMemberIdSchema,
+  grantorId: teamMemberIdSchema,
   reason: z.string().nullable(),
 });
 
@@ -43,17 +36,12 @@ export const couponReceiptApp = new Hono<{ Variables: { tenantId: string } }>()
   .get("/", async (c) => {
     return c.json(await listCouponReceipts({ tenantId: c.get("tenantId") }));
   })
-  .post(
-    "/:receipt_id/use",
-    zValidator("json", z.object({ usedAt: epochMs })),
-    async (c) => {
-      const receipt = await useCouponReceipt({
-        receiptId: c.req.param("receipt_id"),
-        usedAt: c.req.valid("json").usedAt,
-      });
-      if (!receipt) {
-        return c.json({ error: "not found or already used" }, 409);
-      }
-      return c.json(receipt);
-    },
-  );
+  .post("/:couponReceiptId/use", async (c) => {
+    const receipt = await useCouponReceipt({
+      couponReceiptId: c.req.param("couponReceiptId"),
+    });
+    if (!receipt) {
+      return c.json({ error: "not found or already used" }, 409);
+    }
+    return c.json(receipt);
+  });

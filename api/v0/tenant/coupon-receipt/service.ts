@@ -5,23 +5,32 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "../../../db/index.ts";
 import { couponReceipts } from "../../../db/schema.ts";
+import { generateId } from "../../../lib/id.ts";
 import type { ReceiptCreateBody } from "./routes.ts";
 
 function rowToReceipt(row: typeof couponReceipts.$inferSelect) {
   const base = {
-    uniqueId: row.uniqueId,
-    coupon: row.coupon,
-    on: row.on,
+    couponReceiptId: row.couponReceiptId,
+    couponId: row.couponId,
+    receivedAt: row.receivedAt,
     usedAt: row.usedAt,
     reason: row.reason,
   };
   switch (row.grantorType) {
     case "team_member":
-      return { ...base, grantorType: "team_member", by: row.byTeamMember };
+      return {
+        ...base,
+        grantorType: "team_member",
+        grantorId: row.byTeamMemberId,
+      };
     case "tenant":
-      return { ...base, grantorType: "tenant", by: row.byTenant };
+      return { ...base, grantorType: "tenant", grantorId: row.byTenantId };
     case "reciprocal":
-      return { ...base, grantorType: "reciprocal", by: row.byCouponGrant };
+      return {
+        ...base,
+        grantorType: "reciprocal",
+        grantorId: row.byCouponGrantId,
+      };
   }
 }
 
@@ -29,8 +38,8 @@ export async function listCouponReceipts({ tenantId }: { tenantId: string }) {
   const rows = await db
     .select()
     .from(couponReceipts)
-    .where(eq(couponReceipts.tenant, tenantId))
-    .orderBy(desc(couponReceipts.on));
+    .where(eq(couponReceipts.tenantId, tenantId))
+    .orderBy(desc(couponReceipts.receivedAt));
   return rows.map(rowToReceipt);
 }
 
@@ -41,38 +50,44 @@ export async function createCouponReceipt({
   receipt: ReceiptCreateBody;
   tenantId: string;
 }) {
+  const couponReceiptId = generateId({ prefix: "coupon_receipt" });
+  const receivedAt = Date.now();
   await db
     .insert(couponReceipts)
     .values({
-      uniqueId: receipt.uniqueId,
-      tenant: tenantId,
-      coupon: receipt.coupon,
-      on: receipt.on,
+      couponReceiptId,
+      tenantId,
+      couponId: receipt.couponId,
+      receivedAt,
       usedAt: null,
       reason: receipt.reason,
       grantorType: "team_member",
-      byTeamMember: receipt.by,
-      byTenant: null,
-      byCouponGrant: null,
+      byTeamMemberId: receipt.grantorId,
+      byTenantId: null,
+      byCouponGrantId: null,
     })
     .onConflictDoNothing();
-  return { ...receipt, usedAt: null, grantorType: "team_member" as const };
+  return {
+    ...receipt,
+    couponReceiptId,
+    receivedAt,
+    usedAt: null,
+    grantorType: "team_member" as const,
+  };
 }
 
 /** Mark the receipt used, or return null if it's unknown or already used. */
 export async function useCouponReceipt({
-  receiptId,
-  usedAt,
+  couponReceiptId,
 }: {
-  receiptId: string;
-  usedAt: number;
+  couponReceiptId: string;
 }) {
   const updated = await db
     .update(couponReceipts)
-    .set({ usedAt })
+    .set({ usedAt: Date.now() })
     .where(
       and(
-        eq(couponReceipts.uniqueId, receiptId),
+        eq(couponReceipts.couponReceiptId, couponReceiptId),
         isNull(couponReceipts.usedAt),
       ),
     )
