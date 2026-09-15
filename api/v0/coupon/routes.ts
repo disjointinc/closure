@@ -2,15 +2,15 @@
  * v0/coupon/routes.ts -- HTTP for /v0/coupon: request validation and
  * wiring. Business logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
+import { notFoundResponse } from "../../lib/http.ts";
 import {
   featureSetTo,
   microcredits,
   resetSchedule,
 } from "../../schemas/common.ts";
-import { checkCoupon } from "../../schemas/coupon.ts";
+import { checkCoupon, couponSchema } from "../../schemas/coupon.ts";
 import {
   couponIdSchema,
   couponTemplateIdSchema,
@@ -77,8 +77,80 @@ const couponCreateSchema = z.union([
 
 export type CouponCreateBody = z.infer<typeof couponCreateSchema>;
 
-export const couponApp = new Hono()
-  .post("/", zValidator("json", couponCreateSchema), async (c) => {
+/** The coupon shape the call surface reads: awards carry full values. */
+const couponApiSchema = z.object({
+  // couponSchema is refined, so rebuild its shape rather than .extend() it.
+  ...couponSchema.shape,
+  defaultAward: awardApiSchema.nullable(),
+  featuresGranted: couponDefinitionFields.featuresGranted,
+  creditsGranted: couponDefinitionFields.creditsGranted,
+});
+
+const createCouponRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["coupon"],
+  summary: "Create a coupon",
+  request: {
+    body: {
+      content: { "application/json": { schema: couponCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: couponApiSchema } },
+      description: "Created",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const listCouponsRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["coupon"],
+  summary: "List coupons",
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(couponApiSchema) } },
+      description: "OK",
+    },
+  },
+});
+
+const getCouponRoute = createRoute({
+  method: "get",
+  path: "/{couponId}",
+  tags: ["coupon"],
+  summary: "Get a coupon",
+  request: { params: z.object({ couponId: couponIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: couponApiSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const deleteCouponRoute = createRoute({
+  method: "delete",
+  path: "/{couponId}",
+  tags: ["coupon"],
+  summary: "Delete a coupon",
+  request: { params: z.object({ couponId: couponIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: couponApiSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+export const couponApp = new OpenAPIHono()
+  .openapi(createCouponRoute, async (c) => {
     const body = c.req.valid("json");
     const coupon = await createCoupon({ coupon: body });
     if (!coupon) {
@@ -86,20 +158,20 @@ export const couponApp = new Hono()
     }
     return c.json(coupon, 201);
   })
-  .get("/", async (c) => {
-    return c.json(await listCoupons());
+  .openapi(listCouponsRoute, async (c) => {
+    return c.json(await listCoupons(), 200);
   })
-  .get("/:couponId", async (c) => {
+  .openapi(getCouponRoute, async (c) => {
     const coupon = await getCoupon({ couponId: c.req.param("couponId") });
     if (!coupon) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(coupon);
+    return c.json(coupon, 200);
   })
-  .delete("/:couponId", async (c) => {
+  .openapi(deleteCouponRoute, async (c) => {
     const coupon = await deleteCoupon({ couponId: c.req.param("couponId") });
     if (!coupon) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(coupon);
+    return c.json(coupon, 200);
   });

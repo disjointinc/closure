@@ -105,7 +105,7 @@ export async function createCouponTemplate({
   template,
 }: {
   template: CouponTemplateCreateBody;
-}): Promise<CouponTemplateApi | null> {
+}): Promise<CouponTemplateApi> {
   const couponTemplateId = generateId({ prefix: "coupon_template" });
   await db
     .insert(couponTemplates)
@@ -152,7 +152,8 @@ export async function createCouponTemplate({
         .onConflictDoNothing();
     }
   }
-  return getCouponTemplate({ couponTemplateId });
+  // The template row always exists once its id is stored.
+  return getCouponTemplate({ couponTemplateId }) as Promise<CouponTemplateApi>;
 }
 
 /** Deprecate the template, or return null if no such template exists. */
