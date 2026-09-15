@@ -85,6 +85,10 @@ services:
     command: sh -c "npm ci --ignore-scripts && exec npm run dev -w web"
     ports:
       - "${CLOSURE_WEB_PORT:-3216}:3216"
+    environment:
+      # Browser-side origin of the API; the dev server passes VITE_* through
+      # to the bundle (web/src/lib/api.ts).
+      VITE_CLOSURE_API_URL: ${VITE_CLOSURE_API_URL:-http://localhost:3226}
 
 volumes:
   closure-pgdata:

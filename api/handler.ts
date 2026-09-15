@@ -17,7 +17,6 @@
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { config } from "../config.ts";
 import { db } from "./db/index.ts";
 import { addOnTypeApp } from "./v0/add-on-type/routes.ts";
 import { couponApp } from "./v0/coupon/routes.ts";
@@ -38,7 +37,7 @@ import { taskTypeApp } from "./v0/task-type/routes.ts";
 
 const app = new Hono()
   // Browser calls from the web console are cross-origin in the dev stack.
-  .use("*", cors({ origin: config.web.origin }))
+  .use("*", cors())
   .get("/", (c) => c.text("hello world\n"))
   .get("/healthz", async (c) => {
     try {
