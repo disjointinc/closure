@@ -2,16 +2,18 @@
  * v0/tenant/invoice/routes.ts -- HTTP for /v0/tenant/:tenantId/invoice: request
  * validation and wiring. Business logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
+import { notFoundResponse } from "../../../lib/http.ts";
+import { epochMs } from "../../../schemas/common.ts";
 import {
   arrearsChargingSchema,
   upfrontChargingSchema,
 } from "../../../schemas/cycle.ts";
+import { invoiceIdSchema, tenantIdSchema } from "../../../schemas/ids.ts";
 import { itemSchema } from "../../../schemas/item.ts";
 import { taxationAmountSchema } from "../../../schemas/taxation-amount.ts";
-import { valueCreateSchema } from "../../../schemas/value.ts";
+import { valueCreateSchema, valueSchema } from "../../../schemas/value.ts";
 import {
   closeInvoice,
   createInvoice,
@@ -61,17 +63,120 @@ const closeInvoiceSchema = z.object({
   closedReason: z.string().nullable(),
 });
 
+const invoiceItemApiSchema = itemSchema
+  .omit({ perUnitValueId: true })
+  .extend({ perUnitValue: valueSchema });
+
+const invoiceApiFields = {
+  invoiceId: invoiceIdSchema,
+  createdAt: epochMs,
+  closedAt: epochMs.nullable(),
+  closedReason: z.string().nullable(),
+  items: z.array(invoiceItemApiSchema),
+  taxationAmounts: z.array(taxationAmountSchema),
+};
+
+const invoiceApiSchema = z.discriminatedUnion("charged", [
+  upfrontChargingSchema.extend(invoiceApiFields),
+  arrearsChargingSchema.extend(invoiceApiFields),
+]);
+
 export type InvoiceCreateBody = z.infer<typeof invoiceCreateSchema>;
 export type CloseInvoiceBody = z.infer<typeof closeInvoiceSchema>;
 
-export const invoiceApp = new Hono<{ Variables: { tenantId: string } }>()
-  .post("/", zValidator("json", invoiceCreateSchema), async (c) => {
+const createInvoiceRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["tenant/invoice"],
+  summary: "Create an invoice",
+  request: {
+    params: z.object({ tenantId: tenantIdSchema }),
+    body: {
+      content: { "application/json": { schema: invoiceCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: invoiceApiSchema } },
+      description: "Created",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const listInvoicesRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["tenant/invoice"],
+  summary: "List invoices",
+  request: {
+    params: z.object({ tenantId: tenantIdSchema }),
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(invoiceApiSchema) } },
+      description: "OK",
+    },
+  },
+});
+
+const getInvoiceRoute = createRoute({
+  method: "get",
+  path: "/{invoiceId}",
+  tags: ["tenant/invoice"],
+  summary: "Get an invoice",
+  request: {
+    params: z.object({
+      invoiceId: invoiceIdSchema,
+      tenantId: tenantIdSchema,
+    }),
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: invoiceApiSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const closeInvoiceRoute = createRoute({
+  method: "post",
+  path: "/{invoiceId}/close",
+  tags: ["tenant/invoice"],
+  summary: "Close an invoice",
+  request: {
+    params: z.object({
+      invoiceId: invoiceIdSchema,
+      tenantId: tenantIdSchema,
+    }),
+    body: {
+      content: { "application/json": { schema: closeInvoiceSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: invoiceApiSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+export const invoiceApp = new OpenAPIHono<{ Variables: { tenantId: string } }>()
+  .openapi(createInvoiceRoute, async (c) => {
     const body = c.req.valid("json");
     try {
-      return c.json(
-        await createInvoice({ invoice: body, tenantId: c.get("tenantId") }),
-        201,
-      );
+      const invoice = await createInvoice({
+        invoice: body,
+        tenantId: c.get("tenantId"),
+      });
+      if (!invoice) {
+        return c.json({ error: "not found" }, 404);
+      }
+      return c.json(invoice, 201);
     } catch (error) {
       if (error instanceof InvoiceTaxNotFoundError) {
         return c.json({ error: error.message }, 404);
@@ -79,27 +184,23 @@ export const invoiceApp = new Hono<{ Variables: { tenantId: string } }>()
       throw error;
     }
   })
-  .get("/", async (c) => {
-    return c.json(await listInvoices({ tenantId: c.get("tenantId") }));
+  .openapi(listInvoicesRoute, async (c) => {
+    return c.json(await listInvoices({ tenantId: c.get("tenantId") }), 200);
   })
-  .get("/:invoiceId", async (c) => {
+  .openapi(getInvoiceRoute, async (c) => {
     const invoice = await getInvoice({ invoiceId: c.req.param("invoiceId") });
     if (!invoice) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(invoice);
+    return c.json(invoice, 200);
   })
-  .post(
-    "/:invoiceId/close",
-    zValidator("json", closeInvoiceSchema),
-    async (c) => {
-      const invoice = await closeInvoice({
-        body: c.req.valid("json"),
-        invoiceId: c.req.param("invoiceId"),
-      });
-      if (!invoice) {
-        return c.json({ error: "not found" }, 404);
-      }
-      return c.json(invoice);
-    },
-  );
+  .openapi(closeInvoiceRoute, async (c) => {
+    const invoice = await closeInvoice({
+      body: c.req.valid("json"),
+      invoiceId: c.req.param("invoiceId"),
+    });
+    if (!invoice) {
+      return c.json({ error: "not found" }, 404);
+    }
+    return c.json(invoice, 200);
+  });
