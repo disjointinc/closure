@@ -2,11 +2,12 @@
  * v0/product-line/routes.ts -- HTTP for /v0/product-line: request validation
  * and wiring. Business logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
+import { invalidResponse, notFoundResponse } from "../../lib/http.ts";
 import {
   addOnTypeIdSchema,
+  assignmentIdSchema,
   featureIdSchema,
   meterIdSchema,
   planIdSchema,
@@ -71,8 +72,174 @@ const consolidateSchema = z.object({
 
 export type ConsolidateProductLineBody = z.infer<typeof consolidateSchema>;
 
-export const productLineApp = new Hono()
-  .post("/", zValidator("json", productLineCreateSchema), async (c) => {
+const splitResultSchema = z.object({
+  deprecatedProductLineId: productLineIdSchema,
+  targets: z.array(
+    z.object({
+      productLineId: productLineIdSchema,
+      features: z.number().int(),
+      meters: z.number().int(),
+      plans: z.number().int(),
+      addOnTypes: z.number().int(),
+      assignments: z.number().int(),
+    }),
+  ),
+});
+
+const splitErrorSchema = z.object({
+  error: z.string(),
+  straddlers: z.array(z.string()).optional(),
+  unpartitioned: z.array(z.string()).optional(),
+});
+
+const consolidateResultSchema = z.object({
+  consolidatedProductLineId: productLineIdSchema,
+  deprecatedProductLineId: productLineIdSchema,
+  endedAssignmentIds: z.array(assignmentIdSchema),
+});
+
+const consolidateErrorSchema = z.object({
+  error: z.string(),
+  missingResolutions: z.array(z.string()).optional(),
+});
+
+const createProductLineRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["product-line"],
+  summary: "Create a product line",
+  request: {
+    body: {
+      content: { "application/json": { schema: productLineCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: productLineSchema } },
+      description: "Created",
+    },
+    400: invalidResponse,
+  },
+});
+
+const listProductLinesRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["product-line"],
+  summary: "List product lines",
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(productLineSchema) } },
+      description: "OK",
+    },
+  },
+});
+
+const getProductLineRoute = createRoute({
+  method: "get",
+  path: "/{productLineId}",
+  tags: ["product-line"],
+  summary: "Get a product line",
+  request: { params: z.object({ productLineId: productLineIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: productLineSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const patchProductLineRoute = createRoute({
+  method: "patch",
+  path: "/{productLineId}",
+  tags: ["product-line"],
+  summary: "Patch a product line",
+  request: {
+    params: z.object({ productLineId: productLineIdSchema }),
+    body: {
+      content: { "application/json": { schema: productLinePatchSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: productLineSchema } },
+      description: "OK",
+    },
+    400: invalidResponse,
+    404: notFoundResponse,
+  },
+});
+
+const deprecateProductLineRoute = createRoute({
+  method: "delete",
+  path: "/{productLineId}",
+  tags: ["product-line"],
+  summary: "Deprecate a product line",
+  request: { params: z.object({ productLineId: productLineIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: productLineSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const splitProductLineRoute = createRoute({
+  method: "post",
+  path: "/{productLineId}/split",
+  tags: ["product-line"],
+  summary: "Split a product line",
+  request: {
+    params: z.object({ productLineId: productLineIdSchema }),
+    body: {
+      content: { "application/json": { schema: splitSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: splitResultSchema } },
+      description: "OK",
+    },
+    400: {
+      content: { "application/json": { schema: splitErrorSchema } },
+      description: "Invalid input",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const consolidateProductLineRoute = createRoute({
+  method: "post",
+  path: "/{productLineId}/consolidate",
+  tags: ["product-line"],
+  summary: "Consolidate a product line",
+  request: {
+    params: z.object({ productLineId: productLineIdSchema }),
+    body: {
+      content: { "application/json": { schema: consolidateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: consolidateResultSchema } },
+      description: "OK",
+    },
+    400: {
+      content: { "application/json": { schema: consolidateErrorSchema } },
+      description: "Invalid input",
+    },
+    404: notFoundResponse,
+  },
+});
+
+export const productLineApp = new OpenAPIHono()
+  .openapi(createProductLineRoute, async (c) => {
     const productLine = await createProductLine({
       productLine: c.req.valid("json"),
     });
@@ -81,45 +248,41 @@ export const productLineApp = new Hono()
     }
     return c.json(productLine, 201);
   })
-  .get("/", async (c) => {
-    return c.json(await listProductLines());
+  .openapi(listProductLinesRoute, async (c) => {
+    return c.json(await listProductLines(), 200);
   })
-  .get("/:productLineId", async (c) => {
+  .openapi(getProductLineRoute, async (c) => {
     const productLine = await getProductLine({
       productLineId: c.req.param("productLineId"),
     });
     if (!productLine) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(productLine);
+    return c.json(productLine, 200);
   })
-  .patch(
-    "/:productLineId",
-    zValidator("json", productLinePatchSchema),
-    async (c) => {
-      const productLine = await patchProductLine({
-        patch: c.req.valid("json"),
-        productLineId: c.req.param("productLineId"),
-      });
-      if (!productLine) {
-        return c.json({ error: "not found" }, 404);
-      }
-      if ("error" in productLine) {
-        return c.json(productLine, 400);
-      }
-      return c.json(productLine);
-    },
-  )
-  .delete("/:productLineId", async (c) => {
+  .openapi(patchProductLineRoute, async (c) => {
+    const productLine = await patchProductLine({
+      patch: c.req.valid("json"),
+      productLineId: c.req.param("productLineId"),
+    });
+    if (!productLine) {
+      return c.json({ error: "not found" }, 404);
+    }
+    if ("error" in productLine) {
+      return c.json(productLine, 400);
+    }
+    return c.json(productLine, 200);
+  })
+  .openapi(deprecateProductLineRoute, async (c) => {
     const productLine = await deprecateProductLine({
       productLineId: c.req.param("productLineId"),
     });
     if (!productLine) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(productLine);
+    return c.json(productLine, 200);
   })
-  .post("/:productLineId/split", zValidator("json", splitSchema), async (c) => {
+  .openapi(splitProductLineRoute, async (c) => {
     const result = await splitProductLine({
       body: c.req.valid("json"),
       productLineId: c.req.param("productLineId"),
@@ -132,20 +295,16 @@ export const productLineApp = new Hono()
     }
     return c.json(result, 200);
   })
-  .post(
-    "/:productLineId/consolidate",
-    zValidator("json", consolidateSchema),
-    async (c) => {
-      const result = await consolidateProductLine({
-        body: c.req.valid("json"),
-        productLineId: c.req.param("productLineId"),
-      });
-      if (!result) {
-        return c.json({ error: "not found" }, 404);
-      }
-      if ("error" in result) {
-        return c.json(result, 400);
-      }
-      return c.json(result, 200);
-    },
-  );
+  .openapi(consolidateProductLineRoute, async (c) => {
+    const result = await consolidateProductLine({
+      body: c.req.valid("json"),
+      productLineId: c.req.param("productLineId"),
+    });
+    if (!result) {
+      return c.json({ error: "not found" }, 404);
+    }
+    if ("error" in result) {
+      return c.json(result, 400);
+    }
+    return c.json(result, 200);
+  });
