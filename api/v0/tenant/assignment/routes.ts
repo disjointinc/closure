@@ -84,6 +84,15 @@ const getAssignmentRoute = createRoute({
   },
 });
 
+/*
+ * Assignments aren't deleted, and this fact is user-facing (users care
+ * about and can see old assignments, as opposed to other "deleted"
+ * resources which are technically still stored but are no longer visible
+ * to users because of the deletedAt timestamp). The semantically correct
+ * way to represent this fact to users is to not have a delete route for
+ * assignments, but instead reflect assignment mutation to "ended" with a
+ * PATCH route.
+ */
 const endAssignmentRoute = createRoute({
   method: "patch",
   path: "/{assignmentId}/end",
