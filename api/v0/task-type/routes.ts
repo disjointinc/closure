@@ -2,9 +2,10 @@
  * v0/task-type/routes.ts -- HTTP for /v0/task-type: creation, listing, get,
  * and deprecate. Business logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
+import { notFoundResponse } from "../../lib/http.ts";
+import { taskTypeIdSchema } from "../../schemas/ids.ts";
 import { taskTypeSchema } from "../../schemas/task-type.ts";
 import {
   createTaskType,
@@ -21,29 +22,91 @@ const taskTypeCreateSchema = taskTypeSchema.omit({
 
 export type TaskTypeCreateBody = z.infer<typeof taskTypeCreateSchema>;
 
-export const taskTypeApp = new Hono()
-  .post("/", zValidator("json", taskTypeCreateSchema), async (c) => {
+const createTaskTypeRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["task-type"],
+  summary: "Create a task type",
+  request: {
+    body: {
+      content: { "application/json": { schema: taskTypeCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: taskTypeSchema } },
+      description: "Created",
+    },
+  },
+});
+
+const listTaskTypesRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["task-type"],
+  summary: "List task types",
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(taskTypeSchema) } },
+      description: "OK",
+    },
+  },
+});
+
+const getTaskTypeRoute = createRoute({
+  method: "get",
+  path: "/{taskTypeId}",
+  tags: ["task-type"],
+  summary: "Get a task type",
+  request: { params: z.object({ taskTypeId: taskTypeIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: taskTypeSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const deprecateTaskTypeRoute = createRoute({
+  method: "delete",
+  path: "/{taskTypeId}",
+  tags: ["task-type"],
+  summary: "Deprecate a task type",
+  request: { params: z.object({ taskTypeId: taskTypeIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: taskTypeSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+export const taskTypeApp = new OpenAPIHono()
+  .openapi(createTaskTypeRoute, async (c) => {
     const body = c.req.valid("json");
     return c.json(await createTaskType({ taskType: body }), 201);
   })
-  .get("/", async (c) => {
-    return c.json(await listTaskTypes());
+  .openapi(listTaskTypesRoute, async (c) => {
+    return c.json(await listTaskTypes(), 200);
   })
-  .get("/:taskTypeId", async (c) => {
+  .openapi(getTaskTypeRoute, async (c) => {
     const taskType = await getTaskType({
       taskTypeId: c.req.param("taskTypeId"),
     });
     if (!taskType) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(taskType);
+    return c.json(taskType, 200);
   })
-  .delete("/:taskTypeId", async (c) => {
+  .openapi(deprecateTaskTypeRoute, async (c) => {
     const taskType = await deprecateTaskType({
       taskTypeId: c.req.param("taskTypeId"),
     });
     if (!taskType) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(taskType);
+    return c.json(taskType, 200);
   });

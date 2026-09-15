@@ -2,8 +2,11 @@
  * v0/tax-type/routes.ts -- HTTP for /v0/tax-type: creation, listing, get,
  * and deprecate. Business logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { z } from "zod";
+import { notFoundResponse } from "../../lib/http.ts";
+import { taxTypeIdSchema } from "../../schemas/ids.ts";
+import { taxTypeSchema } from "../../schemas/tax-type.ts";
 import {
   createTaxType,
   deprecateTaxType,
@@ -12,27 +15,89 @@ import {
   taxTypeCreateSchema,
 } from "./service.ts";
 
-export const taxTypeApp = new Hono()
-  .post("/", zValidator("json", taxTypeCreateSchema), async (c) => {
+const createTaxTypeRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["tax-type"],
+  summary: "Create a tax type",
+  request: {
+    body: {
+      content: { "application/json": { schema: taxTypeCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: taxTypeSchema } },
+      description: "Created",
+    },
+  },
+});
+
+const listTaxTypesRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["tax-type"],
+  summary: "List tax types",
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(taxTypeSchema) } },
+      description: "OK",
+    },
+  },
+});
+
+const getTaxTypeRoute = createRoute({
+  method: "get",
+  path: "/{taxTypeId}",
+  tags: ["tax-type"],
+  summary: "Get a tax type",
+  request: { params: z.object({ taxTypeId: taxTypeIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: taxTypeSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const deprecateTaxTypeRoute = createRoute({
+  method: "delete",
+  path: "/{taxTypeId}",
+  tags: ["tax-type"],
+  summary: "Deprecate a tax type",
+  request: { params: z.object({ taxTypeId: taxTypeIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: taxTypeSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+export const taxTypeApp = new OpenAPIHono()
+  .openapi(createTaxTypeRoute, async (c) => {
     const body = c.req.valid("json");
     return c.json(await createTaxType({ taxType: body }), 201);
   })
-  .get("/", async (c) => {
-    return c.json(await listTaxTypes());
+  .openapi(listTaxTypesRoute, async (c) => {
+    return c.json(await listTaxTypes(), 200);
   })
-  .get("/:taxTypeId", async (c) => {
+  .openapi(getTaxTypeRoute, async (c) => {
     const taxType = await getTaxType({ taxTypeId: c.req.param("taxTypeId") });
     if (!taxType) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(taxType);
+    return c.json(taxType, 200);
   })
-  .delete("/:taxTypeId", async (c) => {
+  .openapi(deprecateTaxTypeRoute, async (c) => {
     const taxType = await deprecateTaxType({
       taxTypeId: c.req.param("taxTypeId"),
     });
     if (!taxType) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(taxType);
+    return c.json(taxType, 200);
   });
