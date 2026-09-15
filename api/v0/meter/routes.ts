@@ -2,9 +2,10 @@
  * v0/meter/routes.ts -- HTTP for /v0/meter: request validation and wiring.
  * Business logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
+import { notFoundResponse } from "../../lib/http.ts";
+import { meterIdSchema } from "../../schemas/ids.ts";
 import { meterSchema } from "../../schemas/meter.ts";
 import {
   createMeter,
@@ -21,24 +22,86 @@ const meterCreateSchema = meterSchema.omit({
 
 export type MeterCreateBody = z.infer<typeof meterCreateSchema>;
 
-export const meterApp = new Hono()
-  .post("/", zValidator("json", meterCreateSchema), async (c) => {
+const createMeterRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["meter"],
+  summary: "Create a meter",
+  request: {
+    body: {
+      content: { "application/json": { schema: meterCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: meterSchema } },
+      description: "Created",
+    },
+  },
+});
+
+const listMetersRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["meter"],
+  summary: "List meters",
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(meterSchema) } },
+      description: "OK",
+    },
+  },
+});
+
+const getMeterRoute = createRoute({
+  method: "get",
+  path: "/{meterId}",
+  tags: ["meter"],
+  summary: "Get a meter",
+  request: { params: z.object({ meterId: meterIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: meterSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const deprecateMeterRoute = createRoute({
+  method: "delete",
+  path: "/{meterId}",
+  tags: ["meter"],
+  summary: "Deprecate a meter",
+  request: { params: z.object({ meterId: meterIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: meterSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+export const meterApp = new OpenAPIHono()
+  .openapi(createMeterRoute, async (c) => {
     return c.json(await createMeter({ meter: c.req.valid("json") }), 201);
   })
-  .get("/", async (c) => {
-    return c.json(await listMeters());
+  .openapi(listMetersRoute, async (c) => {
+    return c.json(await listMeters(), 200);
   })
-  .get("/:meterId", async (c) => {
+  .openapi(getMeterRoute, async (c) => {
     const meter = await getMeter({ meterId: c.req.param("meterId") });
     if (!meter) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(meter);
+    return c.json(meter, 200);
   })
-  .delete("/:meterId", async (c) => {
+  .openapi(deprecateMeterRoute, async (c) => {
     const meter = await deprecateMeter({ meterId: c.req.param("meterId") });
     if (!meter) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(meter);
+    return c.json(meter, 200);
   });

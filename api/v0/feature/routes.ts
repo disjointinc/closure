@@ -2,11 +2,12 @@
  * v0/feature/routes.ts -- HTTP for /v0/feature: request validation and
  * wiring. Business logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
+import { notFoundResponse } from "../../lib/http.ts";
 import { featureOptionSchema } from "../../schemas/feature-option.ts";
 import { featureSchema } from "../../schemas/feature.ts";
+import { featureIdSchema } from "../../schemas/ids.ts";
 import {
   createFeature,
   deprecateFeature,
@@ -32,26 +33,88 @@ const featureCreateSchema = featureSchema
 
 export type FeatureCreateBody = z.infer<typeof featureCreateSchema>;
 
-export const featureApp = new Hono()
-  .post("/", zValidator("json", featureCreateSchema), async (c) => {
+const createFeatureRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["feature"],
+  summary: "Create a feature",
+  request: {
+    body: {
+      content: { "application/json": { schema: featureCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: featureSchema } },
+      description: "Created",
+    },
+  },
+});
+
+const listFeaturesRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["feature"],
+  summary: "List features",
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(featureSchema) } },
+      description: "OK",
+    },
+  },
+});
+
+const getFeatureRoute = createRoute({
+  method: "get",
+  path: "/{featureId}",
+  tags: ["feature"],
+  summary: "Get a feature",
+  request: { params: z.object({ featureId: featureIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: featureSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const deprecateFeatureRoute = createRoute({
+  method: "delete",
+  path: "/{featureId}",
+  tags: ["feature"],
+  summary: "Deprecate a feature",
+  request: { params: z.object({ featureId: featureIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: featureSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+export const featureApp = new OpenAPIHono()
+  .openapi(createFeatureRoute, async (c) => {
     return c.json(await createFeature({ feature: c.req.valid("json") }), 201);
   })
-  .get("/", async (c) => {
-    return c.json(await listFeatures());
+  .openapi(listFeaturesRoute, async (c) => {
+    return c.json(await listFeatures(), 200);
   })
-  .get("/:featureId", async (c) => {
+  .openapi(getFeatureRoute, async (c) => {
     const feature = await getFeature({ featureId: c.req.param("featureId") });
     if (!feature) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(feature);
+    return c.json(feature, 200);
   })
-  .delete("/:featureId", async (c) => {
+  .openapi(deprecateFeatureRoute, async (c) => {
     const feature = await deprecateFeature({
       featureId: c.req.param("featureId"),
     });
     if (!feature) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(feature);
+    return c.json(feature, 200);
   });

@@ -2,9 +2,9 @@
  * v0/loan-template/routes.ts -- HTTP for /v0/loan-template: request
  * validation and wiring. Business logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
+import { notFoundResponse } from "../../lib/http.ts";
 import { loanTemplateIdSchema } from "../../schemas/ids.ts";
 import { loanDefinitionFields } from "../../schemas/loan.ts";
 import { loanTemplateSchema } from "../../schemas/loan-template.ts";
@@ -40,37 +40,91 @@ const loanTemplateCreateSchema = loanTemplateSchema
 
 export type LoanTemplateCreateBody = z.infer<typeof loanTemplateCreateSchema>;
 
-export const loanTemplateApp = new Hono()
-  .post("/", zValidator("json", loanTemplateCreateSchema), async (c) => {
+const createLoanTemplateRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["loan-template"],
+  summary: "Create a loan template",
+  request: {
+    body: {
+      content: { "application/json": { schema: loanTemplateCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: loanTemplateSchema } },
+      description: "Created",
+    },
+  },
+});
+
+const listLoanTemplatesRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["loan-template"],
+  summary: "List loan templates",
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(loanTemplateSchema) } },
+      description: "OK",
+    },
+  },
+});
+
+const getLoanTemplateRoute = createRoute({
+  method: "get",
+  path: "/{loanTemplateId}",
+  tags: ["loan-template"],
+  summary: "Get a loan template",
+  request: { params: z.object({ loanTemplateId: loanTemplateIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: loanTemplateSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const deprecateLoanTemplateRoute = createRoute({
+  method: "delete",
+  path: "/{loanTemplateId}",
+  tags: ["loan-template"],
+  summary: "Deprecate a loan template",
+  request: { params: z.object({ loanTemplateId: loanTemplateIdSchema }) },
+  responses: {
+    200: {
+      content: { "application/json": { schema: loanTemplateSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+export const loanTemplateApp = new OpenAPIHono()
+  .openapi(createLoanTemplateRoute, async (c) => {
     const body = c.req.valid("json");
     return c.json(await createLoanTemplate({ template: body }), 201);
   })
-  .get("/", async (c) => {
-    return c.json(await listLoanTemplates());
+  .openapi(listLoanTemplatesRoute, async (c) => {
+    return c.json(await listLoanTemplates(), 200);
   })
-  .get(
-    "/:loanTemplateId",
-    zValidator("param", z.object({ loanTemplateId: loanTemplateIdSchema })),
-    async (c) => {
-      const template = await getLoanTemplate({
-        loanTemplateId: c.req.param("loanTemplateId"),
-      });
-      if (!template) {
-        return c.json({ error: "not found" }, 404);
-      }
-      return c.json(template);
-    },
-  )
-  .delete(
-    "/:loanTemplateId",
-    zValidator("param", z.object({ loanTemplateId: loanTemplateIdSchema })),
-    async (c) => {
-      const template = await deprecateLoanTemplate({
-        loanTemplateId: c.req.param("loanTemplateId"),
-      });
-      if (!template) {
-        return c.json({ error: "not found" }, 404);
-      }
-      return c.json(template);
-    },
-  );
+  .openapi(getLoanTemplateRoute, async (c) => {
+    const template = await getLoanTemplate({
+      loanTemplateId: c.req.param("loanTemplateId"),
+    });
+    if (!template) {
+      return c.json({ error: "not found" }, 404);
+    }
+    return c.json(template, 200);
+  })
+  .openapi(deprecateLoanTemplateRoute, async (c) => {
+    const template = await deprecateLoanTemplate({
+      loanTemplateId: c.req.param("loanTemplateId"),
+    });
+    if (!template) {
+      return c.json({ error: "not found" }, 404);
+    }
+    return c.json(template, 200);
+  });

@@ -2,9 +2,9 @@
  * v0/experiment/routes.ts -- HTTP for /v0/experiment: request validation
  * and wiring. Business logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
+import { invalidResponse, notFoundResponse } from "../../lib/http.ts";
 import { epochMs } from "../../schemas/common.ts";
 import { experimentSchema } from "../../schemas/experiment.ts";
 import { cycleIdSchema, experimentIdSchema } from "../../schemas/ids.ts";
@@ -71,8 +71,78 @@ export type ConcludeExperimentBody = z.infer<typeof concludeSchema>;
 
 const experimentParamSchema = z.object({ experimentId: experimentIdSchema });
 
-export const experimentApp = new Hono()
-  .post("/", zValidator("json", experimentCreateSchema), async (c) => {
+const createExperimentRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["experiment"],
+  summary: "Create an experiment",
+  request: {
+    body: {
+      content: { "application/json": { schema: experimentCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: experimentSchema } },
+      description: "Created",
+    },
+    400: invalidResponse,
+  },
+});
+
+const listExperimentsRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["experiment"],
+  summary: "List experiments",
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(experimentSchema) } },
+      description: "OK",
+    },
+  },
+});
+
+const getExperimentRoute = createRoute({
+  method: "get",
+  path: "/{experimentId}",
+  tags: ["experiment"],
+  summary: "Get an experiment",
+  request: { params: experimentParamSchema },
+  responses: {
+    200: {
+      content: { "application/json": { schema: experimentSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const concludeExperimentRoute = createRoute({
+  method: "post",
+  path: "/{experimentId}/conclude",
+  tags: ["experiment"],
+  summary: "Conclude an experiment",
+  request: {
+    params: experimentParamSchema,
+    body: {
+      content: { "application/json": { schema: concludeSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: experimentSchema } },
+      description: "OK",
+    },
+    400: invalidResponse,
+    404: notFoundResponse,
+  },
+});
+
+export const experimentApp = new OpenAPIHono()
+  .openapi(createExperimentRoute, async (c) => {
     const body = c.req.valid("json");
     const experiment = await createExperiment({ experiment: body });
     if ("error" in experiment) {
@@ -80,35 +150,26 @@ export const experimentApp = new Hono()
     }
     return c.json(experiment, 201);
   })
-  .get("/", async (c) => {
-    return c.json(await listExperiments());
+  .openapi(listExperimentsRoute, async (c) => {
+    return c.json(await listExperiments(), 200);
   })
-  .get(
-    "/:experimentId",
-    zValidator("param", experimentParamSchema),
-    async (c) => {
-      const experiment = await getExperiment(c.req.valid("param"));
-      if (!experiment) {
-        return c.json({ error: "not found" }, 404);
-      }
-      return c.json(experiment);
-    },
-  )
-  .post(
-    "/:experimentId/conclude",
-    zValidator("param", experimentParamSchema),
-    zValidator("json", concludeSchema),
-    async (c) => {
-      const experiment = await concludeExperiment({
-        body: c.req.valid("json"),
-        experimentId: c.req.valid("param").experimentId,
-      });
-      if (!experiment) {
-        return c.json({ error: "not found" }, 404);
-      }
-      if ("error" in experiment) {
-        return c.json(experiment, 400);
-      }
-      return c.json(experiment);
-    },
-  );
+  .openapi(getExperimentRoute, async (c) => {
+    const experiment = await getExperiment(c.req.valid("param"));
+    if (!experiment) {
+      return c.json({ error: "not found" }, 404);
+    }
+    return c.json(experiment, 200);
+  })
+  .openapi(concludeExperimentRoute, async (c) => {
+    const experiment = await concludeExperiment({
+      body: c.req.valid("json"),
+      experimentId: c.req.valid("param").experimentId,
+    });
+    if (!experiment) {
+      return c.json({ error: "not found" }, 404);
+    }
+    if ("error" in experiment) {
+      return c.json(experiment, 400);
+    }
+    return c.json(experiment, 200);
+  });
