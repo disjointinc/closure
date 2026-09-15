@@ -2,10 +2,10 @@
  * v0/tenant/credit-grant/routes.ts -- HTTP for /v0/tenant/:tenantId/credit-grant:
  * request validation and wiring. Business logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 import { MeterBalanceUnavailableError } from "../../../cache/meter/index.ts";
+import { serviceUnavailableResponse } from "../../../lib/http.ts";
 import { creditGrantSchema } from "../../../schemas/credit-grant.ts";
 import { createCreditGrant, listCreditGrants } from "./service.ts";
 
@@ -16,8 +16,43 @@ const creditGrantCreateSchema = creditGrantSchema.omit({
 
 export type CreditGrantCreateBody = z.infer<typeof creditGrantCreateSchema>;
 
-export const creditGrantApp = new Hono<{ Variables: { tenantId: string } }>()
-  .post("/", zValidator("json", creditGrantCreateSchema), async (c) => {
+const createCreditGrantRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["tenant/credit-grant"],
+  summary: "Create a credit grant",
+  request: {
+    body: {
+      content: { "application/json": { schema: creditGrantCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: creditGrantSchema } },
+      description: "Created",
+    },
+    503: serviceUnavailableResponse,
+  },
+});
+
+const listCreditGrantsRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["tenant/credit-grant"],
+  summary: "List credit grants",
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(creditGrantSchema) } },
+      description: "OK",
+    },
+  },
+});
+
+export const creditGrantApp = new OpenAPIHono<{
+  Variables: { tenantId: string };
+}>()
+  .openapi(createCreditGrantRoute, async (c) => {
     const tenantId = c.get("tenantId");
     const body = c.req.valid("json");
     try {
@@ -43,6 +78,6 @@ export const creditGrantApp = new Hono<{ Variables: { tenantId: string } }>()
       throw error;
     }
   })
-  .get("/", async (c) => {
-    return c.json(await listCreditGrants({ tenantId: c.get("tenantId") }));
+  .openapi(listCreditGrantsRoute, async (c) => {
+    return c.json(await listCreditGrants({ tenantId: c.get("tenantId") }), 200);
   });
