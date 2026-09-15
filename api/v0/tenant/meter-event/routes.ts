@@ -2,10 +2,12 @@
  * v0/tenant/meter-event/routes.ts -- HTTP for /v0/tenant/:tenantId/meter-event:
  * request validation and wiring. Business logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 import { MeterBalanceUnavailableError } from "../../../cache/meter/index.ts";
+import { serviceUnavailableResponse } from "../../../lib/http.ts";
+import { microcredits } from "../../../schemas/common.ts";
+import { tenantIdSchema } from "../../../schemas/ids.ts";
 import { meterEventSchema } from "../../../schemas/meter-event.ts";
 import { recordEvent } from "./service.ts";
 
@@ -16,11 +18,39 @@ const meterEventCreateSchema = meterEventSchema.omit({
   tenantId: true,
 });
 
+/* The ingest outcome joined onto the recorded event: the persisted status
+ * and the post-decision balance (null on a redelivery whose balance key has
+ * since been lost). */
+const meterEventApiSchema = meterEventSchema.extend({
+  balanceMicrocredits: microcredits.nullable(),
+});
+
 export type MeterEventCreateBody = z.infer<typeof meterEventCreateSchema>;
 
-export const meterEventApp = new Hono<{
+const recordMeterEventRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["tenant/meter-event"],
+  summary: "Record a meter event",
+  request: {
+    params: z.object({ tenantId: tenantIdSchema }),
+    body: {
+      content: { "application/json": { schema: meterEventCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: meterEventApiSchema } },
+      description: "Created",
+    },
+    503: serviceUnavailableResponse,
+  },
+});
+
+export const meterEventApp = new OpenAPIHono<{
   Variables: { tenantId: string };
-}>().post("/", zValidator("json", meterEventCreateSchema), async (c) => {
+}>().openapi(recordMeterEventRoute, async (c) => {
   const tenantId = c.get("tenantId");
   const body = c.req.valid("json");
   try {
