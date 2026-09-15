@@ -2,10 +2,11 @@
  * v0/tenant/assignment/routes.ts -- HTTP for /v0/tenant/:tenantId/assignment: request
  * validation and wiring. Business logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
+import { invalidResponse, notFoundResponse } from "../../../lib/http.ts";
 import { assignmentSchema } from "../../../schemas/assignment.ts";
+import { assignmentIdSchema, tenantIdSchema } from "../../../schemas/ids.ts";
 import {
   createAssignment,
   endAssignment,
@@ -29,8 +30,84 @@ const assignmentCreateSchema = assignmentSchema
 
 export type AssignmentCreateBody = z.infer<typeof assignmentCreateSchema>;
 
-export const assignmentApp = new Hono<{ Variables: { tenantId: string } }>()
-  .post("/", zValidator("json", assignmentCreateSchema), async (c) => {
+const createAssignmentRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["tenant/assignment"],
+  summary: "Create an assignment",
+  request: {
+    body: {
+      content: { "application/json": { schema: assignmentCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: assignmentSchema } },
+      description: "Created",
+    },
+    400: invalidResponse,
+    404: notFoundResponse,
+  },
+});
+
+const listAssignmentsRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["tenant/assignment"],
+  summary: "List assignments",
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(assignmentSchema) } },
+      description: "OK",
+    },
+  },
+});
+
+const getAssignmentRoute = createRoute({
+  method: "get",
+  path: "/{assignmentId}",
+  tags: ["tenant/assignment"],
+  summary: "Get an assignment",
+  request: {
+    params: z.object({
+      assignmentId: assignmentIdSchema,
+      tenantId: tenantIdSchema,
+    }),
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: assignmentSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const endAssignmentRoute = createRoute({
+  method: "patch",
+  path: "/{assignmentId}/end",
+  tags: ["tenant/assignment"],
+  summary: "End an assignment",
+  request: {
+    params: z.object({
+      assignmentId: assignmentIdSchema,
+      tenantId: tenantIdSchema,
+    }),
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: assignmentSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+export const assignmentApp = new OpenAPIHono<{
+  Variables: { tenantId: string };
+}>()
+  .openapi(createAssignmentRoute, async (c) => {
     const tenantId = c.get("tenantId");
     const assignment = await createAssignment({
       assignment: c.req.valid("json"),
@@ -44,24 +121,24 @@ export const assignmentApp = new Hono<{ Variables: { tenantId: string } }>()
     }
     return c.json(assignment, 201);
   })
-  .get("/", async (c) => {
-    return c.json(await listAssignments({ tenantId: c.get("tenantId") }));
+  .openapi(listAssignmentsRoute, async (c) => {
+    return c.json(await listAssignments({ tenantId: c.get("tenantId") }), 200);
   })
-  .get("/:assignmentId", async (c) => {
+  .openapi(getAssignmentRoute, async (c) => {
     const assignment = await getAssignment({
       assignmentId: c.req.param("assignmentId"),
     });
     if (!assignment) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(assignment);
+    return c.json(assignment, 200);
   })
-  .patch("/:assignmentId/end", async (c) => {
+  .openapi(endAssignmentRoute, async (c) => {
     const assignment = await endAssignment({
       assignmentId: c.req.param("assignmentId"),
     });
     if (!assignment) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(assignment);
+    return c.json(assignment, 200);
   });

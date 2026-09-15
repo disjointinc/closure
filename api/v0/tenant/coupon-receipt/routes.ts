@@ -3,10 +3,16 @@
  * /v0/tenant/:tenantId/coupon-receipt: request validation and wiring. Business
  * logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
-import { couponIdSchema, teamMemberIdSchema } from "../../../schemas/ids.ts";
+import { conflictResponse } from "../../../lib/http.ts";
+import { epochMs } from "../../../schemas/common.ts";
+import {
+  couponIdSchema,
+  couponReceiptIdSchema,
+  teamMemberIdSchema,
+  tenantIdSchema,
+} from "../../../schemas/ids.ts";
 import {
   createCouponReceipt,
   listCouponReceipts,
@@ -22,8 +28,77 @@ const receiptCreateSchema = z.object({
 
 export type ReceiptCreateBody = z.infer<typeof receiptCreateSchema>;
 
-export const couponReceiptApp = new Hono<{ Variables: { tenantId: string } }>()
-  .post("/", zValidator("json", receiptCreateSchema), async (c) => {
+/* rowToReceipt (service.ts) doesn't narrow grantorType/grantorId by variant,
+ * so the wire schema is the widened shape it actually returns -- the
+ * discriminated couponReceiptSchema would not typecheck against it. */
+const couponReceiptApiSchema = z.object({
+  couponReceiptId: couponReceiptIdSchema,
+  couponId: couponIdSchema,
+  receivedAt: epochMs,
+  usedAt: epochMs.nullable(),
+  reason: z.string().nullable(),
+  grantorType: z.string(),
+  grantorId: z.string().nullable(),
+});
+
+const createCouponReceiptRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["tenant/coupon-receipt"],
+  summary: "Create a coupon receipt",
+  request: {
+    body: {
+      content: { "application/json": { schema: receiptCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: couponReceiptApiSchema } },
+      description: "Created",
+    },
+  },
+});
+
+const listCouponReceiptsRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["tenant/coupon-receipt"],
+  summary: "List coupon receipts",
+  responses: {
+    200: {
+      content: {
+        "application/json": { schema: z.array(couponReceiptApiSchema) },
+      },
+      description: "OK",
+    },
+  },
+});
+
+const useCouponReceiptRoute = createRoute({
+  method: "post",
+  path: "/{couponReceiptId}/use",
+  tags: ["tenant/coupon-receipt"],
+  summary: "Use a coupon receipt",
+  request: {
+    params: z.object({
+      couponReceiptId: couponReceiptIdSchema,
+      tenantId: tenantIdSchema,
+    }),
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: couponReceiptApiSchema } },
+      description: "OK",
+    },
+    409: conflictResponse,
+  },
+});
+
+export const couponReceiptApp = new OpenAPIHono<{
+  Variables: { tenantId: string };
+}>()
+  .openapi(createCouponReceiptRoute, async (c) => {
     const body = c.req.valid("json");
     return c.json(
       await createCouponReceipt({
@@ -33,15 +108,18 @@ export const couponReceiptApp = new Hono<{ Variables: { tenantId: string } }>()
       201,
     );
   })
-  .get("/", async (c) => {
-    return c.json(await listCouponReceipts({ tenantId: c.get("tenantId") }));
+  .openapi(listCouponReceiptsRoute, async (c) => {
+    return c.json(
+      await listCouponReceipts({ tenantId: c.get("tenantId") }),
+      200,
+    );
   })
-  .post("/:couponReceiptId/use", async (c) => {
+  .openapi(useCouponReceiptRoute, async (c) => {
     const receipt = await useCouponReceipt({
       couponReceiptId: c.req.param("couponReceiptId"),
     });
     if (!receipt) {
       return c.json({ error: "not found or already used" }, 409);
     }
-    return c.json(receipt);
+    return c.json(receipt, 200);
   });
