@@ -87,6 +87,7 @@ async function transitionLoan({
     .set({
       closedAt: result.loan.closedAt,
       servicingState: result.loan.servicingState,
+      writeOffId: result.loan.writeOffId,
     })
     .where(and(eq(loans.loanId, loanId), eq(loans.tenantId, tenantId)));
   return result;
