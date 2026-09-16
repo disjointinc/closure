@@ -1,0 +1,106 @@
+---
+title: "Getting started"
+description: "Make your first calls to the Closure API in minutes."
+---
+
+## Base URL
+
+```
+http://localhost:3216
+```
+
+All routes are versioned under `/v0`. v0 is pre-release: shapes can break between versions.
+
+## The API spec
+
+Every endpoint — input and output shapes included — is generated from the API's own route definitions into an OpenAPI 3.1 spec:
+
+- **Live:** `GET /openapi.json` on the API itself.
+- **Rendered:** the API reference tab of this site.
+
+## Conventions
+
+- **IDs** look like `plan_3f8k2…` — a type prefix, an underscore, lowercase letters and digits. You never mint IDs; the server does.
+- **Timestamps** are integer milliseconds since the unix epoch (`createdAt`, `deprecatedAt`, `startsAt`, …).
+- **Money** is an integer amount in a currency's smallest billable unit:
+  `{ "currency": "USD", "unit": "cents", "value": 5250 }` is $52.50. A value holds one or more amounts, at most one per currency.
+- **Meter quantities** are integer microcredits: 1 credit = 1,000,000 microcredits.
+- **Durations** are `{ "days": 30 }` or `{ "months": 1 }` — exactly one field set.
+- **Errors**: business-rule failures return 4xx with `{ "error": "…" }`; malformed requests return 400 with validation details.
+- **Auth**: none yet. CORS is open; don't expose a dev API to the internet.
+
+## Resource lifecycle
+
+Nothing is destroyed. `DELETE` returns the resource with `deprecatedAt` stamped (plans, meters, cycles, product lines, features, …). Coupons, team members, and tenants use `deletedAt` instead. Invoices, experiments, and loans move through their own lifecycles: `POST …/finalize`, `POST …/conclude`, `PATCH …/close`, `PATCH …/write-off`.
+
+## Quickstart
+
+Create a billing cycle (prices are keyed to cycles):
+
+```bash
+curl -s -X POST http://localhost:3216/v0/cycle \
+  -H 'content-type: application/json' \
+  -d '{
+    "charged": "upfront",
+    "cycleLength": { "days": null, "months": 1 },
+    "defaultDiscountPercentage": null,
+    "name": "Monthly",
+    "description": null
+  }'
+```
+
+Create a product line — plans are scoped to one:
+
+```bash
+curl -s -X POST http://localhost:3216/v0/product-line \
+  -H 'content-type: application/json' \
+  -d '{
+    "forceBillingCycleSynchronizationWithProductLineIds": [],
+    "name": "Compute",
+    "description": null
+  }'
+```
+
+Create a plan with a price (prices carry full inline values; cycles are referenced by id):
+
+```bash
+curl -s -X POST http://localhost:3216/v0/plan \
+  -H 'content-type: application/json' \
+  -d '{
+    "productLineId": "product_line_…",
+    "derivedFromPlanId": null,
+    "name": "Starter",
+    "description": null,
+    "prices": [
+      {
+        "cycleId": "cycle_…",
+        "value": {
+          "name": "Monthly subscription",
+          "description": null,
+          "amounts": [{ "currency": "USD", "unit": "cents", "value": 2900 }]
+        }
+      }
+    ],
+    "features": null,
+    "meters": null,
+    "addOnTypeIds": null
+  }'
+```
+
+Create a tenant:
+
+```bash
+curl -s -X POST http://localhost:3216/v0/tenant \
+  -H 'content-type: application/json' \
+  -d '{ "externalIds": { "stripe": "cus_…" } }'
+```
+
+Then check what the tenant is entitled to:
+
+```bash
+curl -s http://localhost:3216/v0/tenant/{tenantId}/entitlements
+```
+
+## Next steps
+
+Every route is in the **API reference** tab, grouped by resource — request bodies, path params, and response shapes are all rendered from the spec.
