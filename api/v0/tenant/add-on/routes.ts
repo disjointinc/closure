@@ -29,7 +29,7 @@ export type AddOnCreateBody = z.infer<typeof addOnCreateSchema>;
 const attachAddOnRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/add-on"],
+  tags: ["Tenant > Add-on"],
   summary: "Attach an add-on",
   request: {
     body: {
@@ -49,7 +49,7 @@ const attachAddOnRoute = createRoute({
 const listAddOnsRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/add-on"],
+  tags: ["Tenant > Add-on"],
   summary: "List add-ons",
   responses: {
     200: {
@@ -62,7 +62,7 @@ const listAddOnsRoute = createRoute({
 const getAddOnRoute = createRoute({
   method: "get",
   path: "/{addOnId}",
-  tags: ["tenant/add-on"],
+  tags: ["Tenant > Add-on"],
   summary: "Get an add-on",
   request: {
     params: z.object({ addOnId: addOnIdSchema, tenantId: tenantIdSchema }),
@@ -79,7 +79,7 @@ const getAddOnRoute = createRoute({
 const deleteAddOnRoute = createRoute({
   method: "delete",
   path: "/{addOnId}",
-  tags: ["tenant/add-on"],
+  tags: ["Tenant > Add-on"],
   summary: "Delete an add-on",
   request: {
     params: z.object({ addOnId: addOnIdSchema, tenantId: tenantIdSchema }),

@@ -60,7 +60,7 @@ const tenantRowSchema = z.object({
 const createTenantRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant"],
+  tags: ["Tenant"],
   summary: "Create a tenant",
   request: {
     body: {
@@ -79,7 +79,7 @@ const createTenantRoute = createRoute({
 const listTenantsRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant"],
+  tags: ["Tenant"],
   summary: "List tenants",
   responses: {
     200: {
@@ -92,7 +92,7 @@ const listTenantsRoute = createRoute({
 const getTenantRoute = createRoute({
   method: "get",
   path: "/{tenantId}",
-  tags: ["tenant"],
+  tags: ["Tenant"],
   summary: "Get a tenant",
   request: { params: z.object({ tenantId: tenantIdSchema }) },
   responses: {
@@ -107,7 +107,7 @@ const getTenantRoute = createRoute({
 const patchTenantRoute = createRoute({
   method: "patch",
   path: "/{tenantId}",
-  tags: ["tenant"],
+  tags: ["Tenant"],
   summary: "Patch a tenant",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),
@@ -128,7 +128,7 @@ const patchTenantRoute = createRoute({
 const deleteTenantRoute = createRoute({
   method: "delete",
   path: "/{tenantId}",
-  tags: ["tenant"],
+  tags: ["Tenant"],
   summary: "Delete a tenant",
   request: { params: z.object({ tenantId: tenantIdSchema }) },
   responses: {

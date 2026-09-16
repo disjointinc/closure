@@ -33,7 +33,7 @@ export type AssignmentCreateBody = z.infer<typeof assignmentCreateSchema>;
 const createAssignmentRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/assignment"],
+  tags: ["Tenant > Assignment"],
   summary: "Create an assignment",
   request: {
     body: {
@@ -54,7 +54,7 @@ const createAssignmentRoute = createRoute({
 const listAssignmentsRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/assignment"],
+  tags: ["Tenant > Assignment"],
   summary: "List assignments",
   responses: {
     200: {
@@ -67,7 +67,7 @@ const listAssignmentsRoute = createRoute({
 const getAssignmentRoute = createRoute({
   method: "get",
   path: "/{assignmentId}",
-  tags: ["tenant/assignment"],
+  tags: ["Tenant > Assignment"],
   summary: "Get an assignment",
   request: {
     params: z.object({
@@ -96,7 +96,7 @@ const getAssignmentRoute = createRoute({
 const endAssignmentRoute = createRoute({
   method: "patch",
   path: "/{assignmentId}/end",
-  tags: ["tenant/assignment"],
+  tags: ["Tenant > Assignment"],
   summary: "End an assignment",
   request: {
     params: z.object({

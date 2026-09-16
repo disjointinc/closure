@@ -12,8 +12,8 @@
  * Routes are chained on a single OpenAPIHono instance so AppType carries the
  * full route schema -- that is what powers typesafe clients (hono/client's
  * hc) -- and the OpenAPI doc is derived from the same definitions.
- * /openapi.json serves the doc; the docs site renders its API reference
- * from that live URL.
+ * /openapi.json serves the doc; the docs site syncs it to a local file and
+ * renders its API reference from that.
  * Mounts are alphabetical after /, /healthz, and /openapi.json.
  */
 
@@ -85,7 +85,34 @@ const app = apiApp
   .notFound((c) => c.json({ error: "not found" }, 404));
 
 /** The spec as served live at /openapi.json. */
-export const getApiDoc = () => apiApp.getOpenAPI31Document(apiDoc);
+export const getApiDoc = () => {
+  const doc = apiApp.getOpenAPI31Document(apiDoc);
+  // Mintlify slugifies "Tenant > Add-on" to tenant->-add-on; rewrite the page
+  // URL with " > " as "-" so nested tags get clean routes.
+  for (const pathItem of Object.values(doc.paths ?? {})) {
+    for (const method of [
+      "delete",
+      "get",
+      "head",
+      "options",
+      "patch",
+      "post",
+      "put",
+      "trace",
+    ] as const) {
+      const operation = pathItem[method];
+      const tag = operation?.tags?.[0];
+      if (!operation || !tag?.includes(" > ") || !operation.summary) continue;
+      const group = tag.toLowerCase().replaceAll(" > ", "/");
+      const page = operation.summary
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      operation["x-mint"] = { href: `/api-reference/${group}/${page}` };
+    }
+  }
+  return doc;
+};
 
 const api = app.get("/openapi.json", (c) => {
   return c.json(getApiDoc());
