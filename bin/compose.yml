@@ -57,7 +57,7 @@ services:
     # the server when the mounted source changes (dev).
     command: sh -c "npm install --ignore-scripts && exec node --watch api/server.ts"
     ports:
-      - "${CLOSURE_API_PORT:-3226}:3226"
+      - "${CLOSURE_API_PORT:-3216}:3216"
     environment:
       CLOSURE_POSTGRES_HOST: closure-db
       CLOSURE_POSTGRES_PORT: "5432"
@@ -84,14 +84,25 @@ services:
     # has no .git to install into here.
     command: sh -c "npm ci --ignore-scripts && exec npm run dev -w web"
     ports:
-      - "${CLOSURE_WEB_PORT:-3216}:3216"
+      - "${CLOSURE_WEB_PORT:-3226}:3226"
     environment:
       # Browser-side origin of the API; the dev server passes VITE_* through
       # to the bundle (web/src/lib/api.ts).
-      VITE_CLOSURE_API_URL: ${VITE_CLOSURE_API_URL:-http://localhost:3226}
+      VITE_CLOSURE_API_URL: ${VITE_CLOSURE_API_URL:-http://localhost:3216}
+  closure-docs:
+    image: node:24-alpine
+    working_dir: /closure/docs
+    volumes:
+      - ..:/closure
+      # Keeps the npx download of the mint CLI warm across restarts.
+      - closure-docs-npm-cache:/root/.npm
+    command: sh -c "npx --yes mint@^4.2.894 dev --port 3236"
+    ports:
+      - "${CLOSURE_DOCS_PORT:-3236}:3236"
 
 volumes:
   closure-pgdata:
-  closure-api-node-modules:
   closure-migrate-node-modules:
+  closure-api-node-modules:
   closure-web-node-modules:
+  closure-docs-npm-cache:
