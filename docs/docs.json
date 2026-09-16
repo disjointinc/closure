@@ -39,7 +39,7 @@
         "groups": [
           {
             "group": "Get started",
-            "pages": ["guide/getting-started"]
+            "pages": ["guide/quickstart"]
           }
         ]
       },
