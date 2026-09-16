@@ -1,0 +1,52 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Closure",
+  "colors": {
+    "primary": "#2E5DEC",
+    "light": "#5B82E4",
+    "dark": "#2E5DEC"
+  },
+  "background": {
+    "color": {
+      "light": "#FFFFFF",
+      "dark": "#15102B"
+    }
+  },
+  "logo": {
+    "light": "/assets/logo/light.svg",
+    "dark": "/assets/logo/black.svg",
+    "href": "http://localhost:3226"
+  },
+  "favicon": {
+    "light": "/assets/logomark/white.svg",
+    "dark": "/assets/logomark/black.svg"
+  },
+  "icons": {
+    "library": "lucide"
+  },
+  "appearance": {
+    "default": "system"
+  },
+  "styling": {
+    "codeblocks": "system",
+    "eyebrows": "section"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guide",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": ["guide/getting-started"]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "openapi": "http://closure-api:3216/openapi.json"
+      }
+    ]
+  }
+}
