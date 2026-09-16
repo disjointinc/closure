@@ -18,7 +18,7 @@ import {
 const createCycleRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["cycle"],
+  tags: ["Cycle"],
   summary: "Create a cycle",
   request: {
     body: {
@@ -37,7 +37,7 @@ const createCycleRoute = createRoute({
 const listCyclesRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["cycle"],
+  tags: ["Cycle"],
   summary: "List cycles",
   responses: {
     200: {
@@ -50,7 +50,7 @@ const listCyclesRoute = createRoute({
 const getCycleRoute = createRoute({
   method: "get",
   path: "/{cycleId}",
-  tags: ["cycle"],
+  tags: ["Cycle"],
   summary: "Get a cycle",
   request: { params: z.object({ cycleId: cycleIdSchema }) },
   responses: {
@@ -65,7 +65,7 @@ const getCycleRoute = createRoute({
 const deprecateCycleRoute = createRoute({
   method: "delete",
   path: "/{cycleId}",
-  tags: ["cycle"],
+  tags: ["Cycle"],
   summary: "Deprecate a cycle",
   request: { params: z.object({ cycleId: cycleIdSchema }) },
   responses: {

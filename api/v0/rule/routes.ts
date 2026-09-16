@@ -22,7 +22,7 @@ const ruleApiResponseSchema = z
 const createRuleRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["rule"],
+  tags: ["Rule"],
   summary: "Create a rule",
   request: {
     body: {
@@ -42,7 +42,7 @@ const createRuleRoute = createRoute({
 const listRulesRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["rule"],
+  tags: ["Rule"],
   summary: "List rules",
   responses: {
     200: {
@@ -57,7 +57,7 @@ const listRulesRoute = createRoute({
 const getRuleRoute = createRoute({
   method: "get",
   path: "/{ruleId}",
-  tags: ["rule"],
+  tags: ["Rule"],
   summary: "Get a rule",
   request: { params: z.object({ ruleId: ruleIdSchema }) },
   responses: {
@@ -72,7 +72,7 @@ const getRuleRoute = createRoute({
 const deprecateRuleRoute = createRoute({
   method: "delete",
   path: "/{ruleId}",
-  tags: ["rule"],
+  tags: ["Rule"],
   summary: "Deprecate a rule",
   request: { params: z.object({ ruleId: ruleIdSchema }) },
   responses: {

@@ -34,7 +34,7 @@ export type TeamMemberPatchBody = z.infer<typeof teamMemberPatchSchema>;
 const createTeamMemberRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["team-member"],
+  tags: ["Team member"],
   summary: "Create a team member",
   request: {
     body: {
@@ -53,7 +53,7 @@ const createTeamMemberRoute = createRoute({
 const listTeamMembersRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["team-member"],
+  tags: ["Team member"],
   summary: "List team members",
   responses: {
     200: {
@@ -66,7 +66,7 @@ const listTeamMembersRoute = createRoute({
 const getTeamMemberRoute = createRoute({
   method: "get",
   path: "/{teamMemberId}",
-  tags: ["team-member"],
+  tags: ["Team member"],
   summary: "Get a team member",
   request: { params: z.object({ teamMemberId: teamMemberIdSchema }) },
   responses: {
@@ -81,7 +81,7 @@ const getTeamMemberRoute = createRoute({
 const patchTeamMemberRoute = createRoute({
   method: "patch",
   path: "/{teamMemberId}",
-  tags: ["team-member"],
+  tags: ["Team member"],
   summary: "Patch a team member",
   request: {
     params: z.object({ teamMemberId: teamMemberIdSchema }),
@@ -102,7 +102,7 @@ const patchTeamMemberRoute = createRoute({
 const deleteTeamMemberRoute = createRoute({
   method: "delete",
   path: "/{teamMemberId}",
-  tags: ["team-member"],
+  tags: ["Team member"],
   summary: "Delete a team member",
   request: { params: z.object({ teamMemberId: teamMemberIdSchema }) },
   responses: {

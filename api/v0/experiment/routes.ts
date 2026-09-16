@@ -74,7 +74,7 @@ const experimentParamSchema = z.object({ experimentId: experimentIdSchema });
 const createExperimentRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["experiment"],
+  tags: ["Experiment"],
   summary: "Create an experiment",
   request: {
     body: {
@@ -94,7 +94,7 @@ const createExperimentRoute = createRoute({
 const listExperimentsRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["experiment"],
+  tags: ["Experiment"],
   summary: "List experiments",
   responses: {
     200: {
@@ -107,7 +107,7 @@ const listExperimentsRoute = createRoute({
 const getExperimentRoute = createRoute({
   method: "get",
   path: "/{experimentId}",
-  tags: ["experiment"],
+  tags: ["Experiment"],
   summary: "Get an experiment",
   request: { params: experimentParamSchema },
   responses: {
@@ -122,7 +122,7 @@ const getExperimentRoute = createRoute({
 const concludeExperimentRoute = createRoute({
   method: "post",
   path: "/{experimentId}/conclude",
-  tags: ["experiment"],
+  tags: ["Experiment"],
   summary: "Conclude an experiment",
   request: {
     params: experimentParamSchema,

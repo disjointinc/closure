@@ -18,7 +18,7 @@ import {
 const createTaxTypeRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tax-type"],
+  tags: ["Tax type"],
   summary: "Create a tax type",
   request: {
     body: {
@@ -37,7 +37,7 @@ const createTaxTypeRoute = createRoute({
 const listTaxTypesRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tax-type"],
+  tags: ["Tax type"],
   summary: "List tax types",
   responses: {
     200: {
@@ -50,7 +50,7 @@ const listTaxTypesRoute = createRoute({
 const getTaxTypeRoute = createRoute({
   method: "get",
   path: "/{taxTypeId}",
-  tags: ["tax-type"],
+  tags: ["Tax type"],
   summary: "Get a tax type",
   request: { params: z.object({ taxTypeId: taxTypeIdSchema }) },
   responses: {
@@ -65,7 +65,7 @@ const getTaxTypeRoute = createRoute({
 const deprecateTaxTypeRoute = createRoute({
   method: "delete",
   path: "/{taxTypeId}",
-  tags: ["tax-type"],
+  tags: ["Tax type"],
   summary: "Deprecate a tax type",
   request: { params: z.object({ taxTypeId: taxTypeIdSchema }) },
   responses: {

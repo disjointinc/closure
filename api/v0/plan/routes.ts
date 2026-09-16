@@ -74,7 +74,7 @@ export type PlanCreateBody = z.infer<typeof planCreateSchema>;
 const createPlanRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["plan"],
+  tags: ["Plan"],
   summary: "Create a plan",
   request: {
     body: {
@@ -94,7 +94,7 @@ const createPlanRoute = createRoute({
 const listPlansRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["plan"],
+  tags: ["Plan"],
   summary: "List plans",
   responses: {
     200: {
@@ -107,7 +107,7 @@ const listPlansRoute = createRoute({
 const getPlanRoute = createRoute({
   method: "get",
   path: "/{planId}",
-  tags: ["plan"],
+  tags: ["Plan"],
   summary: "Get a plan",
   request: { params: z.object({ planId: planIdSchema }) },
   responses: {
@@ -122,7 +122,7 @@ const getPlanRoute = createRoute({
 const deprecatePlanRoute = createRoute({
   method: "delete",
   path: "/{planId}",
-  tags: ["plan"],
+  tags: ["Plan"],
   summary: "Deprecate a plan",
   request: { params: z.object({ planId: planIdSchema }) },
   responses: {

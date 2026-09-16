@@ -36,7 +36,7 @@ export type FeatureCreateBody = z.infer<typeof featureCreateSchema>;
 const createFeatureRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["feature"],
+  tags: ["Feature"],
   summary: "Create a feature",
   request: {
     body: {
@@ -55,7 +55,7 @@ const createFeatureRoute = createRoute({
 const listFeaturesRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["feature"],
+  tags: ["Feature"],
   summary: "List features",
   responses: {
     200: {
@@ -68,7 +68,7 @@ const listFeaturesRoute = createRoute({
 const getFeatureRoute = createRoute({
   method: "get",
   path: "/{featureId}",
-  tags: ["feature"],
+  tags: ["Feature"],
   summary: "Get a feature",
   request: { params: z.object({ featureId: featureIdSchema }) },
   responses: {
@@ -83,7 +83,7 @@ const getFeatureRoute = createRoute({
 const deprecateFeatureRoute = createRoute({
   method: "delete",
   path: "/{featureId}",
-  tags: ["feature"],
+  tags: ["Feature"],
   summary: "Deprecate a feature",
   request: { params: z.object({ featureId: featureIdSchema }) },
   responses: {

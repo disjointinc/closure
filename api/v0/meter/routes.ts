@@ -25,7 +25,7 @@ export type MeterCreateBody = z.infer<typeof meterCreateSchema>;
 const createMeterRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["meter"],
+  tags: ["Meter"],
   summary: "Create a meter",
   request: {
     body: {
@@ -44,7 +44,7 @@ const createMeterRoute = createRoute({
 const listMetersRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["meter"],
+  tags: ["Meter"],
   summary: "List meters",
   responses: {
     200: {
@@ -57,7 +57,7 @@ const listMetersRoute = createRoute({
 const getMeterRoute = createRoute({
   method: "get",
   path: "/{meterId}",
-  tags: ["meter"],
+  tags: ["Meter"],
   summary: "Get a meter",
   request: { params: z.object({ meterId: meterIdSchema }) },
   responses: {
@@ -72,7 +72,7 @@ const getMeterRoute = createRoute({
 const deprecateMeterRoute = createRoute({
   method: "delete",
   path: "/{meterId}",
-  tags: ["meter"],
+  tags: ["Meter"],
   summary: "Deprecate a meter",
   request: { params: z.object({ meterId: meterIdSchema }) },
   responses: {

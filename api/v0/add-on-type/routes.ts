@@ -38,7 +38,7 @@ export type AddOnTypeCreateBody = z.infer<typeof addOnTypeCreateSchema>;
 const createAddOnTypeRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["add-on-type"],
+  tags: ["Add-on type"],
   summary: "Create an add-on type",
   request: {
     body: {
@@ -58,7 +58,7 @@ const createAddOnTypeRoute = createRoute({
 const listAddOnTypesRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["add-on-type"],
+  tags: ["Add-on type"],
   summary: "List add-on types",
   responses: {
     200: {
@@ -71,7 +71,7 @@ const listAddOnTypesRoute = createRoute({
 const getAddOnTypeRoute = createRoute({
   method: "get",
   path: "/{addOnTypeId}",
-  tags: ["add-on-type"],
+  tags: ["Add-on type"],
   summary: "Get an add-on type",
   request: { params: z.object({ addOnTypeId: addOnTypeIdSchema }) },
   responses: {
@@ -86,7 +86,7 @@ const getAddOnTypeRoute = createRoute({
 const deprecateAddOnTypeRoute = createRoute({
   method: "delete",
   path: "/{addOnTypeId}",
-  tags: ["add-on-type"],
+  tags: ["Add-on type"],
   summary: "Deprecate an add-on type",
   request: { params: z.object({ addOnTypeId: addOnTypeIdSchema }) },
   responses: {

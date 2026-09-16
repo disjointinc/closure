@@ -89,7 +89,7 @@ const couponApiSchema = z.object({
 const createCouponRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["coupon"],
+  tags: ["Coupon"],
   summary: "Create a coupon",
   request: {
     body: {
@@ -109,7 +109,7 @@ const createCouponRoute = createRoute({
 const listCouponsRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["coupon"],
+  tags: ["Coupon"],
   summary: "List coupons",
   responses: {
     200: {
@@ -122,7 +122,7 @@ const listCouponsRoute = createRoute({
 const getCouponRoute = createRoute({
   method: "get",
   path: "/{couponId}",
-  tags: ["coupon"],
+  tags: ["Coupon"],
   summary: "Get a coupon",
   request: { params: z.object({ couponId: couponIdSchema }) },
   responses: {
@@ -137,7 +137,7 @@ const getCouponRoute = createRoute({
 const deleteCouponRoute = createRoute({
   method: "delete",
   path: "/{couponId}",
-  tags: ["coupon"],
+  tags: ["Coupon"],
   summary: "Delete a coupon",
   request: { params: z.object({ couponId: couponIdSchema }) },
   responses: {

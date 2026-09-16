@@ -43,7 +43,7 @@ export type LoanTemplateCreateBody = z.infer<typeof loanTemplateCreateSchema>;
 const createLoanTemplateRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["loan-template"],
+  tags: ["Loan template"],
   summary: "Create a loan template",
   request: {
     body: {
@@ -62,7 +62,7 @@ const createLoanTemplateRoute = createRoute({
 const listLoanTemplatesRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["loan-template"],
+  tags: ["Loan template"],
   summary: "List loan templates",
   responses: {
     200: {
@@ -75,7 +75,7 @@ const listLoanTemplatesRoute = createRoute({
 const getLoanTemplateRoute = createRoute({
   method: "get",
   path: "/{loanTemplateId}",
-  tags: ["loan-template"],
+  tags: ["Loan template"],
   summary: "Get a loan template",
   request: { params: z.object({ loanTemplateId: loanTemplateIdSchema }) },
   responses: {
@@ -90,7 +90,7 @@ const getLoanTemplateRoute = createRoute({
 const deprecateLoanTemplateRoute = createRoute({
   method: "delete",
   path: "/{loanTemplateId}",
-  tags: ["loan-template"],
+  tags: ["Loan template"],
   summary: "Deprecate a loan template",
   request: { params: z.object({ loanTemplateId: loanTemplateIdSchema }) },
   responses: {

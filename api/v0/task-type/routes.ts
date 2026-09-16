@@ -25,7 +25,7 @@ export type TaskTypeCreateBody = z.infer<typeof taskTypeCreateSchema>;
 const createTaskTypeRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["task-type"],
+  tags: ["Task type"],
   summary: "Create a task type",
   request: {
     body: {
@@ -44,7 +44,7 @@ const createTaskTypeRoute = createRoute({
 const listTaskTypesRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["task-type"],
+  tags: ["Task type"],
   summary: "List task types",
   responses: {
     200: {
@@ -57,7 +57,7 @@ const listTaskTypesRoute = createRoute({
 const getTaskTypeRoute = createRoute({
   method: "get",
   path: "/{taskTypeId}",
-  tags: ["task-type"],
+  tags: ["Task type"],
   summary: "Get a task type",
   request: { params: z.object({ taskTypeId: taskTypeIdSchema }) },
   responses: {
@@ -72,7 +72,7 @@ const getTaskTypeRoute = createRoute({
 const deprecateTaskTypeRoute = createRoute({
   method: "delete",
   path: "/{taskTypeId}",
-  tags: ["task-type"],
+  tags: ["Task type"],
   summary: "Deprecate a task type",
   request: { params: z.object({ taskTypeId: taskTypeIdSchema }) },
   responses: {

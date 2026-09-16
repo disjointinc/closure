@@ -106,7 +106,7 @@ const consolidateErrorSchema = z.object({
 const createProductLineRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["product-line"],
+  tags: ["Product line"],
   summary: "Create a product line",
   request: {
     body: {
@@ -126,7 +126,7 @@ const createProductLineRoute = createRoute({
 const listProductLinesRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["product-line"],
+  tags: ["Product line"],
   summary: "List product lines",
   responses: {
     200: {
@@ -139,7 +139,7 @@ const listProductLinesRoute = createRoute({
 const getProductLineRoute = createRoute({
   method: "get",
   path: "/{productLineId}",
-  tags: ["product-line"],
+  tags: ["Product line"],
   summary: "Get a product line",
   request: { params: z.object({ productLineId: productLineIdSchema }) },
   responses: {
@@ -154,7 +154,7 @@ const getProductLineRoute = createRoute({
 const patchProductLineRoute = createRoute({
   method: "patch",
   path: "/{productLineId}",
-  tags: ["product-line"],
+  tags: ["Product line"],
   summary: "Patch a product line",
   request: {
     params: z.object({ productLineId: productLineIdSchema }),
@@ -176,7 +176,7 @@ const patchProductLineRoute = createRoute({
 const deprecateProductLineRoute = createRoute({
   method: "delete",
   path: "/{productLineId}",
-  tags: ["product-line"],
+  tags: ["Product line"],
   summary: "Deprecate a product line",
   request: { params: z.object({ productLineId: productLineIdSchema }) },
   responses: {
@@ -191,7 +191,7 @@ const deprecateProductLineRoute = createRoute({
 const splitProductLineRoute = createRoute({
   method: "post",
   path: "/{productLineId}/split",
-  tags: ["product-line"],
+  tags: ["Product line"],
   summary: "Split a product line",
   request: {
     params: z.object({ productLineId: productLineIdSchema }),
@@ -216,8 +216,8 @@ const splitProductLineRoute = createRoute({
 const consolidateProductLineRoute = createRoute({
   method: "post",
   path: "/{productLineId}/consolidate",
-  tags: ["product-line"],
-  summary: "Consolidate a product line",
+  tags: ["Product line"],
+  summary: "Consolidate product lines",
   request: {
     params: z.object({ productLineId: productLineIdSchema }),
     body: {

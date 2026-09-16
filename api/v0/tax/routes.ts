@@ -20,7 +20,7 @@ export type TaxCreateBody = z.infer<typeof taxCreateSchema>;
 const createTaxRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tax"],
+  tags: ["Tax"],
   summary: "Create a tax",
   request: {
     body: {
@@ -39,7 +39,7 @@ const createTaxRoute = createRoute({
 const listTaxesRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tax"],
+  tags: ["Tax"],
   summary: "List taxes",
   responses: {
     200: {
@@ -52,7 +52,7 @@ const listTaxesRoute = createRoute({
 const getTaxRoute = createRoute({
   method: "get",
   path: "/{taxId}",
-  tags: ["tax"],
+  tags: ["Tax"],
   summary: "Get a tax",
   request: { params: z.object({ taxId: taxIdSchema }) },
   responses: {
@@ -67,7 +67,7 @@ const getTaxRoute = createRoute({
 const deprecateTaxRoute = createRoute({
   method: "delete",
   path: "/{taxId}",
-  tags: ["tax"],
+  tags: ["Tax"],
   summary: "Deprecate a tax",
   request: { params: z.object({ taxId: taxIdSchema }) },
   responses: {

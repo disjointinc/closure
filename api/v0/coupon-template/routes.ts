@@ -74,7 +74,7 @@ export type CouponTemplateCreateBody = z.infer<
 const createCouponTemplateRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["coupon-template"],
+  tags: ["Coupon template"],
   summary: "Create a coupon template",
   request: {
     body: {
@@ -93,7 +93,7 @@ const createCouponTemplateRoute = createRoute({
 const listCouponTemplatesRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["coupon-template"],
+  tags: ["Coupon template"],
   summary: "List coupon templates",
   responses: {
     200: {
@@ -108,7 +108,7 @@ const listCouponTemplatesRoute = createRoute({
 const getCouponTemplateRoute = createRoute({
   method: "get",
   path: "/{couponTemplateId}",
-  tags: ["coupon-template"],
+  tags: ["Coupon template"],
   summary: "Get a coupon template",
   request: { params: z.object({ couponTemplateId: couponTemplateIdSchema }) },
   responses: {
@@ -123,7 +123,7 @@ const getCouponTemplateRoute = createRoute({
 const deprecateCouponTemplateRoute = createRoute({
   method: "delete",
   path: "/{couponTemplateId}",
-  tags: ["coupon-template"],
+  tags: ["Coupon template"],
   summary: "Deprecate a coupon template",
   request: { params: z.object({ couponTemplateId: couponTemplateIdSchema }) },
   responses: {
