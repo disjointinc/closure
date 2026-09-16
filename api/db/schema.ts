@@ -810,8 +810,14 @@ export const loans = pgTable(
     ),
     createdAt: epochMs("created_at").notNull(),
     closedAt: epochMs("closed_at"),
-    /** Set when the creditor abandoned collection; closedAt is stamped alongside. */
-    writtenOffAt: epochMs("written_off_at"),
+    /* Current write-off event when the creditor abandoned collection
+     * (closedAt is stamped alongside). Cleared when a refund reversal
+     * reopens the loan; the event rows themselves are append-only. */
+    writeOffId: text("write_off_id").references(
+      /* The loans <-> loan_write_offs FKs are circular; the explicit return
+       * type breaks the type-inference cycle (runtime resolution is lazy). */
+      (): AnyPgColumn => loanWriteOffs.writeOffId,
+    ),
     /** When repayment is due: created_at + duration, stamped at creation. */
     endsAt: epochMs("ends_at").notNull(),
     /** The template this loan's definition was copied from, if any. */

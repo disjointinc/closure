@@ -239,6 +239,13 @@
       "when": 1789523050288,
       "tag": "0033_massive_sinister_six",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1789523651905,
+      "tag": "0034_loan_write_off_pointer",
+      "breakpoints": true
     }
   ]
 }
