@@ -20,26 +20,65 @@ import {
   type LoanDue,
 } from "./calculation.ts";
 import { LoanServicingError, serviceLoanDetail } from "./servicing.ts";
-import type { LoanCreateBody } from "./routes.ts";
+import type { LoanApi, LoanCreateBody } from "./routes.ts";
 
-/** Shape a loan row into the API loan: the row plus read-time obligations. */
+/** The API write-off: the event row minus the redundant parent FK. */
+type WriteOffEvent = {
+  writeOffId: string;
+  createdAt: number;
+  code: WriteOffCode;
+  reason: string | null;
+};
+
+/** Fetch write-off events by id (the loans' current-state pointer targets). */
+async function writeOffsById({
+  writeOffIds,
+}: {
+  writeOffIds: string[];
+}): Promise<Map<string, WriteOffEvent>> {
+  const events = new Map<string, WriteOffEvent>();
+  if (writeOffIds.length === 0) {
+    return events;
+  }
+  const rows = await db
+    .select()
+    .from(loanWriteOffs)
+    .where(inArray(loanWriteOffs.writeOffId, writeOffIds));
+  for (const row of rows) {
+    events.set(row.writeOffId, {
+      writeOffId: row.writeOffId,
+      createdAt: row.createdAt,
+      // Codes were zod-validated at the write boundary, so they always parse.
+      code: row.code as WriteOffCode,
+      reason: row.reason,
+    });
+  }
+  return events;
+}
+
+/** Shape a loan row (+ its current write-off event) into the API loan. */
 function toApiLoan({
   due,
   installments,
   row,
+  writeOff,
 }: {
   due: LoanDue[];
   installments: (typeof loanInstallments.$inferSelect)[];
   row: typeof loans.$inferSelect;
-}): Loan {
-  return { ...row, due, installments };
+  writeOff: WriteOffEvent | null;
+}): LoanApi {
+  /* writeOffId stays internal: the API loan embeds the event itself. */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { writeOffId, ...fields } = row;
+  return { ...fields, writeOff, due, installments };
 }
 
 export async function listLoans({
   tenantId,
 }: {
   tenantId: string;
-}): Promise<Loan[]> {
+}): Promise<LoanApi[]> {
   const rows = await db
     .select()
     .from(loans)
@@ -68,13 +107,21 @@ export async function listLoans({
       installment,
     ]);
   }
+  const writeOffs = await writeOffsById({
+    writeOffIds: rows.flatMap((row) =>
+      row.writeOffId === null ? [] : [row.writeOffId],
+    ),
+  });
   return rows.map((row) => {
     const installments = installmentsByLoan.get(row.loanId) ?? [];
     const projected = projectLoan({ installments, loan: row });
+    const writeOff =
+      row.writeOffId === null ? null : (writeOffs.get(row.writeOffId) ?? null);
     return toApiLoan({
       due: projected.due,
       installments,
       row: projected.loan,
+      writeOff,
     });
   });
 }
@@ -85,7 +132,7 @@ export async function getLoan({
 }: {
   loanId: string;
   tenantId: string;
-}): Promise<Loan | null> {
+}): Promise<LoanApi | null> {
   return db.transaction(
     async (tx) => {
       const [row] = await tx
@@ -111,10 +158,17 @@ export async function getLoan({
         installments: installmentRows,
         loan: row,
       });
+      const writeOff =
+        row.writeOffId === null
+          ? null
+          : ((await writeOffsById({ writeOffIds: [row.writeOffId] })).get(
+              row.writeOffId,
+            ) ?? null);
       return toApiLoan({
         due: projected.due,
         installments: installmentRows,
         row: projected.loan,
+        writeOff,
       });
     },
     { isolationLevel: "repeatable read", accessMode: "read only" },
@@ -151,7 +205,7 @@ export async function createLoan({
 }: {
   loan: LoanCreateBody;
   tenantId: string;
-}): Promise<Loan | null | { error: string }> {
+}): Promise<LoanApi | null | { error: string }> {
   const [tenant] = await db
     .select({ tenantId: tenants.tenantId })
     .from(tenants)
@@ -323,6 +377,7 @@ export async function createLoan({
     due: projected.due,
     installments: installmentRows,
     row: projected.loan,
+    writeOff: null,
   });
 }
 
@@ -333,7 +388,7 @@ export async function closeLoan({
 }: {
   loanId: string;
   tenantId: string;
-}): Promise<Loan | null> {
+}): Promise<LoanApi | null> {
   return db.transaction(async (tx) => {
     const at = Date.now();
     const settled = await serviceLoanDetail({ at, loanId, tenantId, tx });
@@ -344,10 +399,17 @@ export async function closeLoan({
     if (row.closedAt !== null) {
       /* Already closed (paid off or written off): closing is a no-op that
        * keeps the original stamp and cause. */
+      const writeOff =
+        row.writeOffId === null
+          ? null
+          : ((await writeOffsById({ writeOffIds: [row.writeOffId] })).get(
+              row.writeOffId,
+            ) ?? null);
       return toApiLoan({
         due: settled.due,
         installments: settled.installments,
         row,
+        writeOff,
       });
     }
     if (
@@ -371,6 +433,7 @@ export async function closeLoan({
       due: settled.due,
       installments: settled.installments,
       row: { ...row, closedAt: at },
+      writeOff: null,
     });
   });
 }
@@ -390,7 +453,7 @@ export async function writeOffLoan({
   loanId: string;
   reason: string | null;
   tenantId: string;
-}): Promise<Loan | null> {
+}): Promise<LoanApi | null> {
   return db.transaction(async (tx) => {
     const at = Date.now();
     const settled = await serviceLoanDetail({ at, loanId, tenantId, tx });
@@ -400,10 +463,15 @@ export async function writeOffLoan({
     const row = settled.loan;
     if (row.writeOffId !== null) {
       // Idempotent: keep the original stamp and event.
+      const writeOff =
+        (await writeOffsById({ writeOffIds: [row.writeOffId] })).get(
+          row.writeOffId,
+        ) ?? null;
       return toApiLoan({
         due: settled.due,
         installments: settled.installments,
         row,
+        writeOff,
       });
     }
     if (row.closedAt !== null) {
@@ -444,6 +512,7 @@ export async function writeOffLoan({
       due: [],
       installments,
       row: { ...row, closedAt: at, writeOffId },
+      writeOff: { writeOffId, createdAt: at, code, reason },
     });
   });
 }
