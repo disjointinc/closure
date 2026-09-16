@@ -105,11 +105,9 @@ services:
     working_dir: /closure/docs
     volumes:
       - ..:/closure
-      # Keeps the npx download of the mint CLI warm across restarts.
-      - closure-docs-npm-cache:/root/.npm
-    # --local-schema: permits the http (non-TLS) OpenAPI spec URL in docs.json;
-    # without it the CLI accepts only https URLs or repo-local files.
-    command: sh -c "npx --yes mint@^4.2.894 dev --port 3236 --local-schema"
+      # Container-local node_modules (see closure-migrate above).
+      - closure-docs-node-modules:/closure/docs/node_modules
+    command: sh -c "npm install && exec npm run dev"
     ports:
       - "${CLOSURE_DOCS_PORT:-3236}:3236"
     # mint fetches the OpenAPI spec (docs.json) from closure-api at startup.
@@ -122,4 +120,4 @@ volumes:
   closure-migrate-node-modules:
   closure-api-node-modules:
   closure-web-node-modules:
-  closure-docs-npm-cache:
+  closure-docs-node-modules:
