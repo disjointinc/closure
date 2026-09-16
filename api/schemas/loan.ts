@@ -7,6 +7,7 @@ import {
   tenantIdSchema,
 } from "./ids.ts";
 import { installmentSchema } from "./installment.ts";
+import { writeOffCodeSchema } from "./write-off.ts";
 import {
   annualInterestPercentageSchema,
   loanAmountSchema,
@@ -40,9 +41,13 @@ export const loanSchema = z.object({
   assignmentId: assignmentIdSchema.nullable(),
   createdAt: epochMs,
   closedAt: epochMs.nullable(),
+  /** Set when the creditor abandoned collection; closedAt is stamped alongside. */
+  writtenOffAt: epochMs.nullable(),
+  /** Current write-off's code/reason (latest loan_write_offs row), if any. */
+  writtenOffCode: writeOffCodeSchema.nullable(),
+  writtenOffReason: z.string().nullable(),
   /** When repayment is due: createdAt + duration, stamped at creation. */
   endsAt: epochMs,
-  deletedAt: epochMs.nullable(),
   /** The template this loan's definition was copied from, if any. */
   loanTemplateId: loanTemplateIdSchema.nullable(),
   ...loanDefinitionFields,
