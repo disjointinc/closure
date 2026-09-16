@@ -27,13 +27,11 @@ export const config = {
   },
   api: {
     host: env("CLOSURE_API_HOST", "0.0.0.0"),
-    port: envPort("CLOSURE_API_PORT", 3226),
+    port: envPort("CLOSURE_API_PORT", 3216),
   },
   web: {
     host: env("CLOSURE_WEB_HOST", "0.0.0.0"),
-    port: envPort("CLOSURE_WEB_PORT", 3216),
-    /** Browser origin the API accepts cross-origin requests from. */
-    origin: env("CLOSURE_WEB_ORIGIN", "http://localhost:3216"),
+    port: envPort("CLOSURE_WEB_PORT", 3226),
   },
 } as const;
 
