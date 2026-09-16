@@ -2,13 +2,13 @@
  * v0/tenant/refund/routes.ts -- HTTP for /v0/tenant/:tenantId/refund: request
  * validation and wiring. Business logic lives in service.ts.
  */
-import { zValidator } from "@hono/zod-validator";
-import { Hono } from "hono";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
-import { refundSchema } from "../../../schemas/refund.ts";
+import { notFoundResponse } from "../../../lib/http.ts";
 import { refundIdSchema, tenantIdSchema } from "../../../schemas/ids.ts";
-import { LoanServicingError } from "../loan/servicing.ts";
+import { refundSchema } from "../../../schemas/refund.ts";
 import { valueCreateSchema, valueSchema } from "../../../schemas/value.ts";
+import { LoanServicingError } from "../loan/servicing.ts";
 import {
   createRefund,
   getRefund,
@@ -46,7 +46,82 @@ const refundPatchSchema = z.object({
 export type RefundCreateBody = z.infer<typeof refundCreateSchema>;
 export type RefundPatchBody = z.infer<typeof refundPatchSchema>;
 
-export const refundApp = new Hono<{ Variables: { tenantId: string } }>()
+const createRefundRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["tenant/refund"],
+  summary: "Create a refund",
+  request: {
+    params: z.object({ tenantId: tenantIdSchema }),
+    body: {
+      content: { "application/json": { schema: refundCreateSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: refundApiSchema } },
+      description: "Created",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const listRefundsRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["tenant/refund"],
+  summary: "List refunds",
+  request: {
+    params: z.object({ tenantId: tenantIdSchema }),
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.array(refundApiSchema) } },
+      description: "OK",
+    },
+  },
+});
+
+const getRefundRoute = createRoute({
+  method: "get",
+  path: "/{refundId}",
+  tags: ["tenant/refund"],
+  summary: "Get a refund",
+  request: {
+    params: z.object({ refundId: refundIdSchema, tenantId: tenantIdSchema }),
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: refundApiSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+const patchRefundRoute = createRoute({
+  method: "patch",
+  path: "/{refundId}",
+  tags: ["tenant/refund"],
+  summary: "Patch a refund",
+  request: {
+    params: z.object({ refundId: refundIdSchema, tenantId: tenantIdSchema }),
+    body: {
+      content: { "application/json": { schema: refundPatchSchema } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      content: { "application/json": { schema: refundApiSchema } },
+      description: "OK",
+    },
+    404: notFoundResponse,
+  },
+});
+
+export const refundApp = new OpenAPIHono<{ Variables: { tenantId: string } }>()
   .onError((error, c) => {
     console.error("refund request failed", error);
     if (error instanceof LoanServicingError) {
@@ -54,8 +129,7 @@ export const refundApp = new Hono<{ Variables: { tenantId: string } }>()
     }
     return c.json({ error: "internal server error" }, 500);
   })
-  .use("*", zValidator("param", z.object({ tenantId: tenantIdSchema })))
-  .post("/", zValidator("json", refundCreateSchema), async (c) => {
+  .openapi(createRefundRoute, async (c) => {
     const body = c.req.valid("json");
     const refund = await createRefund({
       refund: body,
@@ -66,36 +140,27 @@ export const refundApp = new Hono<{ Variables: { tenantId: string } }>()
     }
     return c.json(refund, 201);
   })
-  .get("/", async (c) => {
-    return c.json(await listRefunds({ tenantId: c.get("tenantId") }));
+  .openapi(listRefundsRoute, async (c) => {
+    return c.json(await listRefunds({ tenantId: c.get("tenantId") }), 200);
   })
-  .get(
-    "/:refundId",
-    zValidator("param", z.object({ refundId: refundIdSchema })),
-    async (c) => {
-      const refund = await getRefund({
-        refundId: c.req.param("refundId"),
-        tenantId: c.get("tenantId"),
-      });
-      if (!refund) {
-        return c.json({ error: "not found" }, 404);
-      }
-      return c.json(refund);
-    },
-  )
-  .patch(
-    "/:refundId",
-    zValidator("param", z.object({ refundId: refundIdSchema })),
-    zValidator("json", refundPatchSchema),
-    async (c) => {
-      const refund = await patchRefund({
-        patch: c.req.valid("json"),
-        refundId: c.req.param("refundId"),
-        tenantId: c.get("tenantId"),
-      });
-      if (!refund) {
-        return c.json({ error: "not found" }, 404);
-      }
-      return c.json(refund);
-    },
-  );
+  .openapi(getRefundRoute, async (c) => {
+    const refund = await getRefund({
+      refundId: c.req.param("refundId"),
+      tenantId: c.get("tenantId"),
+    });
+    if (!refund) {
+      return c.json({ error: "not found" }, 404);
+    }
+    return c.json(refund, 200);
+  })
+  .openapi(patchRefundRoute, async (c) => {
+    const refund = await patchRefund({
+      patch: c.req.valid("json"),
+      refundId: c.req.param("refundId"),
+      tenantId: c.get("tenantId"),
+    });
+    if (!refund) {
+      return c.json({ error: "not found" }, 404);
+    }
+    return c.json(refund, 200);
+  });
