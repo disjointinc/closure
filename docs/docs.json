@@ -14,13 +14,13 @@
     }
   },
   "logo": {
-    "light": "/assets/logo/light.svg",
-    "dark": "/assets/logo/black.svg",
+    "light": "/assets/logo/padless_black.svg",
+    "dark": "/assets/logo/padless_white.svg",
     "href": "http://localhost:3226"
   },
   "favicon": {
-    "light": "/assets/logomark/white.svg",
-    "dark": "/assets/logomark/black.svg"
+    "light": "/assets/logomark/black.svg",
+    "dark": "/assets/logomark/white.svg"
   },
   "icons": {
     "library": "lucide"
