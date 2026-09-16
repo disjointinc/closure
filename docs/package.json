@@ -1,0 +1,10 @@
+{
+  "name": "closure-docs",
+  "private": true,
+  "scripts": {
+    "dev": "mint dev --port 3236 --local-schema"
+  },
+  "devDependencies": {
+    "mint": "^4.2.894"
+  }
+}
