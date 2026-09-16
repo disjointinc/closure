@@ -1,16 +1,18 @@
 /** Fixed-principal origination and lifecycle; settlement lives in servicing.ts. */
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../../../db/index.ts";
 import {
   assignments,
   loanInstallments,
   loans,
+  loanWriteOffs,
   tenants,
 } from "../../../db/schema.ts";
 import { generateId } from "../../../lib/id.ts";
 import type { Loan } from "../../../schemas/loan.ts";
 import { loanDefinitionFields } from "../../../schemas/loan.ts";
 import { MAX_LOAN_INSTALLMENTS } from "../../../schemas/loan-servicing.ts";
+import type { WriteOff, WriteOffCode } from "../../../schemas/write-off.ts";
 import { getLoanTemplate } from "../../loan-template/service.ts";
 import {
   calculateLoan,
@@ -19,6 +21,19 @@ import {
 } from "./calculation.ts";
 import { LoanServicingError, serviceLoanDetail } from "./servicing.ts";
 import type { LoanCreateBody } from "./routes.ts";
+
+/** Shape a loan row into the API loan: the row plus read-time obligations. */
+function toApiLoan({
+  due,
+  installments,
+  row,
+}: {
+  due: LoanDue[];
+  installments: (typeof loanInstallments.$inferSelect)[];
+  row: typeof loans.$inferSelect;
+}): Loan {
+  return { ...row, due, installments };
+}
 
 export async function listLoans({
   tenantId,
@@ -56,7 +71,11 @@ export async function listLoans({
   return rows.map((row) => {
     const installments = installmentsByLoan.get(row.loanId) ?? [];
     const projected = projectLoan({ installments, loan: row });
-    return { ...projected.loan, due: projected.due, installments };
+    return toApiLoan({
+      due: projected.due,
+      installments,
+      row: projected.loan,
+    });
   });
 }
 
@@ -92,11 +111,11 @@ export async function getLoan({
         installments: installmentRows,
         loan: row,
       });
-      return {
-        ...projected.loan,
+      return toApiLoan({
         due: projected.due,
         installments: installmentRows,
-      };
+        row: projected.loan,
+      });
     },
     { isolationLevel: "repeatable read", accessMode: "read only" },
   );
@@ -281,10 +300,10 @@ export async function createLoan({
     assignmentId: loan.assignmentId,
     closedAt: null,
     createdAt,
-    deletedAt: null,
     endsAt,
     loanId,
     tenantId,
+    writeOffId: null,
     ...definition,
     servicingState,
   };
@@ -300,11 +319,11 @@ export async function createLoan({
     installments: installmentRows,
     loan: inserted,
   });
-  return {
-    ...projected.loan,
+  return toApiLoan({
     due: projected.due,
     installments: installmentRows,
-  };
+    row: projected.loan,
+  });
 }
 
 /** Closing never forgives debt; legacy balances cannot establish payoff. */
@@ -322,6 +341,15 @@ export async function closeLoan({
       return null;
     }
     const row = settled.loan;
+    if (row.closedAt !== null) {
+      /* Already closed (paid off or written off): closing is a no-op that
+       * keeps the original stamp and cause. */
+      return toApiLoan({
+        due: settled.due,
+        installments: settled.installments,
+        row,
+      });
+    }
     if (
       !row.servicingState ||
       row.servicingState.principalAmount !== 0 ||
@@ -333,74 +361,113 @@ export async function closeLoan({
         message: "cannot close a loan with an outstanding balance",
       });
     }
-    const closedAt = row.closedAt ?? at;
     await tx
       .update(loans)
-      .set({ closedAt })
+      .set({ closedAt: at })
       .where(and(eq(loans.loanId, loanId), eq(loans.tenantId, tenantId)));
     /* The settlement result already holds the post-settlement row and live
      * installments; only closedAt needed a stamp. */
-    return {
-      ...row,
-      closedAt,
+    return toApiLoan({
       due: settled.due,
       installments: settled.installments,
-    };
+      row: { ...row, closedAt: at },
+    });
   });
 }
 
-/** Archive only paid-off serviced loans; legacy rows may still be archived. */
-export async function deleteLoan({
+/**
+ * Write off an open loan: stop collection (closedAt stamped, live
+ * installments canceled, no further accrual) while the debt stays on
+ * record. One append-only loan_write_offs row carries the code/reason.
+ */
+export async function writeOffLoan({
+  code,
+  loanId,
+  reason,
+  tenantId,
+}: {
+  code: WriteOffCode;
+  loanId: string;
+  reason: string | null;
+  tenantId: string;
+}): Promise<Loan | null> {
+  return db.transaction(async (tx) => {
+    const at = Date.now();
+    const settled = await serviceLoanDetail({ at, loanId, tenantId, tx });
+    if (!settled) {
+      return null;
+    }
+    const row = settled.loan;
+    if (row.writeOffId !== null) {
+      // Idempotent: keep the original stamp and event.
+      return toApiLoan({
+        due: settled.due,
+        installments: settled.installments,
+        row,
+      });
+    }
+    if (row.closedAt !== null) {
+      throw new LoanServicingError({
+        code: "invalid_state",
+        message: "loan is already paid off",
+      });
+    }
+    /* Cancel live, under-allocated installments (mirroring payoff
+     * cancellation): a written-off loan shows no open schedule. */
+    const installments = [];
+    for (const installment of settled.installments) {
+      const open =
+        (installment.allocatedAmount ?? 0) < installment.amount.value;
+      if (open) {
+        await tx
+          .update(loanInstallments)
+          .set({ canceledAt: at })
+          .where(eq(loanInstallments.installmentId, installment.installmentId));
+      }
+      installments.push(
+        open ? { ...installment, canceledAt: at } : installment,
+      );
+    }
+    const writeOffId = generateId({ prefix: "write_off" });
+    await tx.insert(loanWriteOffs).values({
+      writeOffId,
+      loanId,
+      createdAt: at,
+      code,
+      reason,
+    });
+    await tx
+      .update(loans)
+      .set({ closedAt: at, writeOffId })
+      .where(and(eq(loans.loanId, loanId), eq(loans.tenantId, tenantId)));
+    return toApiLoan({
+      due: [],
+      installments,
+      row: { ...row, closedAt: at, writeOffId },
+    });
+  });
+}
+
+/** A loan's write-off history, oldest first; null if no such loan exists. */
+export async function listWriteOffs({
   loanId,
   tenantId,
 }: {
   loanId: string;
   tenantId: string;
-}): Promise<Loan | null> {
-  return db.transaction(async (tx) => {
-    const [row] = await tx
-      .select()
-      .from(loans)
-      .where(and(eq(loans.loanId, loanId), eq(loans.tenantId, tenantId)))
-      .for("update");
-    if (!row || row.deletedAt !== null) {
-      return null;
-    }
-    if (
-      row.servicingState &&
-      (row.closedAt === null ||
-        row.servicingState.principalAmount !== 0 ||
-        row.servicingState.interestAmount !== 0)
-    ) {
-      throw new LoanServicingError({
-        code: "invalid_state",
-        message: "only paid-off loans can be deleted",
-      });
-    }
-    const deletedAt = Date.now();
-    await tx
-      .update(loans)
-      .set({ deletedAt })
-      .where(and(eq(loans.loanId, loanId), eq(loans.tenantId, tenantId)));
-    const installmentRows = await tx
-      .select()
-      .from(loanInstallments)
-      .where(
-        and(
-          eq(loanInstallments.loanId, loanId),
-          isNull(loanInstallments.canceledAt),
-        ),
-      )
-      .orderBy(loanInstallments.dueAt, loanInstallments.createdAt);
-    /* Only deletedAt changed; the row and installments were already in hand. */
-    const projected = projectLoan({
-      installments: installmentRows,
-      loan: { ...row, deletedAt },
-    });
-    return {
-      ...projected.loan,
-      due: projected.due,
-      installments: installmentRows,
-    };
-  });
+}): Promise<WriteOff[] | null> {
+  const [loan] = await db
+    .select({ loanId: loans.loanId })
+    .from(loans)
+    .where(and(eq(loans.loanId, loanId), eq(loans.tenantId, tenantId)));
+  if (!loan) {
+    return null;
+  }
+  const rows = await db
+    .select()
+    .from(loanWriteOffs)
+    .where(eq(loanWriteOffs.loanId, loanId))
+    .orderBy(asc(loanWriteOffs.createdAt));
+  // Codes were zod-validated at the write boundary, so they always parse.
+  return rows.map((row) => ({ ...row, code: row.code as WriteOffCode }));
 }
