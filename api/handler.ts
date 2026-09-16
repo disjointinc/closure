@@ -46,7 +46,7 @@ const apiDoc = {
       "The primitives for real-time, configurable metering, entitlements, " +
       "pricing, referrals, and billing.",
   },
-  servers: [{ url: "http://localhost:3226", description: "Local dev" }],
+  servers: [{ url: "http://localhost:3216", description: "Local dev" }],
 };
 
 /* apiApp stays typed as OpenAPIHono so the doc generator remains accessible

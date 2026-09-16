@@ -54,7 +54,7 @@ log "Starting Closure"
 docker compose --project-name closure -f "$COMPOSE_FILE" up -d
 
 log "Done."
-log "Web:      localhost:${CLOSURE_WEB_PORT:-3216}"
-log "API:      localhost:${CLOSURE_API_PORT:-3226}"
-log "Postgres: localhost:${CLOSURE_POSTGRES_PORT:-54326}"
+log "Web:      localhost:${CLOSURE_WEB_PORT:-3226}"
+log "API:      localhost:${CLOSURE_API_PORT:-3216}"
 log "Redis:    localhost:${CLOSURE_REDIS_PORT:-63796}"
+log "Postgres: localhost:${CLOSURE_POSTGRES_PORT:-54326}"
