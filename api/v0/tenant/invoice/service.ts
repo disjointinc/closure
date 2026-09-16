@@ -2,7 +2,7 @@
  * v0/tenant/invoice/service.ts -- invoice business logic. Invoices wrap their
  * items and taxation amounts: all are passed inline on create. Item per-unit
  * values are owned objects, read and written as full values; taxes stay
- * references. Invoices are closed, never deleted.
+ * references. Invoices are finalized, never deleted.
  */
 import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "../../../db/index.ts";
@@ -18,7 +18,7 @@ import type { Duration } from "../../../schemas/common.ts";
 import type { Invoice } from "../../../schemas/invoice.ts";
 import type { Item } from "../../../schemas/item.ts";
 import { type Value } from "../../../schemas/value.ts";
-import type { CloseInvoiceBody, InvoiceCreateBody } from "./routes.ts";
+import type { InvoiceCreateBody } from "./routes.ts";
 
 type InvoiceItemApi = Omit<Item, "perUnitValueId"> & { perUnitValue: Value };
 
@@ -90,8 +90,7 @@ function expandInvoice({
   const base = {
     invoiceId: row.invoiceId,
     createdAt: row.createdAt,
-    closedAt: row.closedAt,
-    closedReason: row.closedReason,
+    finalizedAt: row.finalizedAt,
     items: itemRows.map((item) => ({
       itemId: item.itemId,
       // items.per_unit_value_id FKs values, so the row always exists.
@@ -277,8 +276,7 @@ export async function createInvoice({
           invoiceId,
           tenantId,
           createdAt,
-          closedAt: null,
-          closedReason: null,
+          finalizedAt: null,
           charged: invoice.charged,
           cycleLength: invoice.cycleLength,
           ...charging,
@@ -347,17 +345,15 @@ export async function createInvoice({
   return getInvoice({ invoiceId });
 }
 
-/** Close the invoice, or return null if no such invoice exists. */
-export async function closeInvoice({
-  body,
+/** Finalize the invoice, or return null if no such invoice exists. */
+export async function finalizeInvoice({
   invoiceId,
 }: {
-  body: CloseInvoiceBody;
   invoiceId: string;
 }): Promise<InvoiceApi | null> {
   const updated = await db
     .update(invoices)
-    .set({ closedAt: Date.now(), closedReason: body.closedReason })
+    .set({ finalizedAt: Date.now() })
     .where(eq(invoices.invoiceId, invoiceId))
     .returning();
   if (updated.length === 0) {

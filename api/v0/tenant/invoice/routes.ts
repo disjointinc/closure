@@ -15,8 +15,8 @@ import { itemSchema } from "../../../schemas/item.ts";
 import { taxationAmountSchema } from "../../../schemas/taxation-amount.ts";
 import { valueCreateSchema, valueSchema } from "../../../schemas/value.ts";
 import {
-  closeInvoice,
   createInvoice,
+  finalizeInvoice,
   getInvoice,
   InvoiceTaxNotFoundError,
   listInvoices,
@@ -59,10 +59,6 @@ const invoiceCreateSchema = z
     });
   });
 
-const closeInvoiceSchema = z.object({
-  closedReason: z.string().nullable(),
-});
-
 const invoiceItemApiSchema = itemSchema
   .omit({ perUnitValueId: true })
   .extend({ perUnitValue: valueSchema });
@@ -70,8 +66,7 @@ const invoiceItemApiSchema = itemSchema
 const invoiceApiFields = {
   invoiceId: invoiceIdSchema,
   createdAt: epochMs,
-  closedAt: epochMs.nullable(),
-  closedReason: z.string().nullable(),
+  finalizedAt: epochMs.nullable(),
   items: z.array(invoiceItemApiSchema),
   taxationAmounts: z.array(taxationAmountSchema),
 };
@@ -82,7 +77,6 @@ const invoiceApiSchema = z.discriminatedUnion("charged", [
 ]);
 
 export type InvoiceCreateBody = z.infer<typeof invoiceCreateSchema>;
-export type CloseInvoiceBody = z.infer<typeof closeInvoiceSchema>;
 
 const createInvoiceRoute = createRoute({
   method: "post",
@@ -141,20 +135,16 @@ const getInvoiceRoute = createRoute({
   },
 });
 
-const closeInvoiceRoute = createRoute({
+const finalizeInvoiceRoute = createRoute({
   method: "post",
-  path: "/{invoiceId}/close",
+  path: "/{invoiceId}/finalize",
   tags: ["tenant/invoice"],
-  summary: "Close an invoice",
+  summary: "Finalize an invoice",
   request: {
     params: z.object({
       invoiceId: invoiceIdSchema,
       tenantId: tenantIdSchema,
     }),
-    body: {
-      content: { "application/json": { schema: closeInvoiceSchema } },
-      required: true,
-    },
   },
   responses: {
     200: {
@@ -194,9 +184,8 @@ export const invoiceApp = new OpenAPIHono<{ Variables: { tenantId: string } }>()
     }
     return c.json(invoice, 200);
   })
-  .openapi(closeInvoiceRoute, async (c) => {
-    const invoice = await closeInvoice({
-      body: c.req.valid("json"),
+  .openapi(finalizeInvoiceRoute, async (c) => {
+    const invoice = await finalizeInvoice({
       invoiceId: c.req.param("invoiceId"),
     });
     if (!invoice) {
