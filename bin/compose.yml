@@ -63,6 +63,17 @@ services:
       CLOSURE_POSTGRES_PORT: "5432"
       CLOSURE_REDIS_HOST: closure-redis
       CLOSURE_REDIS_PORT: "6379"
+    # The docs container renders its API reference from this service's live
+    # /openapi.json at mint startup, so it must be serving before docs boots.
+    # Generous retries: first-boot `npm install` precedes the server.
+    healthcheck:
+      # 127.0.0.1, not localhost: busybox wget tries ::1 first and the server
+      # binds IPv4 only.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3216/healthz || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
     depends_on:
       closure-db:
         condition: service_healthy
@@ -96,9 +107,15 @@ services:
       - ..:/closure
       # Keeps the npx download of the mint CLI warm across restarts.
       - closure-docs-npm-cache:/root/.npm
-    command: sh -c "npx --yes mint@^4.2.894 dev --port 3236"
+    # --local-schema: permits the http (non-TLS) OpenAPI spec URL in docs.json;
+    # without it the CLI accepts only https URLs or repo-local files.
+    command: sh -c "npx --yes mint@^4.2.894 dev --port 3236 --local-schema"
     ports:
       - "${CLOSURE_DOCS_PORT:-3236}:3236"
+    # mint fetches the OpenAPI spec (docs.json) from closure-api at startup.
+    depends_on:
+      closure-api:
+        condition: service_healthy
 
 volumes:
   closure-pgdata:

@@ -2,8 +2,7 @@
  * handler.test.ts -- drift protection: every route under /v0 must be
  * documented in the generated OpenAPI doc. The doc is built from the
  * zod-openapi route definitions, so an undocumented route fails CI.
- * Runs offline: bin/openapi.ts and this file never touch the db
- * (postgres-js connects lazily).
+ * Runs offline: this file never touches the db (postgres-js connects lazily).
  */
 import { describe, expect, it } from "vitest";
 import app, { getApiDoc } from "./handler.ts";

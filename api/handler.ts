@@ -11,8 +11,9 @@
  *
  * Routes are chained on a single OpenAPIHono instance so AppType carries the
  * full route schema -- that is what powers typesafe clients (hono/client's
- * hc) -- and the OpenAPI doc is derived from the same definitions. /openapi.json
- * serves the doc; bin/openapi.ts writes it out statically for the docs site.
+ * hc) -- and the OpenAPI doc is derived from the same definitions.
+ * /openapi.json serves the doc; the docs site renders its API reference
+ * from that live URL.
  * Mounts are alphabetical after /, /healthz, and /openapi.json.
  */
 
@@ -83,7 +84,7 @@ const app = apiApp
   .route("/v0/tenant", tenantApp)
   .notFound((c) => c.json({ error: "not found" }, 404));
 
-/** The spec as served live and written out by bin/openapi.ts. */
+/** The spec as served live at /openapi.json. */
 export const getApiDoc = () => apiApp.getOpenAPI31Document(apiDoc);
 
 const api = app.get("/openapi.json", (c) => {
