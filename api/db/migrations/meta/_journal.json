@@ -225,6 +225,20 @@
       "when": 1789517247229,
       "tag": "0031_blue_caretaker",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1789522216464,
+      "tag": "0032_tense_maestro",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1789523050288,
+      "tag": "0033_massive_sinister_six",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "loans" DROP COLUMN "deleted_at";

@@ -810,10 +810,10 @@ export const loans = pgTable(
     ),
     createdAt: epochMs("created_at").notNull(),
     closedAt: epochMs("closed_at"),
+    /** Set when the creditor abandoned collection; closedAt is stamped alongside. */
+    writtenOffAt: epochMs("written_off_at"),
     /** When repayment is due: created_at + duration, stamped at creation. */
     endsAt: epochMs("ends_at").notNull(),
-    /** Removed ahead of resolution, whether or not one is set. */
-    deletedAt: epochMs("deleted_at"),
     /** The template this loan's definition was copied from, if any. */
     loanTemplateId: text("loan_template_id").references(
       () => loanTemplates.loanTemplateId,
@@ -837,6 +837,29 @@ export const loans = pgTable(
       check("loans_servicing_enabled", sql`(${unserviced}) or (${serviced})`),
     ];
   },
+);
+
+/**
+ * Append-only write-off history: one row per write-off, never updated or
+ * deleted. loans.written_off_at is the current-state pointer (cleared when a
+ * refund reversal reopens the loan); this is the audit trail behind it.
+ */
+export const loanWriteOffs = pgTable(
+  "loan_write_offs",
+  {
+    writeOffId: text("write_off_id").primaryKey(),
+    loanId: text("loan_id")
+      .notNull()
+      .references(() => loans.loanId),
+    createdAt: epochMs("created_at").notNull(),
+    /** Standardized code (writeOffCodeSchema), zod-validated at the boundary. */
+    code: text("code").notNull(),
+    reason: text("reason"),
+  },
+  (t) => [
+    idFormatCheck("write_off", t.writeOffId),
+    index("loan_write_offs_loan").on(t.loanId),
+  ],
 );
 
 /** A loan's materialized repayment schedule (BNPL installments). */
