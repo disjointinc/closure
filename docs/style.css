@@ -1,0 +1,31 @@
+@import url("https://api.fontshare.com/v2/css?f[]=satoshi@500,700,900,701&display=swap");
+
+:root {
+  --font-sans: "Satoshi", system-ui, sans-serif;
+}
+body,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: "Satoshi", system-ui, sans-serif;
+}
+body {
+  font-weight: 500;
+}
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 700;
+}
+strong {
+  font-weight: 900;
+}
+em {
+  font-weight: 700;
+}
