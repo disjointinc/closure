@@ -9,7 +9,6 @@ const invoiceFields = {
   invoiceId: invoiceIdSchema,
   createdAt: epochMs,
   finalizedAt: epochMs.nullable(),
-  finalizedReason: z.string().nullable(),
   items: z.array(itemSchema),
   taxationAmounts: z.array(taxationAmountSchema),
 };

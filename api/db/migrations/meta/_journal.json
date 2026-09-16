@@ -218,6 +218,13 @@
       "when": 1789516580873,
       "tag": "0030_finalize_invoices",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1789517247229,
+      "tag": "0031_blue_caretaker",
+      "breakpoints": true
     }
   ]
 }

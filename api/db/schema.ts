@@ -878,7 +878,6 @@ export const invoices = pgTable(
       .references(() => tenants.tenantId),
     createdAt: epochMs("created_at").notNull(),
     finalizedAt: epochMs("finalized_at"),
-    finalizedReason: text("finalized_reason"),
     ...chargingColumns,
   },
   (t) => [
