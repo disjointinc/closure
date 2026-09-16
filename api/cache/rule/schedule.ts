@@ -12,8 +12,8 @@
  *     not with the event history, and windows are unbounded.
  *   - relative_to_lifecycle_event keeps a per-rule high-water mark
  *     (rule_scheduler_state, committed per chunk), so each tick scans only
- *     invoices closed since the last tick, in bounded keyset-paged chunks,
- *     instead of the full closed history.
+ *     invoices finalized since the last tick, in bounded keyset-paged chunks,
+ *     instead of the full finalized history.
  *   - Per-tenant billing cycles are batched into one query
  *     (getBillingCycles), so a tick does O(1) pg round-trips, not
  *     O(candidates).
@@ -54,7 +54,7 @@ import {
 } from "./evaluate.ts";
 
 /*
- * Lifecycle chunking: one factor in converting close-throughput bursts and
+ * Lifecycle chunking: one factor in converting finalize-throughput bursts and
  * outage backlogs into a drain-rate question. Steady-state ticks see at
  * most one chunk; the max bounds how much work one tick monopolizes before
  * deferring the remainder to the next tick (the watermark guarantees it is
@@ -189,17 +189,17 @@ async function evaluateLifecycle(): Promise<void> {
     const { relativeTo, offset } = rule.trigger;
     const offsetMs = durationToMs(offset);
     const threshold = Date.now() - offsetMs;
-    // invoice_closed / invoice_due key off invoices; the offset is applied
+    // invoice_finalized / invoice_due key off invoices; the offset is applied
     // to the lifecycle timestamp. assignment_started / cycle_end follow the
     // same pattern once those lifecycle events are queryable.
-    if (relativeTo !== "invoice_closed" && relativeTo !== "invoice_due") {
+    if (relativeTo !== "invoice_finalized" && relativeTo !== "invoice_due") {
       continue;
     }
-    /* High-water mark: only scan invoices closed since the last tick, in
-     * fixed-size chunks paged by a (closedAt, invoiceId) keyset cursor --
-     * the partial invoices_closed index serves the range scan, and the
-     * composite cursor makes same-millisecond closes paginate correctly
-     * (a bare closed_at cursor would skip or repeat them at chunk
+    /* High-water mark: only scan invoices finalized since the last tick, in
+     * fixed-size chunks paged by a (finalizedAt, invoiceId) keyset cursor --
+     * the partial invoices_finalized index serves the range scan, and the
+     * composite cursor makes same-millisecond finalizes paginate correctly
+     * (a bare finalized_at cursor would skip or repeat them at chunk
      * boundaries). The mark is committed per chunk, so a crash resumes at
      * the last committed chunk rather than re-scanning the whole delta,
      * and a tick processes at most MAX_CHUNKS_PER_TICK, converting bursts
@@ -242,18 +242,18 @@ async function evaluateLifecycle(): Promise<void> {
         .from(invoices)
         .where(
           and(
-            isNotNull(invoices.closedAt),
+            isNotNull(invoices.finalizedAt),
             or(
-              gt(invoices.closedAt, cursorAt),
+              gt(invoices.finalizedAt, cursorAt),
               and(
-                eq(invoices.closedAt, cursorAt),
+                eq(invoices.finalizedAt, cursorAt),
                 gt(invoices.invoiceId, cursorId),
               ),
             ),
-            lte(invoices.closedAt, threshold),
+            lte(invoices.finalizedAt, threshold),
           ),
         )
-        .orderBy(asc(invoices.closedAt), asc(invoices.invoiceId))
+        .orderBy(asc(invoices.finalizedAt), asc(invoices.invoiceId))
         .limit(LIFECYCLE_CHUNK_SIZE);
       if (due.length === 0) {
         break;
@@ -271,12 +271,12 @@ async function evaluateLifecycle(): Promise<void> {
           })
         : new Map();
       for (const invoice of due) {
-        if (invoice.closedAt === null) {
+        if (invoice.finalizedAt === null) {
           continue;
         }
         /* Advance the mark over every scanned invoice, even out-of-scope
          * ones, so a tenant leaving a plan doesn't wedge it. */
-        cursorAt = Math.max(cursorAt, invoice.closedAt);
+        cursorAt = Math.max(cursorAt, invoice.finalizedAt);
         cursorId = invoice.invoiceId;
         if (!inScope.includes(invoice)) {
           continue;
@@ -306,7 +306,7 @@ async function evaluateLifecycle(): Promise<void> {
       }
       /* Commit the mark per chunk, so resume starts at the last processed
        * chunk rather than the start of the delta. Boundary rows at the same
-       * closedAt re-scan on crash; the idempotency index dedupes them. */
+       * finalizedAt re-scan on crash; the idempotency index dedupes them. */
       await db
         .insert(ruleSchedulerState)
         .values({ ruleId: rule.ruleId, evaluatedThroughMs: cursorAt })

@@ -61,7 +61,7 @@ const inactiveForTriggerSchema = z.object({
 const relativeToLifecycleEventTriggerSchema = z.object({
   type: z.literal("relative_to_lifecycle_event"),
   relativeTo: z.enum([
-    "invoice_closed",
+    "invoice_finalized",
     "invoice_due",
     "cycle_end",
     "assignment_started",

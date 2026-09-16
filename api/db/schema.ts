@@ -877,21 +877,21 @@ export const invoices = pgTable(
       .notNull()
       .references(() => tenants.tenantId),
     createdAt: epochMs("created_at").notNull(),
-    closedAt: epochMs("closed_at"),
-    closedReason: text("closed_reason"),
+    finalizedAt: epochMs("finalized_at"),
+    finalizedReason: text("finalized_reason"),
     ...chargingColumns,
   },
   (t) => [
     idFormatCheck("invoice", t.invoiceId),
     chargingCheck("invoices"),
     index("invoices_tenant").on(t.tenantId),
-    /* The lifecycle rule scheduler scans recently-closed invoices per tick
-     * with no tenant predicate, so the tenant-composite index can't serve
-     * that scan; a partial closed_at index does, and stays small by
-     * covering only the rows the scan can match. */
-    index("invoices_closed")
-      .on(t.closedAt)
-      .where(sql`${t.closedAt} is not null`),
+    /* The lifecycle rule scheduler scans recently-finalized invoices per
+     * tick with no tenant predicate, so the tenant-composite index can't
+     * serve that scan; a partial finalized_at index does, and stays small
+     * by covering only the rows the scan can match. */
+    index("invoices_finalized")
+      .on(t.finalizedAt)
+      .where(sql`${t.finalizedAt} is not null`),
   ],
 );
 
@@ -1246,8 +1246,8 @@ export const ruleRuns = pgTable(
 
 /**
  * Per-rule scheduler high-water mark: the newest lifecycle timestamp already
- * evaluated, so each tick scans only invoices closed since the last one
- * instead of the full closed history. One row per rule; absent = start at 0.
+ * evaluated, so each tick scans only invoices finalized since the last one
+ * instead of the full finalized history. One row per rule; absent = start at 0.
  */
 export const ruleSchedulerState = pgTable("rule_scheduler_state", {
   ruleId: text("rule_id")

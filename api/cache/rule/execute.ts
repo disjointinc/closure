@@ -115,7 +115,7 @@ async function executeCreateTask({
   });
 }
 
-/** add_invoice_item: append a charge to the tenant's open (unclosed) invoice. */
+/** add_invoice_item: append a charge to the tenant's open (unfinalized) invoice. */
 async function executeAddInvoiceItem({
   action,
   target,
@@ -129,7 +129,7 @@ async function executeAddInvoiceItem({
     .where(eq(invoices.tenantId, target.tenantId))
     .orderBy(invoices.createdAt)
     .limit(1);
-  if (!open || open.closedAt !== null) {
+  if (!open || open.finalizedAt !== null) {
     throw new Error(`no open invoice for tenant ${target.tenantId}`);
   }
   if (action.percentageOfInvoice !== null) {

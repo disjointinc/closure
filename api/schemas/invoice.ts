@@ -8,8 +8,8 @@ import { taxationAmountSchema } from "./taxation-amount.ts";
 const invoiceFields = {
   invoiceId: invoiceIdSchema,
   createdAt: epochMs,
-  closedAt: epochMs.nullable(),
-  closedReason: z.string().nullable(),
+  finalizedAt: epochMs.nullable(),
+  finalizedReason: z.string().nullable(),
   items: z.array(itemSchema),
   taxationAmounts: z.array(taxationAmountSchema),
 };
