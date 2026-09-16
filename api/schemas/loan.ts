@@ -5,9 +5,9 @@ import {
   loanIdSchema,
   loanTemplateIdSchema,
   tenantIdSchema,
+  writeOffIdSchema,
 } from "./ids.ts";
 import { installmentSchema } from "./installment.ts";
-import { writeOffCodeSchema } from "./write-off.ts";
 import {
   annualInterestPercentageSchema,
   loanAmountSchema,
@@ -41,11 +41,10 @@ export const loanSchema = z.object({
   assignmentId: assignmentIdSchema.nullable(),
   createdAt: epochMs,
   closedAt: epochMs.nullable(),
-  /** Set when the creditor abandoned collection; closedAt is stamped alongside. */
-  writtenOffAt: epochMs.nullable(),
-  /** Current write-off's code/reason (latest loan_write_offs row), if any. */
-  writtenOffCode: writeOffCodeSchema.nullable(),
-  writtenOffReason: z.string().nullable(),
+  /* Current write-off event when the creditor abandoned collection (closedAt
+   * is stamped alongside). The event's data lives in loan_write_offs; fetch
+   * the write-off history for code/reason. */
+  writeOffId: writeOffIdSchema.nullable(),
   /** When repayment is due: createdAt + duration, stamped at creation. */
   endsAt: epochMs,
   /** The template this loan's definition was copied from, if any. */
