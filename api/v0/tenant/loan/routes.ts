@@ -30,6 +30,16 @@ import {
 
 export { MAX_LOAN_INSTALLMENTS } from "../../../schemas/loan-servicing.ts";
 
+/* A write-off is an owned object, read as a full value (minus the redundant
+ * parent FK): the API loan embeds it, never the bare writeOffId. */
+const writeOffApiSchema = writeOffSchema.omit({ loanId: true });
+
+export const loanApiSchema = loanSchema
+  .omit({ writeOffId: true })
+  .extend({ writeOff: writeOffApiSchema.nullable() });
+
+export type LoanApi = z.infer<typeof loanApiSchema>;
+
 const installmentCreateSchema = installmentSchema.pick({
   amount: true,
   dueAt: true,
@@ -76,7 +86,7 @@ const createLoanRoute = createRoute({
   },
   responses: {
     201: {
-      content: { "application/json": { schema: loanSchema } },
+      content: { "application/json": { schema: loanApiSchema } },
       description: "Created",
     },
     400: invalidResponse,
@@ -94,7 +104,7 @@ const listLoansRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: z.array(loanSchema) } },
+      content: { "application/json": { schema: z.array(loanApiSchema) } },
       description: "OK",
     },
   },
@@ -110,7 +120,7 @@ const getLoanRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: loanSchema } },
+      content: { "application/json": { schema: loanApiSchema } },
       description: "OK",
     },
     404: notFoundResponse,
@@ -127,7 +137,7 @@ const closeLoanRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: loanSchema } },
+      content: { "application/json": { schema: loanApiSchema } },
       description: "OK",
     },
     404: notFoundResponse,
@@ -153,7 +163,7 @@ const writeOffLoanRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: loanSchema } },
+      content: { "application/json": { schema: loanApiSchema } },
       description: "OK",
     },
     404: notFoundResponse,

@@ -1,8 +1,12 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../../../db/index.ts";
-import { loanSchema, type Loan } from "../../../schemas/loan.ts";
-import { loanApp, type LoanCreateBody } from "./routes.ts";
+import {
+  loanApiSchema,
+  loanApp,
+  type LoanApi,
+  type LoanCreateBody,
+} from "./routes.ts";
 import { applyLoanPayment } from "./servicing.ts";
 
 const { query, transaction } = vi.hoisted(() => ({
@@ -57,12 +61,12 @@ const body: LoanCreateBody = {
     repayment: { type: "fixed_schedule" },
   },
 };
-const loan: Loan = {
+const loan: LoanApi = {
   ...body,
   closedAt: null,
   createdAt,
   due: [],
-  writeOffId: null,
+  writeOff: null,
   endsAt,
   installments: [
     {
@@ -94,7 +98,13 @@ const app = new Hono<{ Variables: { tenantId: string } }>()
   .route("/v0/tenant/:tenantId/loan", loanApp);
 const basePath = `/v0/tenant/${tenantId}/loan`;
 
-function queueLoan({ result = loan }: { result?: Loan } = {}) {
+function queueLoan({
+  result = loan,
+  writeOffId = null,
+}: {
+  result?: LoanApi;
+  writeOffId?: string | null;
+} = {}) {
   query.mockResolvedValueOnce({
     rows: [
       [
@@ -103,7 +113,7 @@ function queueLoan({ result = loan }: { result?: Loan } = {}) {
         result.assignmentId,
         result.createdAt,
         result.closedAt,
-        result.writeOffId,
+        writeOffId,
         result.endsAt,
         result.loanTemplateId,
         result.principal,
@@ -199,7 +209,7 @@ describe("loan routes and service (isolated)", () => {
       method: "POST",
     });
     expect(response.status).toBe(201);
-    const parsed = loanSchema.parse(await response.json());
+    const parsed = loanApiSchema.parse(await response.json());
     const createdLoanId = parsed.loanId;
     expect(createdLoanId).toMatch(/^loan_[a-z0-9]{24}$/);
     expect(parsed).toEqual({
@@ -264,9 +274,14 @@ describe("loan routes and service (isolated)", () => {
       method: "PATCH",
     });
     expect(response.status).toBe(200);
-    const parsed = loanSchema.parse(await response.json());
+    const parsed = loanApiSchema.parse(await response.json());
     expect(parsed.closedAt).toBe(createdAt);
-    expect(parsed.writeOffId).toMatch(/^write_off_[a-z0-9]{24}$/);
+    expect(parsed.writeOff).toEqual({
+      writeOffId: expect.stringMatching(/^write_off_[a-z0-9]{24}$/),
+      createdAt,
+      code: "uncollectible",
+      reason: "no answer",
+    });
     expect(parsed.due).toEqual([]);
     expect(parsed.installments[0].canceledAt).toBe(createdAt);
     // Settlement update, schedule cancellation, event insert, loan stamp.
@@ -306,11 +321,13 @@ describe("loan routes and service (isolated)", () => {
 
   it("re-write-off is an idempotent no-op keeping the original event", async () => {
     queueLoan({
-      result: {
-        ...loan,
-        closedAt: createdAt,
-        writeOffId: `write_off_${"a".repeat(24)}`,
-      },
+      result: { ...loan, closedAt: createdAt },
+      writeOffId: `write_off_${"a".repeat(24)}`,
+    });
+    query.mockResolvedValueOnce({
+      rows: [
+        [`write_off_${"a".repeat(24)}`, loanId, createdAt, "goodwill", null],
+      ],
     });
     const response = await app.request(`${basePath}/${loanId}/write-off`, {
       body: JSON.stringify({ code: "uncollectible", reason: "new" }),
@@ -318,8 +335,13 @@ describe("loan routes and service (isolated)", () => {
       method: "PATCH",
     });
     expect(response.status).toBe(200);
-    const parsed = loanSchema.parse(await response.json());
-    expect(parsed.writeOffId).toBe(`write_off_${"a".repeat(24)}`);
+    const parsed = loanApiSchema.parse(await response.json());
+    expect(parsed.writeOff).toEqual({
+      writeOffId: `write_off_${"a".repeat(24)}`,
+      createdAt,
+      code: "goodwill",
+      reason: null,
+    });
     expect(
       query.mock.calls.some(([sql]) =>
         sql.includes('insert into "loan_write_offs"'),
