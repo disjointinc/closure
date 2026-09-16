@@ -43,7 +43,7 @@ Run the whole stack (Postgres, Redis, API, web) in Docker from your checkout:
 docker compose -p closure -f bin/compose.yml up -d
 ```
 
-Default UI is available at http://localhost:3216.
+Default UI is available at http://localhost:3226.
 
 This starts the same services as the one-liner above: `deploy-hobby` uses the
 checkout's `bin/compose.yml` when run from a clone, so both paths produce the
@@ -63,3 +63,5 @@ The API's database schema lives in `api/db/schema.ts` (Drizzle). To change it:
    `docker compose -p closure -f bin/compose.yml up -d` (via the one-shot
    `closure-migrate` service), or apply them to your local db immediately with
    `npm run db:migrate -w api`.
+
+Note: unlike other API changes, all web changes, and all docs changes, DB migrations must be applied before they take effect. No hot-reloading.
