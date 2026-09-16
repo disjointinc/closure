@@ -61,8 +61,8 @@ const loan: Loan = {
   ...body,
   closedAt: null,
   createdAt,
-  deletedAt: null,
   due: [],
+  writeOffId: null,
   endsAt,
   installments: [
     {
@@ -103,8 +103,8 @@ function queueLoan({ result = loan }: { result?: Loan } = {}) {
         result.assignmentId,
         result.createdAt,
         result.closedAt,
+        result.writeOffId,
         result.endsAt,
-        result.deletedAt,
         result.loanTemplateId,
         result.principal,
         result.annualInterestPercentage,
@@ -139,20 +139,34 @@ describe("loan routes and service (isolated)", () => {
   it.each([
     { method: "GET", path: loanId },
     { method: "PATCH", path: `${loanId}/close` },
-    { method: "DELETE", path: loanId },
-  ])("scopes $method $path to the URL tenant", async ({ method, path }) => {
-    query.mockResolvedValueOnce({ rows: [] });
-    const response = await app.request(
-      `/v0/tenant/${otherTenantId}/loan/${path}`,
-      { method },
-    );
-    expect(response.status).toBe(404);
-    expect(query).toHaveBeenCalledTimes(1);
-    const [sql, params] = query.mock.calls[0];
-    expect(sql).toContain('"loans"."tenant_id" =');
-    expect(params).toContain(otherTenantId);
-    expect(params).toContain(loanId);
-  });
+    {
+      body: { code: "uncollectible", reason: null },
+      method: "PATCH",
+      path: `${loanId}/write-off`,
+    },
+    { method: "GET", path: `${loanId}/write-off` },
+  ])(
+    "scopes $method $path to the URL tenant",
+    async ({ body, method, path }) => {
+      query.mockResolvedValueOnce({ rows: [] });
+      const response = await app.request(
+        `/v0/tenant/${otherTenantId}/loan/${path}`,
+        body === undefined
+          ? { method }
+          : {
+              body: JSON.stringify(body),
+              headers: { "Content-Type": "application/json" },
+              method,
+            },
+      );
+      expect(response.status).toBe(404);
+      expect(query).toHaveBeenCalledTimes(1);
+      const [sql, params] = query.mock.calls[0];
+      expect(sql).toContain('"loans"."tenant_id" =');
+      expect(params).toContain(otherTenantId);
+      expect(params).toContain(loanId);
+    },
+  );
 
   it("creates from a template and returns the embedded loan", async () => {
     query
@@ -205,8 +219,8 @@ describe("loan routes and service (isolated)", () => {
       null,
       createdAt,
       null,
-      endsAt,
       null,
+      endsAt,
       loanTemplateId,
       JSON.stringify(amount),
       1,
@@ -235,6 +249,121 @@ describe("loan routes and service (isolated)", () => {
           !sql.includes('"servicing_state"'),
       ),
     ).toBe(false);
+  });
+
+  it("writes off an open loan: stamps, records the event, cancels the schedule", async () => {
+    queueLoan();
+    query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    const response = await app.request(`${basePath}/${loanId}/write-off`, {
+      body: JSON.stringify({ code: "uncollectible", reason: "no answer" }),
+      headers: { "Content-Type": "application/json" },
+      method: "PATCH",
+    });
+    expect(response.status).toBe(200);
+    const parsed = loanSchema.parse(await response.json());
+    expect(parsed.closedAt).toBe(createdAt);
+    expect(parsed.writeOffId).toMatch(/^write_off_[a-z0-9]{24}$/);
+    expect(parsed.due).toEqual([]);
+    expect(parsed.installments[0].canceledAt).toBe(createdAt);
+    // Settlement update, schedule cancellation, event insert, loan stamp.
+    expect(query.mock.calls[2][0]).toContain('update "loans"');
+    expect(query.mock.calls[3][0]).toContain('update "loan_installments"');
+    expect(query.mock.calls[4][0]).toContain('insert into "loan_write_offs"');
+    expect(query.mock.calls[4][1]).toEqual([
+      expect.stringMatching(/^write_off_[a-z0-9]{24}$/),
+      loanId,
+      createdAt,
+      "uncollectible",
+      "no answer",
+    ]);
+    expect(query.mock.calls[5][0]).toContain('update "loans"');
+    expect(query.mock.calls[5][1]).toEqual([
+      createdAt,
+      expect.stringMatching(/^write_off_[a-z0-9]{24}$/),
+      loanId,
+      tenantId,
+    ]);
+  });
+
+  it("rejects write-off on a paid-off loan", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    queueLoan({ result: { ...loan, closedAt: createdAt } });
+    const response = await app.request(`${basePath}/${loanId}/write-off`, {
+      body: JSON.stringify({ code: "uncollectible", reason: null }),
+      headers: { "Content-Type": "application/json" },
+      method: "PATCH",
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "invalid_state",
+      error: "loan is already paid off",
+    });
+  });
+
+  it("re-write-off is an idempotent no-op keeping the original event", async () => {
+    queueLoan({
+      result: {
+        ...loan,
+        closedAt: createdAt,
+        writeOffId: `write_off_${"a".repeat(24)}`,
+      },
+    });
+    const response = await app.request(`${basePath}/${loanId}/write-off`, {
+      body: JSON.stringify({ code: "uncollectible", reason: "new" }),
+      headers: { "Content-Type": "application/json" },
+      method: "PATCH",
+    });
+    expect(response.status).toBe(200);
+    const parsed = loanSchema.parse(await response.json());
+    expect(parsed.writeOffId).toBe(`write_off_${"a".repeat(24)}`);
+    expect(
+      query.mock.calls.some(([sql]) =>
+        sql.includes('insert into "loan_write_offs"'),
+      ),
+    ).toBe(false);
+  });
+
+  it("lists write-off history oldest first", async () => {
+    query.mockResolvedValueOnce({ rows: [[loanId]] }).mockResolvedValueOnce({
+      rows: [
+        [
+          `write_off_${"a".repeat(24)}`,
+          loanId,
+          createdAt,
+          "goodwill",
+          "courtesy",
+        ],
+        [
+          `write_off_${"b".repeat(24)}`,
+          loanId,
+          createdAt + 1000,
+          "uncollectible",
+          null,
+        ],
+      ],
+    });
+    const response = await app.request(`${basePath}/${loanId}/write-off`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([
+      {
+        writeOffId: `write_off_${"a".repeat(24)}`,
+        loanId,
+        createdAt,
+        code: "goodwill",
+        reason: "courtesy",
+      },
+      {
+        writeOffId: `write_off_${"b".repeat(24)}`,
+        loanId,
+        createdAt: createdAt + 1000,
+        code: "uncollectible",
+        reason: null,
+      },
+    ]);
   });
 });
 

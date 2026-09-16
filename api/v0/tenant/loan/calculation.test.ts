@@ -37,7 +37,6 @@ function makeLoan({
     assignmentId: null,
     closedAt: null,
     createdAt,
-    deletedAt: null,
     duration: { days: 365, months: null },
     endsAt,
     loanId: `loan_${"a".repeat(24)}`,
@@ -51,6 +50,7 @@ function makeLoan({
     },
     servicingTerms,
     tenantId: `tenant_${"a".repeat(22)}`,
+    writeOffId: null,
   };
 }
 
@@ -338,5 +338,27 @@ describe("reversals", () => {
       dueAt: at,
     });
     expect(reversed.due).toEqual([{ amount: 6000, dueAt: at }]);
+  });
+
+  it("clears the write-off pointer when a reversal reopens a written-off loan", () => {
+    const loan = makeLoan({ rate: 10 });
+    const paid = calculateLoan({
+      action: { amount: { ...principal, value: 110_000 }, type: "payment" },
+      at: loan.endsAt,
+      installments: [],
+      loan,
+    });
+    const writtenOff = {
+      ...paid.loan,
+      writeOffId: `write_off_${"a".repeat(24)}`,
+    };
+    const reversed = calculateLoan({
+      action: { interestAmount: 1000, principalAmount: 5000, type: "reversal" },
+      at: loan.endsAt + 30 * DAY_MS,
+      installments: savedInstallments({ result: paid }),
+      loan: writtenOff,
+    });
+    expect(reversed.loan.closedAt).toBeNull();
+    expect(reversed.loan.writeOffId).toBeNull();
   });
 });

@@ -18,7 +18,6 @@ export class LoanServicingError extends Error {
   readonly code:
     | "invalid_input"
     | "not_enabled"
-    | "deleted"
     | "closed"
     | "backdated"
     | "overpayment"
@@ -143,12 +142,6 @@ export function calculateLoan({
       message: "legacy loan servicing is disabled",
     });
   }
-  if (loan.deletedAt !== null) {
-    throw new LoanServicingError({
-      code: "deleted",
-      message: "deleted loans cannot be serviced or settled",
-    });
-  }
   if (!Number.isSafeInteger(at) || at < 0 || at > MAX_DATE_MS) {
     throw new LoanServicingError({
       code: "invalid_input",
@@ -180,7 +173,10 @@ export function calculateLoan({
   if (loan.closedAt !== null && action.type === "payment") {
     throw new LoanServicingError({
       code: "closed",
-      message: "loan is already paid off",
+      message:
+        loan.writeOffId !== null
+          ? "loan is written off"
+          : "loan is already paid off",
     });
   }
   if (
@@ -347,7 +343,11 @@ export function calculateLoan({
       paidAt: null,
     });
     all.push(...generated);
+    /* A reversal reopens the loan wholesale: the write-off pointer clears
+     * with closedAt (write-off history lives in loan_write_offs, untouched
+     * here). */
     current.closedAt = null;
+    current.writeOffId = null;
     allocation = {
       interestAmount: action.interestAmount,
       principalAmount: action.principalAmount,
