@@ -205,6 +205,8 @@ Plans can also have add-ons, which are mini feature sets the tenant can purchase
 
 A plan is like a template. Assignment is when we actually apply that template to a tenant. This is also when we tweak that template; maybe a particular tenant needs slightly different features, meters, or prices than the default plan values.
 
+> If you've been setting up the plan and prerequisites in the UI, we'd recommend **using the provided API calls** for the rest of the quickstart. The following calls are things you're likely going to do in your codebase, rather than in the Closure UI.
+
 ### Create the tenant
 
 First, let's create the tenant within Closure. Closure's philosophy on tenants is simple: we store as little info as possible. The right sources of truth live in other systems.
@@ -228,7 +230,24 @@ curl -X POST http://localhost:3216/v0/tenant \
 
 ### Assign them
 
-Override a feature with a special value:
+Let's assign the tenant to a plan.
+
+```bash
+curl -X POST http://localhost:3216/v0/tenant/<tenant ID from above>/assignment \
+  -H 'content-type: application/json' \
+  -d '{
+    "planId": "<plan ID from above>",
+    "experimentId": null,
+    "cycleId": "<first cycle ID from above>",
+    "startsAt": <start time, in epoch milliseconds>,
+    "endsAt": null,
+    "addOns": []
+  }'
+```
+
+### Overrides
+
+Override a feature with a special value.
 
 ## Check entitlements
 
