@@ -203,13 +203,30 @@ Plans can also have add-ons, which are mini feature sets the tenant can purchase
 
 ## Assign a tenant
 
-Create a tenant:
+A plan is like a template. Assignment is when we actually apply that template to a tenant. This is also when we tweak that template; maybe a particular tenant needs slightly different features, meters, or prices than the default plan values.
+
+### Create the tenant
+
+First, let's create the tenant within Closure. Closure's philosophy on tenants is simple: we store as little info as possible. The right sources of truth live in other systems.
+
+1. Your tenant's email address lives in your database.
+1. Your tenant's credit card number lives in your Stripe account.
+1. Your tenant's profile picture lives in your file storage system, etc.
+
+So, when creating a tenant, all you define are its IDs in those external systems.
 
 ```bash
 curl -X POST http://localhost:3216/v0/tenant \
   -H 'content-type: application/json' \
-  -d '{ "externalIds": { "stripe": "cus_…" } }'
+  -d '{
+    "externalIds": {
+      "userId": "user_abc123",
+      "stripeCustomerId": "cus_abc123",
+    }
+  }'
 ```
+
+### Assign them
 
 Override a feature with a special value:
 
