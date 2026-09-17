@@ -17,6 +17,6 @@ export const featureSchema = z.object({
   description: z.string().nullable(),
   /** If options is null, this is a boolean feature. */
   options: z.array(featureOptionSchema).min(1).nullable(),
-  applicableTaxTypeIds: z.array(taxTypeIdSchema).nullable(),
+  applicableTaxTypeIds: z.array(taxTypeIdSchema).min(1).nullable(),
 });
 export type Feature = z.infer<typeof featureSchema>;

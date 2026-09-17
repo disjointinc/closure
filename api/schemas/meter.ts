@@ -14,6 +14,6 @@ export const meterSchema = z.object({
   deprecatedAt: epochMs.nullable(),
   name: z.string().min(1),
   description: z.string().nullable(),
-  applicableTaxTypeIds: z.array(taxTypeIdSchema).nullable(),
+  applicableTaxTypeIds: z.array(taxTypeIdSchema).min(1).nullable(),
 });
 export type Meter = z.infer<typeof meterSchema>;
