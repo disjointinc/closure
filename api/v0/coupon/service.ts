@@ -17,7 +17,23 @@ import { generateId } from "../../lib/id.ts";
 import { type Award, type Coupon } from "../../schemas/coupon.ts";
 import { type AwardApi, expandAward, resolveAward } from "../award/service.ts";
 import { getCouponTemplate } from "../coupon-template/service.ts";
-import type { CouponCreateBody } from "./routes.ts";
+
+/**
+ * The create-input coupon: microcredits, awards as full values. Minted
+ * either inline (couponTemplateId null) or copied from a template, whose
+ * definitional fields are then not accepted.
+ */
+export type CouponCreateBody =
+  | (Omit<
+      CouponApi,
+      "couponId" | "createdAt" | "deletedAt" | "couponTemplateId"
+    > & {
+      couponTemplateId: null;
+    })
+  | {
+      couponTemplateId: string;
+      reciprocalBenefitCouponId: string | null;
+    };
 
 type WithAwardApi<T extends { award: Award }> = Omit<T, "award"> & {
   award: AwardApi;
