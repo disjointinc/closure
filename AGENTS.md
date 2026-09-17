@@ -55,5 +55,3 @@ Log all errors, even if they should never occur in a try-catch block. Log anythi
 Don't use magic numbers. Use constants.
 
 The DB is a strict dependency of the cache. The cache and DB are strict dependencies of API routes. The API routes are strict dependencies of clients, such as the web client. The web client and API routes are strict dependencies of the docs.
-
-API routes are defined with zod-openapi (`createRoute` + `OpenAPIHono`), never plain Hono routes: the OpenAPI doc is generated from the same definitions, and api/handler.test.ts fails CI if a route isn't documented. The doc is served live at GET /openapi.json. docs/ is the Mintlify site (docs.json navigation; guide pages in docs/guide/; the API reference tab renders the live spec from the closure-api service URL in docs.json). docs/ has its own package.json declaring the mint CLI — deliberately outside the root workspaces so the CLI's dependency tree installs only in the docs container. Its dev script passes --local-schema, which permits the http (non-TLS) spec URL in docs.json; the CLI otherwise accepts only https URLs or repo-local files.
