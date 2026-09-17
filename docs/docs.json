@@ -15,8 +15,7 @@
   },
   "logo": {
     "light": "/assets/logo/padless_black.svg",
-    "dark": "/assets/logo/padless_white.svg",
-    "href": "http://localhost:3226"
+    "dark": "/assets/logo/padless_white.svg"
   },
   "favicon": {
     "light": "/assets/logomark/black.svg",
