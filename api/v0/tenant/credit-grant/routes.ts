@@ -1,20 +1,46 @@
 /**
  * v0/tenant/credit-grant/routes.ts -- HTTP for /v0/tenant/:tenantId/credit-grant:
  * request validation and wiring. Business logic lives in service.ts.
+ *
+ * The wire speaks fractional credits; the service speaks microcredits.
+ * Handlers convert at the boundary -- see api/lib/credits.ts.
  */
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 import { MeterBalanceUnavailableError } from "../../../cache/meter/index.ts";
 import { serviceUnavailableResponse } from "../../../lib/http.ts";
-import { creditGrantSchema } from "../../../schemas/credit-grant.ts";
+import {
+  creditsPositive,
+  creditsToMicrocredits,
+  microcreditsToCredits,
+} from "../../../lib/credits.ts";
+import {
+  type CreditGrant,
+  creditGrantSchema,
+} from "../../../schemas/credit-grant.ts";
 import { createCreditGrant, listCreditGrants } from "./service.ts";
 
-const creditGrantCreateSchema = creditGrantSchema.omit({
-  creditGrantId: true,
-  grantedAt: true,
-});
+const creditGrantCreateWireSchema = creditGrantSchema
+  .omit({ amountMicrocredits: true, creditGrantId: true, grantedAt: true })
+  .extend({ amountCredits: creditsPositive });
 
-export type CreditGrantCreateBody = z.infer<typeof creditGrantCreateSchema>;
+/** The wire grant: amountCredits in place of amountMicrocredits. */
+const creditGrantWireSchema = creditGrantSchema
+  .omit({ amountMicrocredits: true })
+  .extend({ amountCredits: creditsPositive });
+type CreditGrantWire = z.infer<typeof creditGrantWireSchema>;
+
+function creditGrantToCredits({
+  grant,
+}: {
+  grant: CreditGrant;
+}): CreditGrantWire {
+  const { amountMicrocredits, ...rest } = grant;
+  return {
+    ...rest,
+    amountCredits: microcreditsToCredits({ microcredits: amountMicrocredits }),
+  };
+}
 
 const createCreditGrantRoute = createRoute({
   method: "post",
@@ -23,13 +49,13 @@ const createCreditGrantRoute = createRoute({
   summary: "Create a credit grant",
   request: {
     body: {
-      content: { "application/json": { schema: creditGrantCreateSchema } },
+      content: { "application/json": { schema: creditGrantCreateWireSchema } },
       required: true,
     },
   },
   responses: {
     201: {
-      content: { "application/json": { schema: creditGrantSchema } },
+      content: { "application/json": { schema: creditGrantWireSchema } },
       description: "Created",
     },
     503: serviceUnavailableResponse,
@@ -43,7 +69,9 @@ const listCreditGrantsRoute = createRoute({
   summary: "List credit grants",
   responses: {
     200: {
-      content: { "application/json": { schema: z.array(creditGrantSchema) } },
+      content: {
+        "application/json": { schema: z.array(creditGrantWireSchema) },
+      },
       description: "OK",
     },
   },
@@ -54,9 +82,18 @@ export const creditGrantApp = new OpenAPIHono<{
 }>()
   .openapi(createCreditGrantRoute, async (c) => {
     const tenantId = c.get("tenantId");
-    const body = c.req.valid("json");
+    const { amountCredits, ...rest } = c.req.valid("json");
     try {
-      return c.json(await createCreditGrant({ grant: body, tenantId }), 201);
+      const grant = await createCreditGrant({
+        grant: {
+          ...rest,
+          amountMicrocredits: creditsToMicrocredits({
+            credits: amountCredits,
+          }),
+        },
+        tenantId,
+      });
+      return c.json(creditGrantToCredits({ grant }), 201);
     } catch (error) {
       if (error instanceof MeterBalanceUnavailableError) {
         // The grant is durable in pg with applied_at_micros NULL; the
@@ -79,5 +116,9 @@ export const creditGrantApp = new OpenAPIHono<{
     }
   })
   .openapi(listCreditGrantsRoute, async (c) => {
-    return c.json(await listCreditGrants({ tenantId: c.get("tenantId") }), 200);
+    const grants = await listCreditGrants({ tenantId: c.get("tenantId") });
+    return c.json(
+      grants.map((grant) => creditGrantToCredits({ grant })),
+      200,
+    );
   });

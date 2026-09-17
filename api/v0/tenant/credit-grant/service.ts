@@ -15,7 +15,12 @@ import { db } from "../../../db/index.ts";
 import { creditGrants } from "../../../db/schema.ts";
 import { generateId } from "../../../lib/id.ts";
 import type { CreditGrant } from "../../../schemas/credit-grant.ts";
-import type { CreditGrantCreateBody } from "./routes.ts";
+
+/** The create-input grant: microcredits, server-stamped fields omitted. */
+export type CreditGrantCreateBody = Omit<
+  CreditGrant,
+  "creditGrantId" | "grantedAt"
+>;
 
 // The row carries reconciler state (applied_at_micros) that isn't part of the
 // wire shape, so it can't pass through directly.
