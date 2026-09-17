@@ -317,15 +317,27 @@ curl -X POST http://localhost:3216/v0/tenant/<tenant ID from above>/meter-overri
   }'
 ```
 
-## Check entitlements
+## Get stuff done
 
-Then check what the tenant is entitled to:
+Now, let's use Closure to get things done in our codebase!
+
+### Check entitlements
+
+First, let's check what features a tenant is entitled to. With this info, we can change what's shown in our UI, what our backend allows, etc. For example, we may only want to show allowed CRMs in our "Connect CRM" tab.
 
 ```bash
-curl http://localhost:3216/v0/tenant/{tenantId}/entitlements
+curl http://localhost:3216/v0/tenant/<tenant ID from above>/feature-entitlements
 ```
 
-## Meter
+Next, let's check what meters a tenant is entitled to. For example, we might use this to show a progress bar (i.e. 10 default seats) or tell the user how much they can buy (i.e. 20 additional seats allowed).
+
+```bash
+curl http://localhost:3216/v0/tenant/<tenant ID from above>/meter-entitlements
+```
+
+### Meter
+
+Metering
 
 ## Next steps
 
