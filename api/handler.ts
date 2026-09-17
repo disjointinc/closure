@@ -84,6 +84,16 @@ const app = apiApp
   .route("/v0/tenant", tenantApp)
   .notFound((c) => c.json({ error: "not found" }, 404));
 
+const cleanPath = ({ path }: { path: string }) =>
+  path
+    .toLowerCase()
+    .replace(/\'/g, "")
+    .replace(/ > /g, "/")
+    .replace(/ /g, "-")
+    .replace(/[^a-z0-9\-\/]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .replace(/-+/g, "-");
+
 /** The spec as served live at /openapi.json. */
 export const getApiDoc = () => {
   const doc = apiApp.getOpenAPI31Document(apiDoc);
@@ -102,13 +112,15 @@ export const getApiDoc = () => {
     ] as const) {
       const operation = pathItem[method];
       const tag = operation?.tags?.[0];
-      if (!operation || !tag?.includes(" > ") || !operation.summary) continue;
-      const group = tag.toLowerCase().replaceAll(" > ", "/");
-      const page = operation.summary
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "");
-      operation["x-mint"] = { href: `/api-reference/${group}/${page}` };
+      if (!operation || !tag?.includes(" > ") || !operation.summary) {
+        continue;
+      }
+      const group = cleanPath({ path: tag });
+      const page = cleanPath({ path: operation.summary });
+      operation["x-mint"] = {
+        href: `/api-reference/${group}/${page}`,
+        metadata: { sidebarTitle: operation.summary },
+      };
     }
   }
   return doc;
