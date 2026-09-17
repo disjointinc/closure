@@ -167,31 +167,52 @@ curl -X POST http://localhost:3216/v0/plan \
     "meters": [
       {
         "meterId": "<meter ID from above>",
-        "defaultCredits": 300,
-        "limitCredits": 1000,
+        "defaultCredits": 10,
+        "limitCredits": 30,
         "reset": "billing_cycle_end",
         "rollovers": 1,
         "topUpPricesPerCredit": [
-          "startingAt": 0,
-          "prices": [
-            {
-              "cycleId": "<first cycle ID from above>",
-              "amounts": [
-                { "currency": "USD", "unit": "cents", "value": 5 },
-                { "currency": "EUR", "unit": "cents", "value": 4.3 },
-              ]
-            },
-            {
-              "cycleId": "<second cycle ID from above>",
-              "amounts": [
-                { "currency": "USD", "unit": "cents", "value": 4 },
-                { "currency": "EUR", "unit": "cents", "value": 3.4 },
-              ]
-            }
-          ],
+          {
+            "startingAt": 0,
+            "prices": [
+              {
+                "cycleId": "<first cycle ID from above>",
+                "amounts": [
+                  { "currency": "USD", "unit": "cents", "value": 500 },
+                  { "currency": "EUR", "unit": "cents", "value": 430 },
+                ]
+              },
+              {
+                "cycleId": "<second cycle ID from above>",
+                "amounts": [
+                  { "currency": "USD", "unit": "cents", "value": 400 },
+                  { "currency": "EUR", "unit": "cents", "value": 340 },
+                ]
+              }
+            ],
+          },
+          {
+            "startingAt": 10,
+            "prices": [
+              {
+                "cycleId": "<first cycle ID from above>",
+                "amounts": [
+                  { "currency": "USD", "unit": "cents", "value": 400 },
+                  { "currency": "EUR", "unit": "cents", "value": 340 },
+                ]
+              },
+              {
+                "cycleId": "<second cycle ID from above>",
+                "amounts": [
+                  { "currency": "USD", "unit": "cents", "value": 350 },
+                  { "currency": "EUR", "unit": "cents", "value": 300 },
+                ]
+              }
+            ]
+          }
         ],
         "topUpCreditPackSizes": {
-          "static": [100, 250, 500]
+          "static": [1, 5, 10, 20]
         }
       }
     ],
@@ -222,8 +243,8 @@ curl -X POST http://localhost:3216/v0/tenant \
   -H 'content-type: application/json' \
   -d '{
     "externalIds": {
-      "userId": "user_abc123",
-      "stripeCustomerId": "cus_abc123",
+      "userId": "<user ID in your database>",
+      "stripeCustomerId": "<customer ID in Stripe>",
     }
   }'
 ```
@@ -247,7 +268,54 @@ curl -X POST http://localhost:3216/v0/tenant/<tenant ID from above>/assignment \
 
 ### Overrides
 
-Override a feature with a special value.
+Let's override a feature assignment. Our plan only allows Hubspot and Attio, but let's grant Salesforce access to this tenant anyway.
+
+```bash
+curl -X POST http://localhost:3216/v0/tenant/<tenant ID from above>/feature-override \
+  -H 'content-type: application/json' \
+  -d '{
+    "featureId": "<second feature ID from above>",
+    "setTo": ["hubspot", "attio", "salesforce"]
+  }'
+```
+
+Let's override a meter's plan values too. Let's bump this tenant's default seat credits to 15, and set their top up price per credit to a lower flat rate.
+
+```bash
+curl -X POST http://localhost:3216/v0/tenant/<tenant ID from above>/meter-override \
+  -H 'content-type: application/json' \
+  -d '{
+    "meterId": "<meter ID from above>",
+    "defaultCredits": 15,
+    "limitCredits": 30,
+    "reset": "billing_cycle_end",
+    "rollovers": 1,
+    "topUpPricesPerCredit": [
+      {
+        "startingAt": 0,
+        "prices": [
+          {
+            "cycleId": "<first cycle ID from above>",
+            "amounts": [
+              { "currency": "USD", "unit": "cents", "value": 400 },
+              { "currency": "EUR", "unit": "cents", "value": 340 },
+            ]
+          },
+          {
+            "cycleId": "<second cycle ID from above>",
+            "amounts": [
+              { "currency": "USD", "unit": "cents", "value": 350 },
+              { "currency": "EUR", "unit": "cents", "value": 300 },
+            ]
+          }
+        ]
+      }
+    ],
+    "topUpCreditPackSizes": {
+      "static": [1, 5, 10, 20]
+    }
+  }'
+```
 
 ## Check entitlements
 
