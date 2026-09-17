@@ -20,6 +20,7 @@
 import { sql } from "drizzle-orm";
 import { cors } from "hono/cors";
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { config } from "../config.ts";
 import { db } from "./db/index.ts";
 import { addOnTypeApp } from "./v0/add-on-type/routes.ts";
 import { couponApp } from "./v0/coupon/routes.ts";
@@ -47,7 +48,9 @@ const apiDoc = {
       "The primitives for real-time, configurable metering, entitlements, " +
       "pricing, referrals, and billing.",
   },
-  servers: [{ url: "http://localhost:3216", description: "Local dev" }],
+  servers: [
+    { url: `http://localhost:${config.api.port}`, description: "Local dev" },
+  ],
 };
 
 /* apiApp stays typed as OpenAPIHono so the doc generator remains accessible

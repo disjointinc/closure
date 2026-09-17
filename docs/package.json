@@ -2,7 +2,7 @@
   "name": "closure-docs",
   "private": true,
   "scripts": {
-    "dev": "mint dev --port 3236"
+    "dev": "mint dev --port ${CLOSURE_DOCS_PORT:-3236}"
   },
   "devDependencies": {
     "mint": "^4.2.894"

@@ -59,6 +59,7 @@ services:
     ports:
       - "${CLOSURE_API_PORT:-3216}:3216"
     environment:
+      CLOSURE_API_PORT: "3216"
       CLOSURE_POSTGRES_HOST: closure-db
       CLOSURE_POSTGRES_PORT: "5432"
       CLOSURE_REDIS_HOST: closure-redis
@@ -69,7 +70,11 @@ services:
     healthcheck:
       # 127.0.0.1, not localhost: busybox wget tries ::1 first and the server
       # binds IPv4 only.
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3216/healthz || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:$${CLOSURE_API_PORT}/healthz || exit 1",
+        ]
       interval: 5s
       timeout: 5s
       retries: 60
@@ -97,9 +102,11 @@ services:
     ports:
       - "${CLOSURE_WEB_PORT:-3226}:3226"
     environment:
+      CLOSURE_WEB_PORT: "3226"
       # Browser-side origin of the API; the dev server passes VITE_* through
-      # to the bundle (web/src/lib/api.ts).
-      VITE_CLOSURE_API_URL: ${VITE_CLOSURE_API_URL:-http://localhost:3216}
+      # to the bundle (web/src/lib/api.ts). Follows CLOSURE_API_PORT unless
+      # VITE_CLOSURE_API_URL is set directly.
+      VITE_CLOSURE_API_URL: ${VITE_CLOSURE_API_URL:-http://localhost:${CLOSURE_API_PORT:-3216}}
   closure-docs:
     image: node:24-alpine
     working_dir: /closure/docs
@@ -111,6 +118,9 @@ services:
     # requires referenced spec files to exist at startup); the background
     # poller keeps it in sync so mint rebuilds the API reference on change.
     command: sh -c "npm install && node sync-openapi.mjs --once && (node sync-openapi.mjs &) && exec npm run dev"
+    environment:
+      CLOSURE_API_URL: http://closure-api:3216/openapi.json
+      CLOSURE_DOCS_PORT: "3236"
     ports:
       - "${CLOSURE_DOCS_PORT:-3236}:3236"
     depends_on:
