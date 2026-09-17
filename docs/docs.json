@@ -45,7 +45,7 @@
       },
       {
         "tab": "API reference",
-        "openapi": "http://closure-api:3216/openapi.json"
+        "openapi": "openapi.json"
       }
     ]
   }
