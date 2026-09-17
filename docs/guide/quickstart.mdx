@@ -1,107 +1,227 @@
 ---
 title: "Quickstart"
-description: "Make your first calls to the Closure API in minutes."
+description: "Run Closure in your codebase."
 ---
 
-## Base URL
+Closure is a system for metering, entitlements, and billing. Closure lets you build powerful functionality on top of these primitives, like:
 
-```
-http://localhost:3216
-```
+1. Actioning and alerting on customer lifecycle events
+1. Granting discounts and referral bonuses
+1. Experimenting with plans and pricing
+1. Processing buy-now-pay-later
+1. Modeling marginal revenue and expenses
 
-Running the API on a different port (`CLOSURE_API_PORT`)? Substitute it here and in the examples below.
+and more! First, though, this quickstart guide will help you set up the basics.
 
-All routes are versioned under `/v0`. v0 is pre-release: shapes can break between versions.
+## Create your first plan
 
-## The API spec
+We recommend creating the plan and its prerequisites in the UI, but in case you want to do it all in the API, we've added sample calls below.
 
-Every endpoint — input and output shapes included — is generated from the API's own route definitions into an OpenAPI 3.1 spec:
+### Prerequisites
 
-- **Live:** `GET /openapi.json` on the API itself.
-- **Rendered:** the API reference tab of this site.
-
-## Conventions
-
-- **IDs** look like `plan_3f8k2…` — a type prefix, an underscore, lowercase letters and digits. You never mint IDs; the server does.
-- **Timestamps** are integer milliseconds since the unix epoch (`createdAt`, `deprecatedAt`, `startsAt`, …).
-- **Money** is an integer amount in a currency's smallest billable unit:
-  `{ "currency": "USD", "unit": "cents", "value": 5250 }` is $52.50. A value holds one or more amounts, at most one per currency.
-- **Meter quantities** are integer microcredits: 1 credit = 1,000,000 microcredits.
-- **Durations** are `{ "days": 30 }` or `{ "months": 1 }` — exactly one field set.
-- **Errors**: business-rule failures return 4xx with `{ "error": "…" }`; malformed requests return 400 with validation details.
-- **Auth**: none yet. CORS is open; don't expose a dev API to the internet.
-
-## Resource lifecycle
-
-Nothing is destroyed. `DELETE` returns the resource with `deprecatedAt` stamped (plans, meters, cycles, product lines, features, …). Coupons, team members, and tenants use `deletedAt` instead. Invoices, experiments, and loans move through their own lifecycles: `POST …/finalize`, `POST …/conclude`, `PATCH …/close`, `PATCH …/write-off`.
-
-## Quickstart
-
-Create a billing cycle (prices are keyed to cycles):
+First, let's create the product line for the plan. Most SaaS businesses just have 1 product line, on which they have multiple plans (starter, pro, enterprise, etc).
 
 ```bash
-curl -s -X POST http://localhost:3216/v0/cycle \
+curl -X POST http://localhost:3216/v0/product-line \
+  -H 'content-type: application/json' \
+  -d '{
+    "name": "Default product line",
+    "description": "The product line where all our plans live",
+    "forceBillingCycleSynchronizationWithProductLineIds": []
+  }'
+```
+
+Next, let's create a feature on that product line.
+
+```bash
+curl -X POST http://localhost:3216/v0/feature \
+  -H 'content-type: application/json' \
+  -d '{
+    "productLineId": "<product line ID from above>",
+    "name": "Slack alerts",
+    "description": "Send the tenant alerts in Slack",
+    "options": null,
+    "applicableTaxTypeIds": null,
+  }'
+```
+
+Features can be boolean values (like above), or select values. Let's create a second, select-type feature.
+
+```bash
+curl -X POST http://localhost:3216/v0/feature \
+  -H 'content-type: application/json' \
+  -d '{
+    "productLineId": "<product line ID from above>",
+    "name": "CRM",
+    "description": "CRMs that can be connected",
+    "options": [
+      {
+        "name": "hubspot",
+        "description": null
+      },
+      {
+        "name": "salesforce",
+        "description": null
+      },
+      {
+        "name": "attio",
+        "description": null
+      },
+      {
+        "name": "dynamics365",
+        "description": null
+      }
+    ],
+    "applicableTaxTypeIds": null,
+  }'
+```
+
+Next, let's create a meter. Unlike features, meters can be used in more than 1 product line, since separate product lines may be pulling from the same balance (for example, an AI token balance).
+
+```bash
+curl -X POST http://localhost:3216/v0/meter \
+  -H 'content-type: application/json' \
+  -d '{
+    "productLineIds": ["<product line ID from above>"],
+    "name": "Seats",
+    "description": "The number of users on a tenant",
+    "applicableTaxTypeIds": null,
+  }'
+```
+
+There are many important things to define for this meter: its default balance, the maximum number of credits a tenant can spend, whether and when the meter resets, the marginal cost of top-up credits, etc. However, these values all vary plan-by-plan, so we set them when creating the plan, not when creating the meter.
+
+Finally, let's create a billing cycle. Some SaaS businesses wait until the end of a billing cycle to tally up costs (billing in arrears), while some bill you upfront before you're granted access.
+
+```bash
+curl -X POST http://localhost:3216/v0/cycle \
   -H 'content-type: application/json' \
   -d '{
     "charged": "upfront",
     "cycleLength": { "days": null, "months": 1 },
     "defaultDiscountPercentage": null,
     "name": "Monthly",
-    "description": null
+    "description": "Monthly billing cycle"
   }'
 ```
 
-Create a product line — plans are scoped to one:
+Most SaaS businesses offer annual plans on a discount. Let's create an annual cycle, billed net 30, with a 5-day grace period.
 
 ```bash
-curl -s -X POST http://localhost:3216/v0/product-line \
+curl -X POST http://localhost:3216/v0/cycle \
   -H 'content-type: application/json' \
   -d '{
-    "forceBillingCycleSynchronizationWithProductLineIds": [],
-    "name": "Compute",
-    "description": null
+    "charged": "arrears",
+    "cycleLength": { "days": null, "months": 12 },
+    "creditPeriod": { "days": 30, "months": null },
+    "gracePeriod": { "days": 5, "months": null },
+    "defaultDiscountPercentage": 20,
+    "name": "Annual",
+    "description": "Annual billing cycle"
   }'
 ```
 
-Create a plan with a price (prices carry full inline values; cycles are referenced by id):
+### Building the plan
+
+A plan is the core model of "how do people pay us, and what do they get in return."
+
+1. Most B2C or SME-focused B2B companies stick to plan defaults when assigning tenants.
+1. Most enterprise-focused B2B companies treat each tenant as unique, and override many plan defaults when assigning tenants.
+
+Wherever your business falls on that spectrum, Closure requires you to start with a plan when assigning a tenant. At its most basic, a plan is just a set of entitlements to features and meters, and a price the tenant pays.
 
 ```bash
-curl -s -X POST http://localhost:3216/v0/plan \
+curl -X POST http://localhost:3216/v0/plan \
   -H 'content-type: application/json' \
   -d '{
-    "productLineId": "product_line_…",
+    "productLineId": "<product line ID from above>",
     "derivedFromPlanId": null,
     "name": "Starter",
-    "description": null,
+    "description": "The starter plan",
     "prices": [
       {
-        "cycleId": "cycle_…",
-        "value": {
-          "name": "Monthly subscription",
-          "description": null,
-          "amounts": [{ "currency": "USD", "unit": "cents", "value": 2900 }]
+        "cycleId": "<first cycle ID from above>",
+        "amounts": [
+          { "currency": "USD", "unit": "cents", "value": 2900 },
+          { "currency": "EUR", "unit": "cents", "value": 2500 },
+        ]
+      },
+      {
+        "cycleId": "<second cycle ID from above>",
+        "amounts": [
+          { "currency": "USD", "unit": "cents", "value": 290000 },
+          { "currency": "EUR", "unit": "cents", "value": 250000 },
+        ]
+      }
+    ],
+    "features": [
+      {
+        "featureId": "<first feature ID from above>",
+        "setTo": false
+      },
+      {
+        "featureId": "<second feature ID from above>",
+        "setTo": ["hubspot", "attio"]
+      }
+    ],
+    "meters": [
+      {
+        "meterId": "<meter ID from above>",
+        "defaultCredits": 300,
+        "limitCredits": 1000,
+        "reset": "billing_cycle_end",
+        "rollovers": 1,
+        "topUpPricesPerCredit": [
+          "startingAt": 0,
+          "prices": [
+            {
+              "cycleId": "<first cycle ID from above>",
+              "amounts": [
+                { "currency": "USD", "unit": "cents", "value": 5 },
+                { "currency": "EUR", "unit": "cents", "value": 4.3 },
+              ]
+            },
+            {
+              "cycleId": "<second cycle ID from above>",
+              "amounts": [
+                { "currency": "USD", "unit": "cents", "value": 4 },
+                { "currency": "EUR", "unit": "cents", "value": 3.4 },
+              ]
+            }
+          ],
+        ],
+        "topUpCreditPackSizes": {
+          "static": [100, 250, 500]
         }
       }
     ],
-    "features": null,
-    "meters": null,
     "addOnTypeIds": null
   }'
 ```
 
+Plans can also have add-ons, which are mini feature sets the tenant can purchase without having to upgrade their whole plan. An example could be a "project management add-on", which might let a tenant access some project management tools in-product, and connect their Asana, Monday.com, etc. We won't create any add-ons for now.
+
+## Assign a tenant
+
 Create a tenant:
 
 ```bash
-curl -s -X POST http://localhost:3216/v0/tenant \
+curl -X POST http://localhost:3216/v0/tenant \
   -H 'content-type: application/json' \
   -d '{ "externalIds": { "stripe": "cus_…" } }'
 ```
 
+Override a feature with a special value:
+
+## Check entitlements
+
 Then check what the tenant is entitled to:
 
 ```bash
-curl -s http://localhost:3216/v0/tenant/{tenantId}/entitlements
+curl http://localhost:3216/v0/tenant/{tenantId}/entitlements
 ```
+
+## Meter
 
 ## Next steps
 
