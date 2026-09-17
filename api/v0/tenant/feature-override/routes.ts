@@ -22,7 +22,7 @@ export type FeatureOverrideCreateBody = z.infer<
 const createFeatureOverrideRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/feature-override"],
+  tags: ["Tenant > Feature override"],
   summary: "Create a feature override",
   request: {
     body: {
@@ -41,7 +41,7 @@ const createFeatureOverrideRoute = createRoute({
 const listFeatureOverridesRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/feature-override"],
+  tags: ["Tenant > Feature override"],
   summary: "List feature overrides",
   responses: {
     200: {

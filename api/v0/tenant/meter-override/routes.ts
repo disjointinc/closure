@@ -55,7 +55,7 @@ const meterOverrideApiSchema = z.object({
 const createMeterOverrideRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/meter-override"],
+  tags: ["Tenant > Meter override"],
   summary: "Create a meter override",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),
@@ -75,7 +75,7 @@ const createMeterOverrideRoute = createRoute({
 const listMeterOverridesRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/meter-override"],
+  tags: ["Tenant > Meter override"],
   summary: "List meter overrides",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),

@@ -30,7 +30,7 @@ export type MeterEventCreateBody = z.infer<typeof meterEventCreateSchema>;
 const recordMeterEventRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/meter-event"],
+  tags: ["Tenant > Meter event"],
   summary: "Record a meter event",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),

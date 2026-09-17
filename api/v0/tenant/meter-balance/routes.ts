@@ -17,7 +17,7 @@ const meterBalanceSchema = z.object({
 const getMeterBalanceRoute = createRoute({
   method: "get",
   path: "/{meterId}",
-  tags: ["tenant/meter-balance"],
+  tags: ["Tenant > Meter balance"],
   summary: "Get a meter balance",
   request: {
     params: z.object({ meterId: meterIdSchema, tenantId: tenantIdSchema }),

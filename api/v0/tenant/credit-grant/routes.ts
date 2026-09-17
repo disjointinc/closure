@@ -19,7 +19,7 @@ export type CreditGrantCreateBody = z.infer<typeof creditGrantCreateSchema>;
 const createCreditGrantRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/credit-grant"],
+  tags: ["Tenant > Credit grant"],
   summary: "Create a credit grant",
   request: {
     body: {
@@ -39,7 +39,7 @@ const createCreditGrantRoute = createRoute({
 const listCreditGrantsRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/credit-grant"],
+  tags: ["Tenant > Credit grant"],
   summary: "List credit grants",
   responses: {
     200: {

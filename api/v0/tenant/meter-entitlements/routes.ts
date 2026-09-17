@@ -20,7 +20,7 @@ const meterEntitlementsSchema = z.array(
 const getMeterEntitlementsRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/meter-entitlements"],
+  tags: ["Tenant > Meter entitlements"],
   summary: "Get a tenant's resolved meter entitlements",
   responses: {
     200: {

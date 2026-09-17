@@ -41,7 +41,7 @@ export type TaskPatchBody = z.infer<typeof taskPatchSchema>;
 const createTaskRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/task"],
+  tags: ["Tenant > Task"],
   summary: "Create a task",
   request: {
     body: {
@@ -60,7 +60,7 @@ const createTaskRoute = createRoute({
 const listTasksRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/task"],
+  tags: ["Tenant > Task"],
   summary: "List tasks",
   responses: {
     200: {
@@ -73,7 +73,7 @@ const listTasksRoute = createRoute({
 const getTaskRoute = createRoute({
   method: "get",
   path: "/{taskId}",
-  tags: ["tenant/task"],
+  tags: ["Tenant > Task"],
   summary: "Get a task",
   request: {
     params: z.object({ taskId: taskIdSchema, tenantId: tenantIdSchema }),
@@ -90,7 +90,7 @@ const getTaskRoute = createRoute({
 const patchTaskRoute = createRoute({
   method: "patch",
   path: "/{taskId}",
-  tags: ["tenant/task"],
+  tags: ["Tenant > Task"],
   summary: "Patch a task",
   request: {
     params: z.object({ taskId: taskIdSchema, tenantId: tenantIdSchema }),
@@ -111,7 +111,7 @@ const patchTaskRoute = createRoute({
 const completeTaskRoute = createRoute({
   method: "post",
   path: "/{taskId}/complete",
-  tags: ["tenant/task"],
+  tags: ["Tenant > Task"],
   summary: "Complete a task",
   request: {
     params: z.object({ taskId: taskIdSchema, tenantId: tenantIdSchema }),
@@ -128,7 +128,7 @@ const completeTaskRoute = createRoute({
 const deleteTaskRoute = createRoute({
   method: "delete",
   path: "/{taskId}",
-  tags: ["tenant/task"],
+  tags: ["Tenant > Task"],
   summary: "Delete a task",
   request: {
     params: z.object({ taskId: taskIdSchema, tenantId: tenantIdSchema }),

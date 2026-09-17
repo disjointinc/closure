@@ -81,7 +81,7 @@ export type InvoiceCreateBody = z.infer<typeof invoiceCreateSchema>;
 const createInvoiceRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/invoice"],
+  tags: ["Tenant > Invoice"],
   summary: "Create an invoice",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),
@@ -102,7 +102,7 @@ const createInvoiceRoute = createRoute({
 const listInvoicesRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/invoice"],
+  tags: ["Tenant > Invoice"],
   summary: "List invoices",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),
@@ -118,7 +118,7 @@ const listInvoicesRoute = createRoute({
 const getInvoiceRoute = createRoute({
   method: "get",
   path: "/{invoiceId}",
-  tags: ["tenant/invoice"],
+  tags: ["Tenant > Invoice"],
   summary: "Get an invoice",
   request: {
     params: z.object({
@@ -138,7 +138,7 @@ const getInvoiceRoute = createRoute({
 const finalizeInvoiceRoute = createRoute({
   method: "post",
   path: "/{invoiceId}/finalize",
-  tags: ["tenant/invoice"],
+  tags: ["Tenant > Invoice"],
   summary: "Finalize an invoice",
   request: {
     params: z.object({

@@ -28,7 +28,7 @@ export type PaymentMethodCreateBody = z.infer<typeof paymentMethodCreateSchema>;
 const createPaymentMethodRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/payment-method"],
+  tags: ["Tenant > Payment method"],
   summary: "Create a payment method",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),
@@ -48,7 +48,7 @@ const createPaymentMethodRoute = createRoute({
 const listPaymentMethodsRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/payment-method"],
+  tags: ["Tenant > Payment method"],
   summary: "List payment methods",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),
@@ -64,7 +64,7 @@ const listPaymentMethodsRoute = createRoute({
 const setDefaultPaymentMethodRoute = createRoute({
   method: "post",
   path: "/{paymentMethodId}/default",
-  tags: ["tenant/payment-method"],
+  tags: ["Tenant > Payment method"],
   summary: "Set a default payment method",
   request: {
     params: z.object({
@@ -84,7 +84,7 @@ const setDefaultPaymentMethodRoute = createRoute({
 const deletePaymentMethodRoute = createRoute({
   method: "delete",
   path: "/{paymentMethodId}",
-  tags: ["tenant/payment-method"],
+  tags: ["Tenant > Payment method"],
   summary: "Delete a payment method",
   request: {
     params: z.object({

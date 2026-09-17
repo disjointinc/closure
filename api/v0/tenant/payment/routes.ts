@@ -42,7 +42,7 @@ export type PaymentPatchBody = z.infer<typeof paymentPatchSchema>;
 const createPaymentRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/payment"],
+  tags: ["Tenant > Payment"],
   summary: "Create a payment",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),
@@ -63,7 +63,7 @@ const createPaymentRoute = createRoute({
 const listPaymentsRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/payment"],
+  tags: ["Tenant > Payment"],
   summary: "List payments",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),
@@ -79,7 +79,7 @@ const listPaymentsRoute = createRoute({
 const getPaymentRoute = createRoute({
   method: "get",
   path: "/{paymentId}",
-  tags: ["tenant/payment"],
+  tags: ["Tenant > Payment"],
   summary: "Get a payment",
   request: {
     params: z.object({ paymentId: paymentIdSchema, tenantId: tenantIdSchema }),
@@ -96,7 +96,7 @@ const getPaymentRoute = createRoute({
 const patchPaymentRoute = createRoute({
   method: "patch",
   path: "/{paymentId}",
-  tags: ["tenant/payment"],
+  tags: ["Tenant > Payment"],
   summary: "Patch a payment",
   request: {
     params: z.object({ paymentId: paymentIdSchema, tenantId: tenantIdSchema }),

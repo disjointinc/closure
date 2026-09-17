@@ -75,7 +75,7 @@ export type LoanCreateBody = z.infer<typeof loanCreateSchema>;
 const createLoanRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/loan"],
+  tags: ["Tenant > Loan"],
   summary: "Create a loan",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),
@@ -97,7 +97,7 @@ const createLoanRoute = createRoute({
 const listLoansRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/loan"],
+  tags: ["Tenant > Loan"],
   summary: "List loans",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),
@@ -113,7 +113,7 @@ const listLoansRoute = createRoute({
 const getLoanRoute = createRoute({
   method: "get",
   path: "/{loanId}",
-  tags: ["tenant/loan"],
+  tags: ["Tenant > Loan"],
   summary: "Get a loan",
   request: {
     params: z.object({ loanId: loanIdSchema, tenantId: tenantIdSchema }),
@@ -130,7 +130,7 @@ const getLoanRoute = createRoute({
 const closeLoanRoute = createRoute({
   method: "patch",
   path: "/{loanId}/close",
-  tags: ["tenant/loan"],
+  tags: ["Tenant > Loan"],
   summary: "Close a loan",
   request: {
     params: z.object({ loanId: loanIdSchema, tenantId: tenantIdSchema }),
@@ -152,7 +152,7 @@ const writeOffBodySchema = z.object({
 const writeOffLoanRoute = createRoute({
   method: "patch",
   path: "/{loanId}/write-off",
-  tags: ["tenant/loan"],
+  tags: ["Tenant > Loan"],
   summary: "Write off a loan",
   request: {
     params: z.object({ loanId: loanIdSchema, tenantId: tenantIdSchema }),
@@ -173,7 +173,7 @@ const writeOffLoanRoute = createRoute({
 const listWriteOffsRoute = createRoute({
   method: "get",
   path: "/{loanId}/write-off",
-  tags: ["tenant/loan"],
+  tags: ["Tenant > Loan"],
   summary: "List a loan's write-off history",
   request: {
     params: z.object({ loanId: loanIdSchema, tenantId: tenantIdSchema }),

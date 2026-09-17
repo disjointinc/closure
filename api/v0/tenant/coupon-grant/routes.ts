@@ -20,7 +20,7 @@ export type CouponGrantCreateBody = z.infer<typeof couponGrantCreateSchema>;
 const createCouponGrantRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/coupon-grant"],
+  tags: ["Tenant > Coupon grant"],
   summary: "Create a coupon grant",
   request: {
     body: {
@@ -39,7 +39,7 @@ const createCouponGrantRoute = createRoute({
 const listCouponGrantsRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/coupon-grant"],
+  tags: ["Tenant > Coupon grant"],
   summary: "List coupon grants",
   responses: {
     200: {

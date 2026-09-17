@@ -16,7 +16,7 @@ const featureEntitlementsSchema = z.array(
 const getFeatureEntitlementsRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/feature-entitlements"],
+  tags: ["Tenant > Feature entitlements"],
   summary: "Get a tenant's resolved feature entitlements",
   responses: {
     200: {

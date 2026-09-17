@@ -49,7 +49,7 @@ export type RefundPatchBody = z.infer<typeof refundPatchSchema>;
 const createRefundRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/refund"],
+  tags: ["Tenant > Refund"],
   summary: "Create a refund",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),
@@ -70,7 +70,7 @@ const createRefundRoute = createRoute({
 const listRefundsRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/refund"],
+  tags: ["Tenant > Refund"],
   summary: "List refunds",
   request: {
     params: z.object({ tenantId: tenantIdSchema }),
@@ -86,7 +86,7 @@ const listRefundsRoute = createRoute({
 const getRefundRoute = createRoute({
   method: "get",
   path: "/{refundId}",
-  tags: ["tenant/refund"],
+  tags: ["Tenant > Refund"],
   summary: "Get a refund",
   request: {
     params: z.object({ refundId: refundIdSchema, tenantId: tenantIdSchema }),
@@ -103,7 +103,7 @@ const getRefundRoute = createRoute({
 const patchRefundRoute = createRoute({
   method: "patch",
   path: "/{refundId}",
-  tags: ["tenant/refund"],
+  tags: ["Tenant > Refund"],
   summary: "Patch a refund",
   request: {
     params: z.object({ refundId: refundIdSchema, tenantId: tenantIdSchema }),

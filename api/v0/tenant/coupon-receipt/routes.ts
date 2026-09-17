@@ -44,7 +44,7 @@ const couponReceiptApiSchema = z.object({
 const createCouponReceiptRoute = createRoute({
   method: "post",
   path: "/",
-  tags: ["tenant/coupon-receipt"],
+  tags: ["Tenant > Coupon receipt"],
   summary: "Create a coupon receipt",
   request: {
     body: {
@@ -63,7 +63,7 @@ const createCouponReceiptRoute = createRoute({
 const listCouponReceiptsRoute = createRoute({
   method: "get",
   path: "/",
-  tags: ["tenant/coupon-receipt"],
+  tags: ["Tenant > Coupon receipt"],
   summary: "List coupon receipts",
   responses: {
     200: {
@@ -78,7 +78,7 @@ const listCouponReceiptsRoute = createRoute({
 const useCouponReceiptRoute = createRoute({
   method: "post",
   path: "/{couponReceiptId}/use",
-  tags: ["tenant/coupon-receipt"],
+  tags: ["Tenant > Coupon receipt"],
   summary: "Use a coupon receipt",
   request: {
     params: z.object({
