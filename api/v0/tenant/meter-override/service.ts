@@ -13,9 +13,20 @@ import { type Value } from "../../../schemas/value.ts";
 import {
   expandTopUp,
   type TopUpApi,
+  type TopUpTierInput,
   topUpValueIds,
 } from "../../plan/service.ts";
-import type { MeterOverrideCreateBody } from "./routes.ts";
+
+/**
+ * The create-input override: microcredits, inline top-up values, and the
+ * server-stamped fields (meterOverrideId, createdAt, tenantId) omitted.
+ */
+export type MeterOverrideCreateBody = Omit<
+  MeterOverride,
+  "meterOverrideId" | "createdAt" | "tenantId" | "topUpPricesPerCredit"
+> & {
+  topUpPricesPerCredit: TopUpTierInput[] | null;
+};
 
 /** The call-surface override: top-up prices carry full values. */
 export type MeterOverrideApi = Omit<MeterOverride, "topUpPricesPerCredit"> & {
