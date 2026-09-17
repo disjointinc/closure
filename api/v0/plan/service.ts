@@ -21,7 +21,26 @@ import {
 import { generateId } from "../../lib/id.ts";
 import type { Plan, PlanMeter } from "../../schemas/plan.ts";
 import { type Value, type ValueCreateBody } from "../../schemas/value.ts";
-import type { PlanCreateBody, PlanMeterInput } from "./routes.ts";
+
+/** A top-up tier as written: prices carry inline value create-inputs. */
+export type TopUpTierInput = {
+  startingAt: number;
+  prices: { cycleId: string; value: ValueCreateBody }[];
+};
+
+/** The create-input plan meter entry: microcredits, inline top-up values. */
+export type PlanMeterInput = Omit<PlanMeter, "topUpPricesPerCredit"> & {
+  topUpPricesPerCredit: TopUpTierInput[] | null;
+};
+
+/** The create-input plan: microcredits, prices carry inline values. */
+export type PlanCreateBody = Omit<
+  Plan,
+  "planId" | "createdAt" | "deprecatedAt" | "prices" | "meters"
+> & {
+  prices: { cycleId: string; value: ValueCreateBody }[];
+  meters: PlanMeterInput[] | null;
+};
 
 export type PlanPriceApi = { cycleId: string; value: Value };
 type TopUpTierApi = { startingAt: number; prices: PlanPriceApi[] };
