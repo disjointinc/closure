@@ -279,7 +279,7 @@ curl -X POST http://localhost:3216/v0/tenant/<tenant ID from above>/feature-over
   }'
 ```
 
-Let's override a meter's plan values too. Let's bump this tenant's default seat credits to 15, and set their top up price per credit to a lower flat rate.
+Let's override a meter's assignment too. Let's bump this tenant's default seat credits to 15, and set their top up price per credit to a lower flat rate.
 
 ```bash
 curl -X POST http://localhost:3216/v0/tenant/<tenant ID from above>/meter-override \
