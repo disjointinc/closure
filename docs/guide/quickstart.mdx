@@ -357,6 +357,8 @@ curl -X POST http://localhost:3216/v0/tenant/<tenant ID from above>/meter-event 
   }'
 ```
 
+> If you're worried about sending duplicate meter events, you can pass an `externalId` associating the meter event with some unique key in another system. Closure will deduplicate events with the same `externalId`.
+
 After processing, we'll get back:
 
 1. A `succeeded` status if the meter event ran successfully.
@@ -367,8 +369,6 @@ Metering in Closure is built to run on the hot path.
 
 1. That means you can trust Closure meter events and meter balances to be blocking API calls.
 1. It also means you don't have to think about batching meter events, eventual balance correctness, etc. Just send events when you need to, and check balances when you need to; Closure should only return accurate values, and should return them fast.
-
-> If you're worried about sending duplicate meter events, you can pass an `externalId` associating the meter event with some unique key in another system. Closure will deduplicate events with the same `externalId`.
 
 ## Next steps
 
