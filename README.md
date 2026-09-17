@@ -1,6 +1,6 @@
 # Closure
 
-Real-time, configurable metering, entitlements, pricing, referrals, and billing. Built on a few principles:
+Real-time, configurable metering, feature checks, pricing, referrals, and billing. Built on a few principles:
 
 1. Pricing should be managed in code
 1. Pricing is always being tweaked
@@ -65,3 +65,16 @@ The API's database schema lives in `api/db/schema.ts` (Drizzle). To change it:
    `npm run db:migrate -w api`.
 
 Note: unlike other API changes, all web changes, and all docs changes, DB migrations must be applied before they take effect. No hot-reloading.
+
+#### Ports
+
+To change a port, set its env var before starting the stack (in your shell or
+in `bin/.env`). Everything follows it: Docker, tests, and scripts.
+
+| Env var                 | Default | Serves      |
+| ----------------------- | ------- | ----------- |
+| `CLOSURE_POSTGRES_PORT` | 54326   | Postgres    |
+| `CLOSURE_REDIS_PORT`    | 63796   | Redis       |
+| `CLOSURE_API_PORT`      | 3216    | API         |
+| `CLOSURE_WEB_PORT`      | 3226    | Web console |
+| `CLOSURE_DOCS_PORT`     | 3236    | Docs site   |
