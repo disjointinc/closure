@@ -12,7 +12,13 @@ import {
 } from "../../../cache/meter/index.ts";
 import { evaluateMeterEventRules } from "../../../cache/rule/evaluate.ts";
 import { generateId } from "../../../lib/id.ts";
-import type { MeterEventCreateBody } from "./routes.ts";
+import type { MeterEvent } from "../../../schemas/meter-event.ts";
+
+/** The create-input event: microcredits, server-stamped fields omitted. */
+export type MeterEventCreateBody = Omit<
+  MeterEvent,
+  "createdAt" | "meterEventId" | "status" | "tenantId"
+>;
 
 export async function recordEvent({
   event,

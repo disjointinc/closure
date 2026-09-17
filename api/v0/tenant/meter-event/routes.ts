@@ -1,31 +1,51 @@
 /**
  * v0/tenant/meter-event/routes.ts -- HTTP for /v0/tenant/:tenantId/meter-event:
  * request validation and wiring. Business logic lives in service.ts.
+ *
+ * The wire speaks fractional credits; the service speaks microcredits.
+ * Handlers convert at the boundary -- see api/lib/credits.ts.
  */
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 import { MeterBalanceUnavailableError } from "../../../cache/meter/index.ts";
 import { serviceUnavailableResponse } from "../../../lib/http.ts";
-import { microcredits } from "../../../schemas/common.ts";
+import {
+  credits,
+  creditsToMicrocredits,
+  microcreditsToCredits,
+} from "../../../lib/credits.ts";
 import { tenantIdSchema } from "../../../schemas/ids.ts";
 import { meterEventSchema } from "../../../schemas/meter-event.ts";
 import { recordEvent } from "./service.ts";
 
-const meterEventCreateSchema = meterEventSchema.omit({
-  createdAt: true,
-  meterEventId: true,
-  status: true,
-  tenantId: true,
-});
+const meterEventCreateWireSchema = meterEventSchema
+  .omit({
+    amountMicrocredits: true,
+    createdAt: true,
+    meterEventId: true,
+    status: true,
+    tenantId: true,
+  })
+  .extend({
+    /**
+     * Signed: positive charges credits, negative refunds them. Rounded to
+     * the nearest millionth; values that round to zero are meaningless.
+     */
+    amountCredits: credits.refine(
+      (value) => creditsToMicrocredits({ credits: value }) !== 0,
+      "amountCredits must be nonzero",
+    ),
+  });
 
-/* The ingest outcome joined onto the recorded event: the persisted status
- * and the post-decision balance (null on a redelivery whose balance key has
- * since been lost). */
-const meterEventApiSchema = meterEventSchema.extend({
-  balanceMicrocredits: microcredits.nullable(),
-});
-
-export type MeterEventCreateBody = z.infer<typeof meterEventCreateSchema>;
+/* The ingest outcome joined onto the recorded event, credit-denominated:
+ * the persisted status and the post-decision balance (null on a redelivery
+ * whose balance key has since been lost). */
+const meterEventWireApiSchema = meterEventSchema
+  .omit({ amountMicrocredits: true })
+  .extend({
+    amountCredits: credits,
+    balanceCredits: credits.nullable(),
+  });
 
 const recordMeterEventRoute = createRoute({
   method: "post",
@@ -35,13 +55,13 @@ const recordMeterEventRoute = createRoute({
   request: {
     params: z.object({ tenantId: tenantIdSchema }),
     body: {
-      content: { "application/json": { schema: meterEventCreateSchema } },
+      content: { "application/json": { schema: meterEventCreateWireSchema } },
       required: true,
     },
   },
   responses: {
     201: {
-      content: { "application/json": { schema: meterEventApiSchema } },
+      content: { "application/json": { schema: meterEventWireApiSchema } },
       description: "Created",
     },
     503: serviceUnavailableResponse,
@@ -52,17 +72,27 @@ export const meterEventApp = new OpenAPIHono<{
   Variables: { tenantId: string };
 }>().openapi(recordMeterEventRoute, async (c) => {
   const tenantId = c.get("tenantId");
-  const body = c.req.valid("json");
+  const { amountCredits, ...rest } = c.req.valid("json");
   try {
     const { balanceMicrocredits, event, status } = await recordEvent({
-      event: body,
+      event: {
+        ...rest,
+        amountMicrocredits: creditsToMicrocredits({ credits: amountCredits }),
+      },
       tenantId,
     });
+    const { amountMicrocredits, ...eventRest } = event;
     return c.json(
       {
-        ...event,
+        ...eventRest,
+        amountCredits: microcreditsToCredits({
+          microcredits: amountMicrocredits,
+        }),
         status,
-        balanceMicrocredits,
+        balanceCredits:
+          balanceMicrocredits === null
+            ? null
+            : microcreditsToCredits({ microcredits: balanceMicrocredits }),
       },
       201,
     );
