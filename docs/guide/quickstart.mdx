@@ -337,8 +337,39 @@ curl http://localhost:3216/v0/tenant/<tenant ID from above>/meter-entitlements
 
 ### Meter
 
-Metering
+First, let's check the tenant's balance on a meter. We might use this to show how much of a progress bar has been used up (i.e. 4 of 10 seats used).
+
+```bash
+curl http://localhost:3216/v0/tenant/<tenant ID from above>/meter-balance/<meter ID from above>
+```
+
+Finally, let's send a meter event. For example, if the tenant just added a user, we're going to want to send that info to the seats meter. We'll charge the user 1 seats credit.
+
+> If you want to refund credits, just pass a negative value for `amountCredits`. Closure supports fractional credit amounts, up to a millionth of a credit.
+
+```bash
+curl -X POST http://localhost:3216/v0/tenant/<tenant ID from above>/meter-event \
+  -H 'content-type: application/json' \
+  -d '{
+    "externalId": "<your idempotency key>",
+    "meterId": "<meter ID from above>",
+    "amountCredits": 1
+  }'
+```
+
+After processing, we'll get back:
+
+1. A `succeeded` status if the meter event ran successfully.
+1. An `insufficient_balance` status if the meter event was rejected because the tenant had insufficient credits.
+1. An `unexpected_error` status if something went wrong internal to Closure.
+
+Metering in Closure is built to run on the hot path.
+
+1. That means you can trust Closure meter events and meter balances to be blocking API calls.
+1. It also means you don't have to think about batching meter events, eventual balance correctness, etc. Just send events when you need to, and check balances when you need to; Closure should only return accurate values, and should return them fast.
+
+> If you're worried about sending duplicate meter events, you can pass an `externalId` associating the meter event with some unique key in another system. Closure will deduplicate events with the same `externalId`.
 
 ## Next steps
 
-Every route is in the **API reference** tab, grouped by resource — request bodies, path params, and response shapes are all rendered from the spec.
+We'll be adding more guides soon. Contributions are welcome and appreciated! Otherwise, all Closure resources are built API-first. Every route is in the **API reference** tab, grouped by resource. Enjoy building!
