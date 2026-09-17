@@ -1,27 +1,29 @@
 /**
  * v0/coupon-template/routes.ts -- HTTP for /v0/coupon-template: request
  * validation and wiring. Business logic lives in service.ts.
+ *
+ * The wire speaks fractional credits; the service speaks microcredits.
+ * Handlers convert at the boundary -- see api/lib/credits.ts.
  */
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 import { notFoundResponse } from "../../lib/http.ts";
 import {
-  featureSetTo,
-  microcredits,
-  resetSchedule,
-} from "../../schemas/common.ts";
-import {
   checkCouponTemplate,
   couponTemplateSchema,
 } from "../../schemas/coupon-template.ts";
-import {
-  couponTemplateIdSchema,
-  featureIdSchema,
-  meterIdSchema,
-} from "../../schemas/ids.ts";
+import { featureSetTo } from "../../schemas/common.ts";
+import { couponTemplateIdSchema, featureIdSchema } from "../../schemas/ids.ts";
 import { awardApiSchema } from "../award/service.ts";
 import {
+  creditGrantedToCredits,
+  creditGrantedToMicrocredits,
+  creditsGrantedWireSchema,
+} from "../coupon/routes.ts";
+import {
   createCouponTemplate,
+  type CouponTemplateApi,
+  type CouponTemplateCreateBody,
   deprecateCouponTemplate,
   getCouponTemplate,
   listCouponTemplates,
@@ -37,39 +39,60 @@ const featuresGrantedApiSchema = z
   )
   .nullable();
 
-const creditsGrantedApiSchema = z
-  .array(
-    z.object({
-      meterId: meterIdSchema,
-      amountMicrocredits: microcredits.positive(),
-      expiration: resetSchedule.nullable(),
-      rollovers: z.number().int().nonnegative().nullable(),
-      award: awardApiSchema,
-    }),
-  )
-  .nullable();
-
-/** The template shape the call surface reads: awards carry full values. */
-const couponTemplateApiSchema = z.object({
+/** The template shape the call surface reads: credits, full award values. */
+const couponTemplateWireApiSchema = z.object({
   ...couponTemplateSchema.shape,
   defaultAward: awardApiSchema.nullable(),
   featuresGranted: featuresGrantedApiSchema,
-  creditsGranted: creditsGrantedApiSchema,
+  creditsGranted: creditsGrantedWireSchema,
 });
+type CouponTemplateWireApi = z.infer<typeof couponTemplateWireApiSchema>;
 
-const couponTemplateCreateSchema = z
+const couponTemplateCreateWireSchema = z
   .object({
     ...couponTemplateSchema.shape,
     defaultAward: awardApiSchema.nullable(),
     featuresGranted: featuresGrantedApiSchema,
-    creditsGranted: creditsGrantedApiSchema,
+    creditsGranted: creditsGrantedWireSchema,
   })
   .omit({ couponTemplateId: true, createdAt: true, deprecatedAt: true })
   .superRefine(checkCouponTemplate);
 
-export type CouponTemplateCreateBody = z.infer<
-  typeof couponTemplateCreateSchema
+export type CouponTemplateCreateWireBody = z.infer<
+  typeof couponTemplateCreateWireSchema
 >;
+
+function templateCreateToMicrocredits({
+  template,
+}: {
+  template: CouponTemplateCreateWireBody;
+}): CouponTemplateCreateBody {
+  return {
+    ...template,
+    creditsGranted:
+      template.creditsGranted === null
+        ? null
+        : template.creditsGranted.map((credit) =>
+            creditGrantedToMicrocredits({ credit }),
+          ),
+  };
+}
+
+function templateApiToCredits({
+  template,
+}: {
+  template: CouponTemplateApi;
+}): CouponTemplateWireApi {
+  return {
+    ...template,
+    creditsGranted:
+      template.creditsGranted === null
+        ? null
+        : template.creditsGranted.map((credit) =>
+            creditGrantedToCredits({ credit }),
+          ),
+  };
+}
 
 const createCouponTemplateRoute = createRoute({
   method: "post",
@@ -78,13 +101,15 @@ const createCouponTemplateRoute = createRoute({
   summary: "Create a coupon template",
   request: {
     body: {
-      content: { "application/json": { schema: couponTemplateCreateSchema } },
+      content: {
+        "application/json": { schema: couponTemplateCreateWireSchema },
+      },
       required: true,
     },
   },
   responses: {
     201: {
-      content: { "application/json": { schema: couponTemplateApiSchema } },
+      content: { "application/json": { schema: couponTemplateWireApiSchema } },
       description: "Created",
     },
   },
@@ -98,7 +123,7 @@ const listCouponTemplatesRoute = createRoute({
   responses: {
     200: {
       content: {
-        "application/json": { schema: z.array(couponTemplateApiSchema) },
+        "application/json": { schema: z.array(couponTemplateWireApiSchema) },
       },
       description: "OK",
     },
@@ -113,7 +138,7 @@ const getCouponTemplateRoute = createRoute({
   request: { params: z.object({ couponTemplateId: couponTemplateIdSchema }) },
   responses: {
     200: {
-      content: { "application/json": { schema: couponTemplateApiSchema } },
+      content: { "application/json": { schema: couponTemplateWireApiSchema } },
       description: "OK",
     },
     404: notFoundResponse,
@@ -128,7 +153,7 @@ const deprecateCouponTemplateRoute = createRoute({
   request: { params: z.object({ couponTemplateId: couponTemplateIdSchema }) },
   responses: {
     200: {
-      content: { "application/json": { schema: couponTemplateApiSchema } },
+      content: { "application/json": { schema: couponTemplateWireApiSchema } },
       description: "OK",
     },
     404: notFoundResponse,
@@ -138,10 +163,17 @@ const deprecateCouponTemplateRoute = createRoute({
 export const couponTemplateApp = new OpenAPIHono()
   .openapi(createCouponTemplateRoute, async (c) => {
     const body = c.req.valid("json");
-    return c.json(await createCouponTemplate({ template: body }), 201);
+    const template = await createCouponTemplate({
+      template: templateCreateToMicrocredits({ template: body }),
+    });
+    return c.json(templateApiToCredits({ template }), 201);
   })
   .openapi(listCouponTemplatesRoute, async (c) => {
-    return c.json(await listCouponTemplates(), 200);
+    const templates = await listCouponTemplates();
+    return c.json(
+      templates.map((template) => templateApiToCredits({ template })),
+      200,
+    );
   })
   .openapi(getCouponTemplateRoute, async (c) => {
     const template = await getCouponTemplate({
@@ -150,7 +182,7 @@ export const couponTemplateApp = new OpenAPIHono()
     if (!template) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(template, 200);
+    return c.json(templateApiToCredits({ template }), 200);
   })
   .openapi(deprecateCouponTemplateRoute, async (c) => {
     const template = await deprecateCouponTemplate({
@@ -159,5 +191,5 @@ export const couponTemplateApp = new OpenAPIHono()
     if (!template) {
       return c.json({ error: "not found" }, 404);
     }
-    return c.json(template, 200);
+    return c.json(templateApiToCredits({ template }), 200);
   });
