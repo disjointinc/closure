@@ -1,10 +1,19 @@
 # Closure
 
-Real-time, configurable metering, feature checks, pricing, referrals, and billing. Built on a few principles:
+Closure is a system for metering, entitlements, and billing. Closure lets you build powerful functionality on top of these primitives, like:
+
+1. Actioning and alerting on customer lifecycle events
+1. Granting discounts and referral bonuses
+1. Experimenting with plans and pricing
+1. Processing buy-now-pay-later
+1. Modeling marginal revenue and expenses
+
+and more! It's built on a few principles:
 
 1. Pricing should be managed in code
 1. Pricing is always being tweaked
 1. Plans are versioned and immutable
+1. Assignments almost always tweak plan settings
 1. Metering shouldn't introduce a visible delay for users
 1. Metering events should be idempotent
 1. Tasks should be created immediately when metering thresholds are hit
@@ -15,13 +24,7 @@ Real-time, configurable metering, feature checks, pricing, referrals, and billin
 
 ### Guided (recommended)
 
-Sign up for free at [disjoint.com](https://www.disjoint.com). Closure is enabled by default for all Disjoint users. We do some more nice things:
-
-1. Optimize your pricing by cross-referencing with our revenue database
-1. Optimize your costs by cross-referencing with our expense database
-1. Set up entitlement and metering checks in your codebase
-1. Set up rules when your customers hit or miss usage targets
-1. Set up payment processing and taxation
+We'll be making a managed version soon.
 
 ### Self-hosted (advanced)
 
