@@ -167,7 +167,7 @@ describe("rule executor", () => {
         actions: [
           {
             type: "add_invoice_item",
-            fixedValueId: null,
+            fixedAmounts: null,
             percentageOfInvoice: 10,
           },
         ],
