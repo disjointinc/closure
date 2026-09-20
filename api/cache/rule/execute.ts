@@ -19,7 +19,7 @@
  */
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../../db/index.ts";
-import { invoices, items, ruleRuns, rules, values } from "../../db/schema.ts";
+import { invoices, items, ruleRuns, rules } from "../../db/schema.ts";
 import { idSuffixLengths } from "../../schemas/ids.ts";
 import type { FiringPayload, RuleAction } from "../../schemas/rule.ts";
 import { createTaskNotifying } from "./task-notify.ts";
@@ -139,23 +139,15 @@ async function executeAddInvoiceItem({
      * configured fee is never silently undercharged. */
     throw new Error("percentage_of_invoice fees are not yet supported");
   }
-  const valueId = action.fixedValueId;
-  if (valueId === null) {
-    throw new Error("add_invoice_item has no fixed value");
-  }
-  const [value] = await db
-    .select()
-    .from(values)
-    .where(eq(values.valueId, valueId));
-  if (!value) {
-    throw new Error(`invoice-item value ${valueId} not found`);
+  if (action.fixedAmounts === null) {
+    throw new Error("add_invoice_item has no fixed amounts");
   }
   await db
     .insert(items)
     .values({
       itemId: derivedId({ prefix: "item", ruleRunId: target.ruleRunId }),
       invoiceId: open.invoiceId,
-      perUnitValueId: valueId,
+      perUnitAmounts: action.fixedAmounts,
       units: 1,
       name: `Late fee (${target.ruleId})`,
       description: null,
