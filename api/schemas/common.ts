@@ -1,6 +1,6 @@
 import currencyCodes from "currency-codes";
 import { z } from "zod";
-import { cycleIdSchema, valueIdSchema } from "./ids.ts";
+import { cycleIdSchema } from "./ids.ts";
 
 /** Milliseconds since the unix epoch. */
 export const epochMs = z.number().int();
@@ -81,15 +81,43 @@ export const currencyAmountSchema = z.object({
 export type CurrencyAmount = z.infer<typeof currencyAmountSchema>;
 
 /**
+ * A monetary value expressed in one or more currencies, e.g.
+ * { currency: "USD", unit: "cents", value: 5250 } is $52.50. Each amount is
+ * a positive integer in that currency's smallest billable unit, and each
+ * currency may appear at most once.
+ */
+export const amountsSchema = z
+  .array(
+    currencyAmountSchema.extend({
+      value: z.number().int().positive(),
+    }),
+  )
+  .min(1)
+  .superRefine((amounts, ctx) => {
+    const seen = new Set<string>();
+    amounts.forEach((amount, index) => {
+      if (seen.has(amount.currency)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [index, "currency"],
+          message: "currencies must be unique within a value",
+        });
+      }
+      seen.add(amount.currency);
+    });
+  });
+export type Amounts = z.infer<typeof amountsSchema>;
+
+/**
  * What a feature is set to: a boolean for on/off features, or the list of
  * enabled options for enumerated features.
  */
 export const featureSetTo = z.union([z.boolean(), z.array(z.string())]);
 
-/** A price: the value charged per cycle. No id of its own. */
+/** A price: the amounts charged per cycle. No id of its own. */
 export const priceSchema = z.object({
   cycleId: cycleIdSchema,
-  valueId: valueIdSchema,
+  amounts: amountsSchema,
 });
 export type Price = z.infer<typeof priceSchema>;
 
