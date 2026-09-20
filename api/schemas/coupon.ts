@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  amountsSchema,
   durationSchema,
   epochMs,
   featureSetTo,
@@ -11,7 +12,6 @@ import {
   couponTemplateIdSchema,
   featureIdSchema,
   meterIdSchema,
-  valueIdSchema,
 } from "./ids.ts";
 
 /**
@@ -25,12 +25,12 @@ const awardDuration = {
 export const awardSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("flat_discount"),
-    valueId: valueIdSchema,
+    amounts: amountsSchema,
     ...awardDuration,
   }),
   z.object({
     type: z.literal("flat_payout"),
-    valueId: valueIdSchema,
+    amounts: amountsSchema,
     ...awardDuration,
   }),
   z.object({
