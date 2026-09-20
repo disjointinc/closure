@@ -90,7 +90,7 @@ const amounts = (name: string) =>
   jsonb(name).$type<CurrencyAmount[]>().notNull();
 
 const topUpCreditPackSizes = (name: string) =>
-  jsonb(name).$type<PlanMeter["topUpCreditPackSizes"]>();
+  jsonb(name).$type<PlanMeter["topUpCreditPackSizes"]>().notNull();
 
 export const chargedEnum = pgEnum("charged", ["upfront", "arrears"]);
 export const meterEventStatusEnum = pgEnum("meter_event_status", [
