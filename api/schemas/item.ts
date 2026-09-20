@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { itemIdSchema, valueIdSchema } from "./ids.ts";
+import { amountsSchema } from "./common.ts";
+import { itemIdSchema } from "./ids.ts";
 
 /** A line item on an invoice. */
 export const itemSchema = z.object({
   itemId: itemIdSchema,
-  perUnitValueId: valueIdSchema,
+  perUnitAmounts: amountsSchema,
   units: z.number().nonnegative(),
   name: z.string().min(1),
   description: z.string().nullable(),
