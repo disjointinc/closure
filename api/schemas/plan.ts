@@ -28,7 +28,7 @@ const topUpTierSchema = z.object({
    * defaultMicrocredits; both are checked by the parent meter entry's
    * refinement.
    */
-  startingAt: microcredits.positive(),
+  startingAt: microcredits.nonnegative(),
   prices: z.array(priceSchema).min(1),
 });
 
@@ -48,7 +48,8 @@ const topUpCreditPackSizesSchema = z.object({
         message: "maximum must be greater than minimum",
         path: ["maximum"],
       },
-    ),
+    )
+    .nullable(),
 });
 
 /**
@@ -85,7 +86,7 @@ export interface PlanMeterCheckInput {
   defaultMicrocredits: number;
   limitMicrocredits: number | null;
   topUpPricesPerCredit: unknown;
-  topUpCreditPackSizes: { dynamic: { maximum: number | null } } | null;
+  topUpCreditPackSizes: { dynamic: { maximum: number | null } | null } | null;
 }
 
 /** Cross-field rules for a plan meter entry (also reused by meter overrides). */
@@ -134,7 +135,7 @@ export function checkPlanMeter(
     });
   }
 
-  const dynamicMaximum = meter.topUpCreditPackSizes?.dynamic.maximum;
+  const dynamicMaximum = meter.topUpCreditPackSizes?.dynamic?.maximum;
   if (
     headroom !== null &&
     typeof dynamicMaximum === "number" &&
