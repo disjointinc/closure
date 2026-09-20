@@ -27,7 +27,6 @@ export const idSuffixLengths = {
   tax_type: 20,
   task_type: 20,
   treatment: 20,
-  value: 20,
   // tenants: 1e12
   tenant: 22,
   // tenant-scoped, ~1e1 per tenant -> ~1e13
@@ -113,5 +112,4 @@ export const tenantIdSchema = prefixedId("tenant");
 export const taskIdSchema = prefixedId("task");
 export const taskTypeIdSchema = prefixedId("task_type");
 export const treatmentIdSchema = prefixedId("treatment");
-export const valueIdSchema = prefixedId("value");
 export const writeOffIdSchema = prefixedId("write_off");
