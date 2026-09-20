@@ -7,7 +7,7 @@
  * - Every entity with its own id prefix is a table with a text prefixed-id
  *   primary key, plus a check constraint enforcing the id's format.
  * - Cross-entity references are real foreign keys, so resources must be
- *   created in dependency order (cycles/values before prices, plans before
+ *   created in dependency order (cycles before prices, plans before
  *   assignments, tenants before invoices, ...).
  * - Self-contained value objects (durations, awards, currency amounts,
  *   provider internals, top-up configs, ...) are jsonb columns typed with
@@ -85,6 +85,10 @@ const featureSetTo = (name: string) => jsonb(name).$type<boolean | string[]>();
 const topUpPricesPerCredit = (name: string) =>
   jsonb(name).$type<PlanMeter["topUpPricesPerCredit"]>();
 
+/** A monetary value in one or more currencies (amountsSchema). */
+const amounts = (name: string) =>
+  jsonb(name).$type<CurrencyAmount[]>().notNull();
+
 const topUpCreditPackSizes = (name: string) =>
   jsonb(name).$type<PlanMeter["topUpCreditPackSizes"]>();
 
@@ -141,19 +145,6 @@ export const teamMembers = pgTable(
 // ---------------------------------------------------------------------------
 // Core pricing entities (immutable / versioned)
 // ---------------------------------------------------------------------------
-
-export const values = pgTable(
-  "values",
-  {
-    valueId: text("value_id").primaryKey(),
-    createdAt: epochMs("created_at").notNull(),
-    deprecatedAt: epochMs("deprecated_at"),
-    name: text("name").notNull(),
-    description: text("description"),
-    amounts: jsonb("amounts").$type<CurrencyAmount[]>().notNull(),
-  },
-  (t) => [idFormatCheck("value", t.valueId)],
-);
 
 export const cycles = pgTable(
   "cycles",
@@ -315,9 +306,7 @@ export const planPrices = pgTable(
     cycleId: text("cycle_id")
       .notNull()
       .references(() => cycles.cycleId),
-    valueId: text("value_id")
-      .notNull()
-      .references(() => values.valueId),
+    amounts: amounts("amounts"),
   },
   (t) => [primaryKey({ columns: [t.planId, t.cycleId] })],
 );
@@ -409,9 +398,7 @@ export const addOnTypePrices = pgTable(
     cycleId: text("cycle_id")
       .notNull()
       .references(() => cycles.cycleId),
-    valueId: text("value_id")
-      .notNull()
-      .references(() => values.valueId),
+    amounts: amounts("amounts"),
   },
   (t) => [primaryKey({ columns: [t.addOnTypeId, t.cycleId] })],
 );
@@ -930,9 +917,7 @@ export const items = pgTable(
     invoiceId: text("invoice_id")
       .notNull()
       .references(() => invoices.invoiceId),
-    perUnitValueId: text("per_unit_value_id")
-      .notNull()
-      .references(() => values.valueId),
+    perUnitAmounts: amounts("per_unit_amounts"),
     units: doublePrecision("units").notNull(),
     name: text("name").notNull(),
     description: text("description"),
@@ -1086,9 +1071,7 @@ export const refunds = pgTable(
     byTeamMemberId: text("by_team_member_id")
       .notNull()
       .references(() => teamMembers.teamMemberId),
-    valueId: text("value_id")
-      .notNull()
-      .references(() => values.valueId),
+    amounts: amounts("amounts"),
     reason: text("reason"),
   },
   (t) => {
