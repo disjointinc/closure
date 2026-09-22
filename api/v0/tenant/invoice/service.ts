@@ -1,8 +1,8 @@
 /**
  * v0/tenant/invoice/service.ts -- invoice business logic. Invoices wrap their
  * items and taxation amounts: all are passed inline on create. Item per-unit
- * values are owned objects, read and written as full values; taxes stay
- * references. Invoices are finalized, never deleted.
+ * amounts are stored inline; taxes stay references. Invoices are finalized,
+ * never deleted.
  */
 import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "../../../db/index.ts";
@@ -11,16 +11,11 @@ import {
   items,
   taxationAmountItems,
   taxationAmounts,
-  values,
 } from "../../../db/schema.ts";
 import { generateId } from "../../../lib/id.ts";
 import type { Duration } from "../../../schemas/common.ts";
 import type { Invoice } from "../../../schemas/invoice.ts";
-import type { Item } from "../../../schemas/item.ts";
-import { type Value } from "../../../schemas/value.ts";
 import type { InvoiceCreateBody } from "./routes.ts";
-
-type InvoiceItemApi = Omit<Item, "perUnitValueId"> & { perUnitValue: Value };
 
 /** Thrown when the invoice body references a tax that does not exist. */
 export class InvoiceTaxNotFoundError extends Error {}
@@ -60,41 +55,29 @@ function isForeignKeyViolation({
   return false;
 }
 
-/** The call-surface invoice: items carry full values. */
-export type InvoiceApi =
-  | (Omit<Extract<Invoice, { charged: "upfront" }>, "items"> & {
-      items: InvoiceItemApi[];
-    })
-  | (Omit<Extract<Invoice, { charged: "arrears" }>, "items"> & {
-      items: InvoiceItemApi[];
-    });
-
 /**
  * Assemble the call-surface invoice from already-fetched rows. Items and
- * taxation amounts must belong to the invoice; valueById covers their
- * perUnitValueIds, and taxItemIdsByTax each taxation amount's item links.
+ * taxation amounts must belong to the invoice; taxItemIdsByTax holds each
+ * taxation amount's item links.
  */
 function expandInvoice({
   row,
   itemRows,
   taxRows,
-  valueById,
   taxItemIdsByTax,
 }: {
   row: typeof invoices.$inferSelect;
   itemRows: (typeof items.$inferSelect)[];
   taxRows: (typeof taxationAmounts.$inferSelect)[];
-  valueById: Map<string, Value>;
   taxItemIdsByTax: Map<string, string[]>;
-}): InvoiceApi {
+}): Invoice {
   const base = {
     invoiceId: row.invoiceId,
     createdAt: row.createdAt,
     finalizedAt: row.finalizedAt,
     items: itemRows.map((item) => ({
       itemId: item.itemId,
-      // items.per_unit_value_id FKs values, so the row always exists.
-      perUnitValue: valueById.get(item.perUnitValueId) as Value,
+      perUnitAmounts: item.perUnitAmounts,
       units: item.units,
       name: item.name,
       description: item.description,
@@ -102,7 +85,7 @@ function expandInvoice({
     taxationAmounts: taxRows.map((tax) => ({
       taxationAmountId: tax.taxationAmountId,
       taxId: tax.taxId,
-      appliesToItemIds: taxItemIdsByTax.get(tax.taxationAmountId) ?? null,
+      onlyApplyToItemIds: taxItemIdsByTax.get(tax.taxationAmountId) ?? null,
       description: tax.description,
       amount: tax.amount,
     })),
@@ -124,7 +107,7 @@ export async function getInvoice({
   invoiceId,
 }: {
   invoiceId: string;
-}): Promise<InvoiceApi | null> {
+}): Promise<Invoice | null> {
   const [row] = await db
     .select()
     .from(invoices)
@@ -140,18 +123,6 @@ export async function getInvoice({
     .select()
     .from(taxationAmounts)
     .where(eq(taxationAmounts.invoiceId, invoiceId));
-  const valueRows = itemRows.length
-    ? await db
-        .select()
-        .from(values)
-        .where(
-          inArray(
-            values.valueId,
-            itemRows.map((item) => item.perUnitValueId),
-          ),
-        )
-    : [];
-  const valueById = new Map(valueRows.map((value) => [value.valueId, value]));
   const taxItemRows = taxRows.length
     ? await db
         .select()
@@ -170,14 +141,14 @@ export async function getInvoice({
       link.itemId,
     ]);
   }
-  return expandInvoice({ row, itemRows, taxRows, valueById, taxItemIdsByTax });
+  return expandInvoice({ row, itemRows, taxRows, taxItemIdsByTax });
 }
 
 export async function listInvoices({
   tenantId,
 }: {
   tenantId: string;
-}): Promise<InvoiceApi[]> {
+}): Promise<Invoice[]> {
   const rows = await db
     .select()
     .from(invoices)
@@ -195,18 +166,6 @@ export async function listInvoices({
     .select()
     .from(taxationAmounts)
     .where(inArray(taxationAmounts.invoiceId, invoiceIds));
-  const valueRows = itemRows.length
-    ? await db
-        .select()
-        .from(values)
-        .where(
-          inArray(
-            values.valueId,
-            itemRows.map((item) => item.perUnitValueId),
-          ),
-        )
-    : [];
-  const valueById = new Map(valueRows.map((value) => [value.valueId, value]));
   const taxItemRows = taxRows.length
     ? await db
         .select()
@@ -244,7 +203,6 @@ export async function listInvoices({
       row,
       itemRows: itemsByInvoice.get(row.invoiceId) ?? [],
       taxRows: taxesByInvoice.get(row.invoiceId) ?? [],
-      valueById,
       taxItemIdsByTax,
     }),
   );
@@ -256,7 +214,7 @@ export async function createInvoice({
 }: {
   invoice: InvoiceCreateBody;
   tenantId: string;
-}): Promise<InvoiceApi | null> {
+}): Promise<Invoice | null> {
   const invoiceId = generateId({ prefix: "invoice" });
   const createdAt = Date.now();
   const charging =
@@ -284,25 +242,13 @@ export async function createInvoice({
         .onConflictDoNothing();
       const itemIds: string[] = [];
       for (const item of invoice.items) {
-        const valueId = generateId({ prefix: "value" });
         const itemId = generateId({ prefix: "item" });
-        await tx
-          .insert(values)
-          .values({
-            valueId,
-            createdAt,
-            deprecatedAt: null,
-            name: item.perUnitValue.name,
-            description: item.perUnitValue.description,
-            amounts: item.perUnitValue.amounts,
-          })
-          .onConflictDoNothing();
         await tx
           .insert(items)
           .values({
             itemId,
             invoiceId,
-            perUnitValueId: valueId,
+            perUnitAmounts: item.perUnitAmounts,
             units: item.units,
             name: item.name,
             description: item.description,
@@ -322,12 +268,12 @@ export async function createInvoice({
             amount: tax.amount,
           })
           .onConflictDoNothing();
-        if (tax.appliesToItemIndexes) {
+        if (tax.onlyApplyToItemIndexes) {
           await tx
             .insert(taxationAmountItems)
             .values(
               /* Validated in-range by invoiceCreateSchema's superRefine. */
-              tax.appliesToItemIndexes.map((itemIndex) => ({
+              tax.onlyApplyToItemIndexes.map((itemIndex) => ({
                 taxationAmountId,
                 itemId: itemIds[itemIndex],
               })),
@@ -350,7 +296,7 @@ export async function finalizeInvoice({
   invoiceId,
 }: {
   invoiceId: string;
-}): Promise<InvoiceApi | null> {
+}): Promise<Invoice | null> {
   const updated = await db
     .update(invoices)
     .set({ finalizedAt: Date.now() })

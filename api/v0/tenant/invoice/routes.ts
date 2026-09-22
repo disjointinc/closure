@@ -13,7 +13,6 @@ import {
 import { invoiceIdSchema, tenantIdSchema } from "../../../schemas/ids.ts";
 import { itemSchema } from "../../../schemas/item.ts";
 import { taxationAmountSchema } from "../../../schemas/taxation-amount.ts";
-import { valueCreateSchema, valueSchema } from "../../../schemas/value.ts";
 import {
   createInvoice,
   finalizeInvoice,
@@ -22,17 +21,15 @@ import {
   listInvoices,
 } from "./service.ts";
 
-// Items own their per-unit value: always passed as a full object.
-const itemInputSchema = itemSchema
-  .omit({ itemId: true, perUnitValueId: true })
-  .extend({ perUnitValue: valueCreateSchema });
+// Items carry their per-unit amounts inline.
+const itemInputSchema = itemSchema.omit({ itemId: true });
 
 const taxationAmountInputSchema = taxationAmountSchema
-  .omit({ appliesToItemIds: true, taxationAmountId: true })
+  .omit({ onlyApplyToItemIds: true, taxationAmountId: true })
   /* Item ids are server-minted, so taxes reference the request's items by
    * position instead. */
   .extend({
-    appliesToItemIndexes: z.array(z.number().int().nonnegative()).nullable(),
+    onlyApplyToItemIndexes: z.array(z.number().int().nonnegative()).nullable(),
   });
 
 const invoiceInputFields = {
@@ -47,11 +44,11 @@ const invoiceCreateSchema = z
   ])
   .superRefine((invoice, ctx) => {
     invoice.taxationAmounts.forEach((tax, taxIndex) => {
-      tax.appliesToItemIndexes?.forEach((itemIndex) => {
+      tax.onlyApplyToItemIndexes?.forEach((itemIndex) => {
         if (itemIndex >= invoice.items.length) {
           ctx.addIssue({
             code: "custom",
-            path: ["taxationAmounts", taxIndex, "appliesToItemIndexes"],
+            path: ["taxationAmounts", taxIndex, "onlyApplyToItemIndexes"],
             message: "item index out of range",
           });
         }
@@ -59,15 +56,11 @@ const invoiceCreateSchema = z
     });
   });
 
-const invoiceItemApiSchema = itemSchema
-  .omit({ perUnitValueId: true })
-  .extend({ perUnitValue: valueSchema });
-
 const invoiceApiFields = {
   invoiceId: invoiceIdSchema,
   createdAt: epochMs,
   finalizedAt: epochMs.nullable(),
-  items: z.array(invoiceItemApiSchema),
+  items: z.array(itemSchema),
   taxationAmounts: z.array(taxationAmountSchema),
 };
 
