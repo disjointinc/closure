@@ -10,12 +10,18 @@
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "../../db/index.ts";
-import { creditGrants, meterBalances, meterEvents } from "../../db/schema.ts";
+import {
+  creditGrants,
+  meterBalances,
+  meterEvents,
+  meterSpends,
+} from "../../db/schema.ts";
 import { redis } from "../index.ts";
 import { keys } from "../keys.ts";
 import {
   flushPendingMeterEvents,
   getMeterBalance,
+  rebuildMeterSpend,
   recordMeterEvent,
   redisTimeMicros,
   setMeterBalance,
@@ -168,6 +174,52 @@ describe("reconciler", () => {
         and(
           eq(meterBalances.tenantId, tenantId),
           eq(meterBalances.meterId, meterId),
+        ),
+      );
+  });
+
+  it("heals a negative spend delta (refunds outpacing charges)", async () => {
+    const tenantId = await makeTenant();
+    const meterId = await makeMeter();
+    // Establish the pg spend checkpoint and the Redis counter.
+    await rebuildMeterSpend({ meterId, tenantId });
+
+    // A succeeded refund lands in pg after the checkpoint without touching
+    // the Redis counter: the pg-derived delta is negative, which is
+    // legitimate for spend (net of refunds) and must heal, not skip.
+    const seeded = makeEvent({
+      amountMicrocredits: -100_000,
+      meterId,
+      tenantId,
+    });
+    await db.insert(meterEvents).values({
+      meterEventId: seeded.meterEventId,
+      externalId: seeded.externalId ?? seeded.meterEventId,
+      createdAt: seeded.createdAt,
+      receivedAtMicros: await redisTimeMicros(),
+      meterId,
+      tenantId,
+      amountMicrocredits: seeded.amountMicrocredits,
+      status: "succeeded",
+    });
+
+    const report = await reconcileMeterBalances();
+    expect(report.spendsHealed).toBeGreaterThanOrEqual(1);
+    expect(await redis.get(keys.meterSpend({ meterId, tenantId }))).toBe(
+      "-100000",
+    );
+
+    // Keep cross-run state clean.
+    await db
+      .delete(meterEvents)
+      .where(eq(meterEvents.meterEventId, seeded.meterEventId));
+    await redis.del(keys.meterSpend({ meterId, tenantId }));
+    await db
+      .delete(meterSpends)
+      .where(
+        and(
+          eq(meterSpends.tenantId, tenantId),
+          eq(meterSpends.meterId, meterId),
         ),
       );
   });

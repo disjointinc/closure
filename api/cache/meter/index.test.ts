@@ -8,10 +8,15 @@
  * test-helpers.ts for setup requirements. Files run sequentially
  * (api/vitest.config.ts).
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "../../db/index.ts";
-import { creditGrants, meterEvents, meterEventsDlq } from "../../db/schema.ts";
+import {
+  creditGrants,
+  meterEvents,
+  meterEventsDlq,
+  meterSpends,
+} from "../../db/schema.ts";
 import { meterEventSchema } from "../../schemas/meter-event.ts";
 import { redis } from "../index.ts";
 import { keys } from "../keys.ts";
@@ -411,6 +416,30 @@ describe("refunds (signed amounts)", () => {
     });
     expect(charge.status).toBe("insufficient_balance");
     expect(charge.balanceMicrocredits).toBe(50_000);
+  });
+
+  it("checkpoints a negative cumulative spend when refunds outpace charges", async () => {
+    const tenantId = await makeTenant();
+    const meterId = await makeMeter();
+
+    // Refund on a never-initialized balance: always succeeds, so net
+    // lifetime spend goes negative.
+    const refund = await recordMeterEvent({
+      event: makeEvent({ amountMicrocredits: -50_000, meterId, tenantId }),
+    });
+    expect(refund.status).toBe("succeeded");
+
+    await checkpointMeterBalances();
+    const [spendRow] = await db
+      .select()
+      .from(meterSpends)
+      .where(
+        and(
+          eq(meterSpends.tenantId, tenantId),
+          eq(meterSpends.meterId, meterId),
+        ),
+      );
+    expect(spendRow.spendMicrocredits).toBe(-50_000);
   });
 
   it("rejects zero-amount events at the schema", () => {
