@@ -23,30 +23,37 @@ export type PlanFeature = z.infer<typeof planFeatureSchema>;
 
 const topUpTierSchema = z.object({
   /**
-   * Microcredits (past the default allocation) at which this tier's prices
-   * kick in. Must be unique across tiers and <= limitMicrocredits -
-   * defaultMicrocredits; both are checked by the parent meter entry's
-   * refinement.
+   * Pack size (inclusive) at which this tier's per-credit prices kick in.
+   * Memoryless: each purchase is priced by its own size, not by cumulative
+   * spend. Must be unique across tiers and <= limitMicrocredits; both are
+   * checked by the parent meter entry's refinement.
    */
-  startingAt: microcredits.nonnegative(),
+  startingAtPackSizeMicrocredits: microcredits.nonnegative(),
   prices: z.array(priceSchema).min(1),
 });
 
 const topUpCreditPackSizesSchema = z.object({
-  static: z.array(microcredits.positive()),
+  /** Each pack must be <= limitMicrocredits (checked on the parent). */
+  static: z.array(microcredits.positive()).nullable(),
   dynamic: z
     .object({
-      interval: microcredits.positive(),
-      minimum: microcredits.positive(),
-      /** Must be > minimum and <= limit - default (checked on the parent). */
-      maximum: microcredits.positive().nullable(),
+      packSizeIntervalMicrocredits: microcredits.positive(),
+      minimumPackSizeMicrocredits: microcredits.positive(),
+      /**
+       * Must be > minimumPackSizeMicrocredits and <= limitMicrocredits
+       * (checked on the parent).
+       */
+      maximumPackSizeMicrocredits: microcredits.positive().nullable(),
     })
     .refine(
       (dynamic) =>
-        dynamic.maximum === null || dynamic.maximum > dynamic.minimum,
+        dynamic.maximumPackSizeMicrocredits === null ||
+        dynamic.maximumPackSizeMicrocredits >
+          dynamic.minimumPackSizeMicrocredits,
       {
-        message: "maximum must be greater than minimum",
-        path: ["maximum"],
+        message:
+          "maximumPackSizeMicrocredits must be greater than minimumPackSizeMicrocredits",
+        path: ["maximumPackSizeMicrocredits"],
       },
     )
     .nullable(),
@@ -71,7 +78,7 @@ export const planMeterFields = {
   rollovers: z.number().int().nonnegative().nullable(),
   /** Usage tiers with their own prices. */
   topUpPricesPerCredit: z.array(topUpTierSchema).min(1).nullable(),
-  topUpCreditPackSizes: topUpCreditPackSizesSchema.nullable(),
+  topUpCreditPackSizes: topUpCreditPackSizesSchema,
 };
 
 const planMeterObject = z.object(planMeterFields);
@@ -86,7 +93,10 @@ export interface PlanMeterCheckInput {
   defaultMicrocredits: number;
   limitMicrocredits: number | null;
   topUpPricesPerCredit: unknown;
-  topUpCreditPackSizes: { dynamic: { maximum: number | null } | null } | null;
+  topUpCreditPackSizes: {
+    static: number[] | null;
+    dynamic: { maximumPackSizeMicrocredits: number | null } | null;
+  };
 }
 
 /** Cross-field rules for a plan meter entry (also reused by meter overrides). */
@@ -104,48 +114,73 @@ export function checkPlanMeter(
       message: "limitMicrocredits must be >= defaultMicrocredits",
     });
   }
-  // Headroom: how many microcredits above the default allocation a tenant
-  // can hold. Null limit means unlimited, which permits any tier/maximum.
-  // Integer arithmetic, so this difference is exact.
-  const headroom =
-    meter.limitMicrocredits === null
-      ? null
-      : meter.limitMicrocredits - meter.defaultMicrocredits;
+  // limitMicrocredits caps cumulative top-up purchases, so no pack-size
+  // value may exceed it. Null limit means unlimited, which permits any
+  // tier threshold or pack size.
 
   const tiers = meter.topUpPricesPerCredit;
   if (Array.isArray(tiers)) {
     const seen = new Set<number>();
-    (tiers as { startingAt: number }[]).forEach((tier, index) => {
-      if (seen.has(tier.startingAt)) {
+    (tiers as { startingAtPackSizeMicrocredits: number }[]).forEach(
+      (tier, index) => {
+        if (seen.has(tier.startingAtPackSizeMicrocredits)) {
+          ctx.addIssue({
+            code: "custom",
+            path: [
+              "topUpPricesPerCredit",
+              index,
+              "startingAtPackSizeMicrocredits",
+            ],
+            message:
+              "startingAtPackSizeMicrocredits values must be unique across tiers",
+          });
+        }
+        seen.add(tier.startingAtPackSizeMicrocredits);
+        if (
+          meter.limitMicrocredits !== null &&
+          tier.startingAtPackSizeMicrocredits > meter.limitMicrocredits
+        ) {
+          ctx.addIssue({
+            code: "custom",
+            path: [
+              "topUpPricesPerCredit",
+              index,
+              "startingAtPackSizeMicrocredits",
+            ],
+            message:
+              "startingAtPackSizeMicrocredits must be <= limitMicrocredits",
+          });
+        }
+      },
+    );
+  }
+
+  if (meter.limitMicrocredits !== null) {
+    meter.topUpCreditPackSizes.static?.forEach((pack, index) => {
+      if (
+        typeof meter.limitMicrocredits === "number" &&
+        pack > meter.limitMicrocredits
+      ) {
         ctx.addIssue({
           code: "custom",
-          path: ["topUpPricesPerCredit", index, "startingAt"],
-          message: "startingAt values must be unique across tiers",
-        });
-      }
-      seen.add(tier.startingAt);
-      if (headroom !== null && tier.startingAt > headroom) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["topUpPricesPerCredit", index, "startingAt"],
-          message:
-            "startingAt must be <= limitMicrocredits - defaultMicrocredits",
+          path: ["topUpCreditPackSizes", "static", index],
+          message: "static pack sizes must be <= limitMicrocredits",
         });
       }
     });
   }
 
-  const dynamicMaximum = meter.topUpCreditPackSizes?.dynamic?.maximum;
   if (
-    headroom !== null &&
-    typeof dynamicMaximum === "number" &&
-    dynamicMaximum > headroom
+    meter.limitMicrocredits !== null &&
+    typeof meter.topUpCreditPackSizes.dynamic?.maximumPackSizeMicrocredits ===
+      "number" &&
+    meter.topUpCreditPackSizes.dynamic?.maximumPackSizeMicrocredits >
+      meter.limitMicrocredits
   ) {
     ctx.addIssue({
       code: "custom",
-      path: ["topUpCreditPackSizes", "dynamic", "maximum"],
-      message:
-        "dynamic maximum must be <= limitMicrocredits - defaultMicrocredits",
+      path: ["topUpCreditPackSizes", "dynamic", "maximumPackSizeMicrocredits"],
+      message: "maximumPackSizeMicrocredits must be <= limitMicrocredits",
     });
   }
 }
