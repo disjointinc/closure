@@ -69,7 +69,6 @@ function toApiLoan({
   writeOff: WriteOffEvent | null;
 }): LoanApi {
   /* writeOffId stays internal: the API loan embeds the event itself. */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { writeOffId, ...fields } = row;
   return { ...fields, writeOff, due, installments };
 }
