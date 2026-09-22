@@ -264,15 +264,8 @@ export async function reconcileMeterBalances(): Promise<ReconcileReport> {
       tenantId: tenant,
     });
     const expected = eventsTotal - (pendingDebitByKey.get(balanceKey) ?? 0);
-    if (expected < 0) {
-      console.error("pg-derived spend delta is negative; skipping heal", {
-        eventsTotal,
-        expected,
-        meter,
-        tenant,
-      });
-      continue;
-    }
+    /* Negative is legitimate: refunds outnumbering charges since the
+     * checkpoint drive the delta below zero. */
     report.spendsChecked += 1;
     const drift = expected - Number(actual);
     if (drift !== 0) {
