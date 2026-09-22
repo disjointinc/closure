@@ -14,14 +14,17 @@ import {
   microcreditsToCredits,
 } from "../../lib/credits.ts";
 import { featureSetTo, resetSchedule } from "../../schemas/common.ts";
-import { checkCoupon, couponSchema } from "../../schemas/coupon.ts";
+import {
+  awardSchema,
+  checkCoupon,
+  couponSchema,
+} from "../../schemas/coupon.ts";
 import {
   couponIdSchema,
   couponTemplateIdSchema,
   featureIdSchema,
   meterIdSchema,
 } from "../../schemas/ids.ts";
-import { awardApiSchema } from "../award/service.ts";
 import {
   createCoupon,
   type CouponApi,
@@ -39,7 +42,7 @@ export const creditsGrantedWireSchema = z
       amountCredits: creditsPositive,
       expiration: resetSchedule.nullable(),
       rollovers: z.number().int().nonnegative().nullable(),
-      award: awardApiSchema,
+      award: awardSchema,
     }),
   )
   .nullable();
@@ -79,7 +82,7 @@ const featuresGrantedSchema = z
     z.object({
       featureId: featureIdSchema,
       setTo: featureSetTo,
-      award: awardApiSchema,
+      award: awardSchema,
     }),
   )
   .nullable();
@@ -90,7 +93,7 @@ const couponDefinitionWireFields = {
   limitPerGrantingTenant: z.number().int().positive().nullable(),
   name: z.string().min(1),
   description: z.string().nullable(),
-  defaultAward: awardApiSchema.nullable(),
+  defaultAward: awardSchema.nullable(),
   featuresGranted: featuresGrantedSchema,
   creditsGranted: creditsGrantedWireSchema,
   /** Only settable when grantableByTenants. */
@@ -122,7 +125,7 @@ export type CouponCreateWireBody = z.infer<typeof couponCreateWireSchema>;
 const couponWireApiSchema = z.object({
   // couponSchema is refined, so rebuild its shape rather than .extend() it.
   ...couponSchema.shape,
-  defaultAward: awardApiSchema.nullable(),
+  defaultAward: awardSchema.nullable(),
   featuresGranted: featuresGrantedSchema,
   creditsGranted: creditsGrantedWireSchema,
 });
