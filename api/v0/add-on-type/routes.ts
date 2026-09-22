@@ -6,8 +6,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 import { invalidResponse, notFoundResponse } from "../../lib/http.ts";
 import { addOnTypeSchema } from "../../schemas/add-on-type.ts";
-import { addOnTypeIdSchema, cycleIdSchema } from "../../schemas/ids.ts";
-import { valueCreateSchema, valueSchema } from "../../schemas/value.ts";
+import { addOnTypeIdSchema } from "../../schemas/ids.ts";
 import {
   createAddOnType,
   deprecateAddOnType,
@@ -15,23 +14,17 @@ import {
   listAddOnTypes,
 } from "./service.ts";
 
-// The call surface for prices: an existing cycle id plus the owned value
-// inline. Cycles are first-class (referenced by id); values are owned by
-// the add-on type, so they're always written and read as full objects.
-export const addOnTypeApiSchema = addOnTypeSchema.extend({
-  prices: z.array(z.object({ cycleId: cycleIdSchema, value: valueSchema })),
-});
+// The call surface for prices: an existing cycle id plus inline amounts.
+export const addOnTypeApiSchema = addOnTypeSchema;
 
 export type AddOnTypeApi = z.infer<typeof addOnTypeApiSchema>;
 
-/** Create-input: the server mints the add-on type and value ids and stamps times. */
-const addOnTypeCreateSchema = addOnTypeSchema
-  .omit({ addOnTypeId: true, createdAt: true, deprecatedAt: true })
-  .extend({
-    prices: z.array(
-      z.object({ cycleId: cycleIdSchema, value: valueCreateSchema }),
-    ),
-  });
+/** Create-input: the server mints the add-on type id and stamps times. */
+const addOnTypeCreateSchema = addOnTypeSchema.omit({
+  addOnTypeId: true,
+  createdAt: true,
+  deprecatedAt: true,
+});
 
 export type AddOnTypeCreateBody = z.infer<typeof addOnTypeCreateSchema>;
 
