@@ -18,17 +18,14 @@ import {
 } from "../../lib/credits.ts";
 import { durationSchema } from "../../schemas/common.ts";
 import { meterIdSchema, ruleIdSchema } from "../../schemas/ids.ts";
-import { checkRule, type RuleTrigger, ruleSchema } from "../../schemas/rule.ts";
 import {
-  createRule,
-  deprecateRule,
-  getRule,
-  listRules,
-  type RuleActionApi,
-  type RuleApi,
-  ruleApiSchema,
-  type RuleCreateBody,
-} from "./service.ts";
+  checkRule,
+  type Rule,
+  type RuleAction,
+  type RuleTrigger,
+  ruleSchema,
+} from "../../schemas/rule.ts";
+import { createRule, deprecateRule, getRule, listRules } from "./service.ts";
 
 /** An absolute amount (credits on the wire), or a percentage of allocation. */
 const amountOrPercentageWireSchema = z.union([
@@ -162,11 +159,7 @@ function triggerToCredits({
   return trigger;
 }
 
-function actionToMicrocredits({
-  action,
-}: {
-  action: RuleActionApi;
-}): RuleActionApi {
+function actionToMicrocredits({ action }: { action: RuleAction }): RuleAction {
   if (action.type !== "create_task") {
     return action;
   }
@@ -186,7 +179,7 @@ function actionToMicrocredits({
   };
 }
 
-function actionToCredits({ action }: { action: RuleActionApi }): RuleActionApi {
+function actionToCredits({ action }: { action: RuleAction }): RuleAction {
   if (action.type !== "create_task") {
     return action;
   }
@@ -206,12 +199,23 @@ function actionToCredits({ action }: { action: RuleActionApi }): RuleActionApi {
   };
 }
 
+/**
+ * The create-input rule: the server mints ruleId and stamps times. The
+ * trigger/actions fields are the internal (microcredits-named) shapes; the
+ * wire create schema overrides them with credit-named twins.
+ */
+export const ruleCreateSchema = z
+  .object(ruleSchema.shape)
+  .omit({ ruleId: true, createdAt: true, deprecatedAt: true })
+  .superRefine((rule, ctx) => checkRule(rule, ctx));
+export type RuleCreateBody = z.infer<typeof ruleCreateSchema>;
+
 const ruleCreateWireSchema = z
   .object(ruleSchema.shape)
   .omit({ ruleId: true, createdAt: true, deprecatedAt: true })
   .extend({
     trigger: ruleTriggerWireSchema,
-    actions: ruleApiSchema.shape.actions,
+    actions: ruleCreateSchema.shape.actions,
   })
   .superRefine(checkRuleWire);
 type RuleCreateWireBody = z.infer<typeof ruleCreateWireSchema>;
@@ -219,7 +223,7 @@ type RuleCreateWireBody = z.infer<typeof ruleCreateWireSchema>;
 /** The rule shape the call surface reads: credit-named and -denominated. */
 const ruleWireApiResponseSchema = z.object(ruleSchema.shape).extend({
   trigger: ruleTriggerWireSchema,
-  actions: ruleApiSchema.shape.actions,
+  actions: ruleCreateSchema.shape.actions,
 });
 type RuleWireApi = z.infer<typeof ruleWireApiResponseSchema>;
 
@@ -235,7 +239,7 @@ function ruleCreateToMicrocredits({
   };
 }
 
-function ruleApiToCredits({ rule }: { rule: RuleApi }): RuleWireApi {
+function ruleApiToCredits({ rule }: { rule: Rule }): RuleWireApi {
   return {
     ...rule,
     trigger: triggerToCredits({ trigger: rule.trigger }),
