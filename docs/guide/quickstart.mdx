@@ -41,7 +41,7 @@ curl -X POST http://localhost:3216/v0/feature \
     "name": "Slack alerts",
     "description": "Send the tenant alerts in Slack",
     "options": null,
-    "applicableTaxTypeIds": null,
+    "applicableTaxTypeIds": []
   }'
 ```
 
@@ -72,7 +72,7 @@ curl -X POST http://localhost:3216/v0/feature \
         "description": null
       }
     ],
-    "applicableTaxTypeIds": null,
+    "applicableTaxTypeIds": []
   }'
 ```
 
@@ -85,13 +85,13 @@ curl -X POST http://localhost:3216/v0/meter \
     "productLineIds": ["<product line ID from above>"],
     "name": "Seats",
     "description": "The number of users on a tenant",
-    "applicableTaxTypeIds": null,
+    "applicableTaxTypeIds": []
   }'
 ```
 
 There are many important things to define for this meter: its default balance, the maximum number of credits a tenant can spend, whether and when the meter resets, the marginal cost of top-up credits, etc. However, these values all vary plan-by-plan, so we set them when creating the plan, not when creating the meter.
 
-Finally, let's create a billing cycle. Some SaaS businesses wait until the end of a billing cycle to tally up costs (billing in arrears), while some bill you upfront before you're granted access.
+Now, let's create a billing cycle. Some SaaS businesses wait until the end of a billing cycle to tally up costs (billing in arrears), while some bill you upfront before you're granted access.
 
 ```bash
 curl -X POST http://localhost:3216/v0/cycle \
@@ -121,6 +121,18 @@ curl -X POST http://localhost:3216/v0/cycle \
   }'
 ```
 
+One last step: create a team member in your organization. We'll be adding feature and meter overrides later, and for auditability, we want to know who on our team landed an override.
+
+```bash
+curl -X POST http://localhost:3216/v0/team-member \
+  -H 'content-type: application/json' \
+  -d '{
+    "email": "colin@example.com",
+    "name": "Colin",
+    "profilePictureUrl": null
+  }'
+```
+
 ### Building the plan
 
 A plan is the core model of "how do people pay us, and what do they get in return."
@@ -143,14 +155,14 @@ curl -X POST http://localhost:3216/v0/plan \
         "cycleId": "<first cycle ID from above>",
         "amounts": [
           { "currency": "USD", "unit": "cents", "value": 2900 },
-          { "currency": "EUR", "unit": "cents", "value": 2500 },
+          { "currency": "EUR", "unit": "cents", "value": 2500 }
         ]
       },
       {
         "cycleId": "<second cycle ID from above>",
         "amounts": [
           { "currency": "USD", "unit": "cents", "value": 290000 },
-          { "currency": "EUR", "unit": "cents", "value": 250000 },
+          { "currency": "EUR", "unit": "cents", "value": 250000 }
         ]
       }
     ],
@@ -173,50 +185,51 @@ curl -X POST http://localhost:3216/v0/plan \
         "rollovers": 1,
         "topUpPricesPerCredit": [
           {
-            "startingAt": 0,
+            "startingAtPackSizeCredits": 0,
             "prices": [
               {
                 "cycleId": "<first cycle ID from above>",
                 "amounts": [
                   { "currency": "USD", "unit": "cents", "value": 500 },
-                  { "currency": "EUR", "unit": "cents", "value": 430 },
+                  { "currency": "EUR", "unit": "cents", "value": 430 }
                 ]
               },
               {
                 "cycleId": "<second cycle ID from above>",
                 "amounts": [
                   { "currency": "USD", "unit": "cents", "value": 400 },
-                  { "currency": "EUR", "unit": "cents", "value": 340 },
+                  { "currency": "EUR", "unit": "cents", "value": 340 }
                 ]
               }
             ],
           },
           {
-            "startingAt": 10,
+            "startingAtPackSizeCredits": 10,
             "prices": [
               {
                 "cycleId": "<first cycle ID from above>",
                 "amounts": [
                   { "currency": "USD", "unit": "cents", "value": 400 },
-                  { "currency": "EUR", "unit": "cents", "value": 340 },
+                  { "currency": "EUR", "unit": "cents", "value": 340 }
                 ]
               },
               {
                 "cycleId": "<second cycle ID from above>",
                 "amounts": [
                   { "currency": "USD", "unit": "cents", "value": 350 },
-                  { "currency": "EUR", "unit": "cents", "value": 300 },
+                  { "currency": "EUR", "unit": "cents", "value": 300 }
                 ]
               }
             ]
           }
         ],
         "topUpCreditPackSizes": {
-          "static": [1, 5, 10, 20]
+          "static": [1, 5, 10, 20],
+          "dynamic": null
         }
       }
     ],
-    "addOnTypeIds": null
+    "addOnTypeIds": []
   }'
 ```
 
@@ -244,7 +257,7 @@ curl -X POST http://localhost:3216/v0/tenant \
   -d '{
     "externalIds": {
       "userId": "<user ID in your database>",
-      "stripeCustomerId": "<customer ID in Stripe>",
+      "stripeCustomerId": "<customer ID in Stripe>"
     }
   }'
 ```
@@ -275,7 +288,9 @@ curl -X POST http://localhost:3216/v0/tenant/<tenant ID from above>/feature-over
   -H 'content-type: application/json' \
   -d '{
     "featureId": "<second feature ID from above>",
-    "setTo": ["hubspot", "attio", "salesforce"]
+    "setTo": ["hubspot", "attio", "salesforce"],
+    "byTeamMemberId": "<team member ID from above>",
+    "reason": null
   }'
 ```
 
@@ -292,28 +307,31 @@ curl -X POST http://localhost:3216/v0/tenant/<tenant ID from above>/meter-overri
     "rollovers": 1,
     "topUpPricesPerCredit": [
       {
-        "startingAt": 0,
+        "startingAtPackSizeCredits": 0,
         "prices": [
           {
             "cycleId": "<first cycle ID from above>",
             "amounts": [
               { "currency": "USD", "unit": "cents", "value": 400 },
-              { "currency": "EUR", "unit": "cents", "value": 340 },
+              { "currency": "EUR", "unit": "cents", "value": 340 }
             ]
           },
           {
             "cycleId": "<second cycle ID from above>",
             "amounts": [
               { "currency": "USD", "unit": "cents", "value": 350 },
-              { "currency": "EUR", "unit": "cents", "value": 300 },
+              { "currency": "EUR", "unit": "cents", "value": 300 }
             ]
           }
         ]
       }
     ],
     "topUpCreditPackSizes": {
-      "static": [1, 5, 10, 20]
-    }
+      "static": [1, 5, 10, 20],
+      "dynamic": null
+    },
+    "byTeamMemberId": "<team member ID from above>",
+    "reason": null
   }'
 ```
 
