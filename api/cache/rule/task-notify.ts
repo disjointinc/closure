@@ -71,7 +71,7 @@ export async function deliverTaskNotification({
   type: TaskType;
 }): Promise<void> {
   const message = renderMessage({ event, task });
-  for (const target of type.integrations ?? []) {
+  for (const target of type.integrations) {
     try {
       if (target.system === "slack") {
         await deliverSlack({ channel: target.channel, message });
@@ -123,7 +123,7 @@ export async function createTaskNotifying({
     assignedToTeamMemberId,
     deletedAt: null,
     completedAt: null,
-    externalRefs: null,
+    externalRefs: [],
   };
   await db.insert(tasks).values(row).onConflictDoNothing();
   if (type) {

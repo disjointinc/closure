@@ -44,7 +44,7 @@ async function makeTaskType(): Promise<string> {
     createdAt: Date.now(),
     deprecatedAt: null,
     defaultAssigneeTeamMemberId: null,
-    integrations: null,
+    integrations: [],
     name: "Executor test type",
     description: null,
   });

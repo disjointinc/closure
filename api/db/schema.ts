@@ -83,7 +83,7 @@ const featureSetTo = (name: string) => jsonb(name).$type<boolean | string[]>();
 
 /** A price per usage tier (plan meter top-ups). */
 const topUpPricesPerCredit = (name: string) =>
-  jsonb(name).$type<PlanMeter["topUpPricesPerCredit"]>();
+  jsonb(name).$type<PlanMeter["topUpPricesPerCredit"]>().notNull();
 
 /** A monetary value in one or more currencies (amountsSchema). */
 const amounts = (name: string) =>
@@ -586,10 +586,9 @@ export const experiments = pgTable(
     createdAt: epochMs("created_at").notNull(),
     concludedAt: epochMs("concluded_at"),
     /** The plan to set per product line on conclusion (planId null = end). */
-    concludingPlans:
-      jsonb("concluding_plans").$type<
-        { productLineId: string; planId: string | null }[]
-      >(),
+    concludingPlans: jsonb("concluding_plans")
+      .$type<{ productLineId: string; planId: string | null }[]>()
+      .notNull(),
     name: text("name").notNull(),
     description: text("description"),
   },
@@ -682,7 +681,7 @@ export const taskTypes = pgTable(
     defaultAssigneeTeamMemberId: text(
       "default_assignee_team_member_id",
     ).references(() => teamMembers.teamMemberId),
-    integrations: jsonb("integrations").$type<IntegrationTarget[]>(),
+    integrations: jsonb("integrations").$type<IntegrationTarget[]>().notNull(),
     name: text("name").notNull(),
     description: text("description"),
   },
@@ -1194,7 +1193,7 @@ export const tasks = pgTable(
       () => teamMembers.teamMemberId,
     ),
     completedAt: epochMs("completed_at"),
-    externalRefs: jsonb("external_refs").$type<ExternalRef[]>(),
+    externalRefs: jsonb("external_refs").$type<ExternalRef[]>().notNull(),
   },
   (t) => [
     idFormatCheck("task", t.taskId),
