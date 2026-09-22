@@ -193,7 +193,7 @@ export async function createPlan({
       )
       .onConflictDoNothing();
   }
-  if (plan.addOnTypeIds) {
+  if (plan.addOnTypeIds.length > 0) {
     await db
       .insert(planAddOnTypes)
       .values(
