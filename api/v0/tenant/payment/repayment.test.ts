@@ -1,6 +1,6 @@
 import { getTableColumns, type Table } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { paymentLoans, payments, refunds, values } from "../../../db/schema.ts";
+import { paymentLoans, payments, refunds } from "../../../db/schema.ts";
 import { applyLoanPayment, reverseLoanPayment } from "../loan/servicing.ts";
 import { patchRefund } from "../refund/service.ts";
 import { createPayment, patchPayment } from "./service.ts";
@@ -61,15 +61,8 @@ const settledPaymentLoan = {
   principalAmount: 70,
   interestAmount: 30,
 };
-const value = {
-  amounts: [{ ...amount, value: 80 }],
-  createdAt: 1,
-  deprecatedAt: null,
-  description: null,
-  name: "Refund",
-  valueId: `value_${"a".repeat(20)}`,
-};
 const refund = {
+  amounts: [{ ...amount, value: 80 }],
   byTeamMemberId: `team_member_${"a".repeat(16)}`,
   createdAt: 1,
   failedAt: null,
@@ -81,7 +74,6 @@ const refund = {
   startedProcessingAt: null,
   succeededAt: null,
   tenantId,
-  valueId: value.valueId,
 };
 const settledRefund = {
   ...refund,
@@ -107,7 +99,6 @@ const settledPaymentLoanRow = row({
 });
 const refundRow = row({ data: refund, table: refunds });
 const settledRefundRow = row({ data: settledRefund, table: refunds });
-const valueRow = row({ data: value, table: values });
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -212,19 +203,16 @@ describe("repayment integration (isolated)", () => {
       [refundRow],
       [settledPaymentRow],
       [refundRow],
-      [valueRow],
       [settledPaymentLoanRow],
       [],
       [settledPaymentLoanRow],
       [[loanId]],
       [],
       [settledRefundRow],
-      [valueRow],
       [settledRefundRow],
       [settledPaymentRow],
       [settledRefundRow],
       [settledRefundRow],
-      [valueRow],
     ]) {
       query.mockResolvedValueOnce({ rows });
     }
@@ -252,10 +240,10 @@ describe("repayment integration (isolated)", () => {
     expect(
       locks.slice(0, 3).map(([sql]) => sql.match(/from "(\w+)"/)?.[1]),
     ).toEqual(["payments", "refunds", "loans"]);
-    expect(query.mock.calls[5][0]).toContain(
+    expect(query.mock.calls[4][0]).toContain(
       '"refunds"."succeeded_at" is not null',
     );
-    expect(query.mock.calls[5][1]).toEqual([paymentId, tenantId]);
+    expect(query.mock.calls[4][1]).toEqual([paymentId, tenantId]);
   });
 
   it.each(["payment", "refund"])(
@@ -269,7 +257,6 @@ describe("repayment integration (isolated)", () => {
               [refundRow],
               [settledPaymentRow],
               [refundRow],
-              [valueRow],
               [settledPaymentLoanRow],
               [],
               [settledPaymentLoanRow],
