@@ -1,8 +1,7 @@
 /**
- * v0/plan/service.ts -- plan business logic. The call surface passes prices
- * (including inside meter top-up tiers) as full inline values; cycles are
- * first-class and referenced by id. Plans are immutable and versioned
- * (derivedFromPlanId), so deletes deprecate.
+ * v0/plan/service.ts -- plan business logic. Cycles are first-class and
+ * referenced by id. Plans are immutable and versioned (derivedFromPlanId),
+ * so deletes deprecate.
  */
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../../db/index.ts";
@@ -16,112 +15,21 @@ import {
   planPrices,
   plans,
   productLines,
-  values,
 } from "../../db/schema.ts";
 import { generateId } from "../../lib/id.ts";
 import type { Plan, PlanMeter } from "../../schemas/plan.ts";
-import { type Value, type ValueCreateBody } from "../../schemas/value.ts";
 
-/** A top-up tier as written: prices carry inline value create-inputs. */
-export type TopUpTierInput = {
-  startingAt: number;
-  prices: { cycleId: string; value: ValueCreateBody }[];
-};
+/** The create-input plan meter entry: microcredits. */
+export type PlanMeterInput = PlanMeter;
 
-/** The create-input plan meter entry: microcredits, inline top-up values. */
-export type PlanMeterInput = Omit<PlanMeter, "topUpPricesPerCredit"> & {
-  topUpPricesPerCredit: TopUpTierInput[] | null;
-};
-
-/** The create-input plan: microcredits, prices carry inline values. */
+/** The create-input plan: microcredits; server mints planId and stamps times. */
 export type PlanCreateBody = Omit<
   Plan,
-  "planId" | "createdAt" | "deprecatedAt" | "prices" | "meters"
-> & {
-  prices: { cycleId: string; value: ValueCreateBody }[];
-  meters: PlanMeterInput[] | null;
-};
+  "planId" | "createdAt" | "deprecatedAt"
+>;
 
-export type PlanPriceApi = { cycleId: string; value: Value };
-type TopUpTierApi = { startingAt: number; prices: PlanPriceApi[] };
-export type TopUpApi = TopUpTierApi[] | null;
-export type PlanMeterApi = Omit<PlanMeter, "topUpPricesPerCredit"> & {
-  topUpPricesPerCredit: TopUpApi;
-};
-export type PlanApi = Omit<Plan, "prices" | "meters"> & {
-  prices: PlanPriceApi[];
-  meters: PlanMeterApi[] | null;
-};
-
-/** Store an inline value, returning the minted value id. */
-async function insertValue({
-  value,
-}: {
-  value: ValueCreateBody;
-}): Promise<string> {
-  const valueId = generateId({ prefix: "value" });
-  await db
-    .insert(values)
-    .values({
-      valueId,
-      createdAt: Date.now(),
-      deprecatedAt: null,
-      ...value,
-    })
-    .onConflictDoNothing();
-  return valueId;
-}
-
-/** Store the inline values, returning the db-ready meter entry. */
-async function resolveMeter({
-  meter,
-}: {
-  meter: PlanMeterInput;
-}): Promise<PlanMeter> {
-  const topUps = meter.topUpPricesPerCredit;
-  if (topUps === null) {
-    return { ...meter, topUpPricesPerCredit: null };
-  }
-  return {
-    ...meter,
-    topUpPricesPerCredit: await Promise.all(
-      topUps.map(async (tier) => ({
-        startingAt: tier.startingAt,
-        prices: await Promise.all(
-          tier.prices.map(async (price) => ({
-            cycleId: price.cycleId,
-            valueId: await insertValue({ value: price.value }),
-          })),
-        ),
-      })),
-    ),
-  };
-}
-
-export function topUpValueIds(
-  topUp: PlanMeter["topUpPricesPerCredit"],
-): string[] {
-  if (topUp === null) {
-    return [];
-  }
-  return topUp.flatMap((tier) => tier.prices.map((price) => price.valueId));
-}
-
-export function expandTopUp(
-  topUp: PlanMeter["topUpPricesPerCredit"],
-  valueFor: (valueId: string) => Value,
-): TopUpApi {
-  if (topUp === null) {
-    return null;
-  }
-  return topUp.map((tier) => ({
-    startingAt: tier.startingAt,
-    prices: tier.prices.map((price) => ({
-      cycleId: price.cycleId,
-      value: valueFor(price.valueId),
-    })),
-  }));
-}
+export type PlanMeterApi = PlanMeter;
+export type PlanApi = Plan;
 
 export async function getPlan({
   planId,
@@ -148,18 +56,6 @@ export async function getPlan({
     .select()
     .from(planAddOnTypes)
     .where(eq(planAddOnTypes.planId, planId));
-  const valueIds = [
-    ...priceRows.map((price) => price.valueId),
-    ...meterRows.flatMap((meter) => topUpValueIds(meter.topUpPricesPerCredit)),
-  ];
-  const valueRows = valueIds.length
-    ? await db.select().from(values).where(inArray(values.valueId, valueIds))
-    : [];
-  const valueById = new Map(valueRows.map((value) => [value.valueId, value]));
-  const valueFor = (valueId: string): Value =>
-    // plan_prices.value_id FKs values (and top-ups are resolved on write),
-    // so the row always exists.
-    valueById.get(valueId) as Value;
   return {
     planId: row.planId,
     productLineId: row.productLineId,
@@ -170,26 +66,22 @@ export async function getPlan({
     description: row.description,
     prices: priceRows.map((price) => ({
       cycleId: price.cycleId,
-      value: valueFor(price.valueId),
+      amounts: price.amounts,
     })),
-    features: featureRows.length
-      ? featureRows.map((feature) => ({
-          featureId: feature.featureId,
-          setTo: feature.setTo,
-        }))
-      : null,
-    meters: meterRows.length
-      ? meterRows.map((meter) => ({
-          ...meter,
-          topUpPricesPerCredit: expandTopUp(
-            meter.topUpPricesPerCredit,
-            valueFor,
-          ),
-        }))
-      : null,
-    addOnTypeIds: addOnTypeRows.length
-      ? addOnTypeRows.map((addOnType) => addOnType.addOnTypeId)
-      : null,
+    features: featureRows.map((feature) => ({
+      featureId: feature.featureId,
+      setTo: feature.setTo,
+    })),
+    meters: meterRows.map((meter) => ({
+      meterId: meter.meterId,
+      defaultMicrocredits: meter.defaultMicrocredits,
+      limitMicrocredits: meter.limitMicrocredits,
+      reset: meter.reset,
+      rollovers: meter.rollovers,
+      topUpPricesPerCredit: meter.topUpPricesPerCredit,
+      topUpCreditPackSizes: meter.topUpCreditPackSizes,
+    })),
+    addOnTypeIds: addOnTypeRows.map((addOnType) => addOnType.addOnTypeId),
   };
 }
 
@@ -215,10 +107,10 @@ export async function createPlan({
   if (!lineRow) {
     return { error: "product line not found" };
   }
-  const referencedFeatureIds = (plan.features ?? []).map(
+  const referencedFeatureIds = plan.features.map(
     (feature) => feature.featureId,
   );
-  const referencedMeterIds = (plan.meters ?? []).map((meter) => meter.meterId);
+  const referencedMeterIds = plan.meters.map((meter) => meter.meterId);
   const [featureRows, meterRows, addOnTypeRows] = await Promise.all([
     referencedFeatureIds.length
       ? db
@@ -245,7 +137,7 @@ export async function createPlan({
   if (meterRows.length !== referencedMeterIds.length) {
     return { error: "a referenced meter does not exist" };
   }
-  if (addOnTypeRows.length !== (plan.addOnTypeIds ?? []).length) {
+  if (addOnTypeRows.length !== plan.addOnTypeIds.length) {
     return { error: "a referenced add-on type does not exist" };
   }
   const sameLine = (row: { productLineId: string }) =>
@@ -280,18 +172,19 @@ export async function createPlan({
       description: plan.description,
     })
     .onConflictDoNothing();
-  for (const price of plan.prices) {
-    const valueId = await insertValue({ value: price.value });
+  if (plan.prices.length > 0) {
     await db
       .insert(planPrices)
-      .values({
-        planId,
-        cycleId: price.cycleId,
-        valueId,
-      })
+      .values(
+        plan.prices.map((price) => ({
+          planId,
+          cycleId: price.cycleId,
+          amounts: price.amounts,
+        })),
+      )
       .onConflictDoNothing();
   }
-  if (plan.features) {
+  if (plan.features.length > 0) {
     await db
       .insert(planFeatures)
       .values(
@@ -303,23 +196,16 @@ export async function createPlan({
       )
       .onConflictDoNothing();
   }
-  if (plan.meters) {
-    for (const meter of plan.meters) {
-      const resolved = await resolveMeter({ meter });
-      await db
-        .insert(planMeters)
-        .values({
+  if (plan.meters.length > 0) {
+    await db
+      .insert(planMeters)
+      .values(
+        plan.meters.map((meter) => ({
+          ...meter,
           planId,
-          meterId: resolved.meterId,
-          defaultMicrocredits: resolved.defaultMicrocredits,
-          limitMicrocredits: resolved.limitMicrocredits,
-          reset: resolved.reset,
-          rollovers: resolved.rollovers,
-          topUpPricesPerCredit: resolved.topUpPricesPerCredit,
-          topUpCreditPackSizes: resolved.topUpCreditPackSizes,
-        })
-        .onConflictDoNothing();
-    }
+        })),
+      )
+      .onConflictDoNothing();
   }
   if (plan.addOnTypeIds) {
     await db
