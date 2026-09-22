@@ -16,14 +16,14 @@ import {
   microcreditsToCredits,
   renameIssueToCredits,
 } from "../../lib/credits.ts";
-import { cycleIdSchema, planIdSchema } from "../../schemas/ids.ts";
+import { priceSchema } from "../../schemas/common.ts";
+import { planIdSchema } from "../../schemas/ids.ts";
 import {
   checkPlanMeter,
   type PlanMeter,
   planMeterFields,
   planSchema,
 } from "../../schemas/plan.ts";
-import { valueCreateSchema, valueSchema } from "../../schemas/value.ts";
 import {
   createPlan,
   deprecatePlan,
@@ -35,46 +35,37 @@ import {
   type PlanMeterInput,
 } from "./service.ts";
 
-// Prices reference first-class cycles by id but own their values, which are
-// always passed as full objects.
-const priceInputSchema = z.object({
-  cycleId: cycleIdSchema,
-  value: valueCreateSchema,
-});
-
-const priceApiSchema = z.object({
-  cycleId: cycleIdSchema,
-  value: valueSchema,
-});
-
-/** A top-up usage tier as passed on the wire: startingAt is in credits. */
-export const topUpTierWireInputSchema = z.object({
-  startingAt: creditsPositive,
-  prices: z.array(priceInputSchema).min(1),
-});
-
-export const topUpTierWireApiSchema = z.object({
-  startingAt: creditsPositive,
-  prices: z.array(priceApiSchema).min(1),
+// Prices reference first-class cycles by id and carry their amounts inline.
+/** A top-up pricing tier as passed on the wire: pack sizes are in credits. */
+export const topUpTierWireSchema = z.object({
+  startingAtPackSizeCredits: credits.nonnegative(),
+  prices: z.array(priceSchema).min(1),
 });
 
 const topUpCreditPackSizesWireSchema = z.object({
-  static: z.array(creditsPositive),
+  /** Each pack must be <= limitCredits (checked on the parent). */
+  static: z.array(creditsPositive).nullable(),
   dynamic: z
     .object({
-      interval: creditsPositive,
-      minimum: creditsPositive,
-      /** Must be > minimum and <= limit - default (checked on the parent). */
-      maximum: creditsPositive.nullable(),
+      packSizeIntervalCredits: creditsPositive,
+      minimumPackSizeCredits: creditsPositive,
+      /**
+       * Must be > minimumPackSizeCredits and <= limitCredits (checked on
+       * the parent).
+       */
+      maximumPackSizeCredits: creditsPositive.nullable(),
     })
     .refine(
       (dynamic) =>
-        dynamic.maximum === null || dynamic.maximum > dynamic.minimum,
+        dynamic.maximumPackSizeCredits === null ||
+        dynamic.maximumPackSizeCredits > dynamic.minimumPackSizeCredits,
       {
-        message: "maximum must be greater than minimum",
-        path: ["maximum"],
+        message:
+          "maximumPackSizeCredits must be greater than minimumPackSizeCredits",
+        path: ["maximumPackSizeCredits"],
       },
-    ),
+    )
+    .nullable(),
 });
 type TopUpCreditPackSizesWire = z.infer<typeof topUpCreditPackSizesWireSchema>;
 
@@ -91,19 +82,19 @@ export const planMeterWireFields = {
   reset: planMeterFields.reset,
   /** Reset periods unused credits roll over into. Null means unlimited. */
   rollovers: planMeterFields.rollovers,
-  topUpCreditPackSizes: topUpCreditPackSizesWireSchema.nullable(),
+  topUpCreditPackSizes: topUpCreditPackSizesWireSchema,
 };
 
 const planMeterWireInputSchema = z
   .object({
     ...planMeterWireFields,
-    topUpPricesPerCredit: z.array(topUpTierWireInputSchema).min(1).nullable(),
+    topUpPricesPerCredit: z.array(topUpTierWireSchema),
   })
   .superRefine(checkPlanMeterWire);
 
 const planMeterWireApiSchema = z.object({
   ...planMeterWireFields,
-  topUpPricesPerCredit: z.array(topUpTierWireApiSchema).min(1).nullable(),
+  topUpPricesPerCredit: z.array(topUpTierWireSchema),
 });
 
 export type PlanMeterWireInput = z.infer<typeof planMeterWireInputSchema>;
@@ -112,23 +103,31 @@ export type PlanMeterWireApi = z.infer<typeof planMeterWireApiSchema>;
 function packSizesToMicrocredits({
   packSizes,
 }: {
-  packSizes: TopUpCreditPackSizesWire | null;
+  packSizes: TopUpCreditPackSizesWire;
 }): PlanMeter["topUpCreditPackSizes"] {
-  if (packSizes === null) {
-    return null;
-  }
+  const dynamic = packSizes.dynamic;
   return {
-    static: packSizes.static.map((credits) =>
-      creditsToMicrocredits({ credits }),
-    ),
-    dynamic: {
-      interval: creditsToMicrocredits({ credits: packSizes.dynamic.interval }),
-      minimum: creditsToMicrocredits({ credits: packSizes.dynamic.minimum }),
-      maximum:
-        packSizes.dynamic.maximum === null
-          ? null
-          : creditsToMicrocredits({ credits: packSizes.dynamic.maximum }),
-    },
+    static:
+      packSizes.static === null
+        ? null
+        : packSizes.static.map((credits) => creditsToMicrocredits({ credits })),
+    dynamic:
+      dynamic === null
+        ? null
+        : {
+            packSizeIntervalMicrocredits: creditsToMicrocredits({
+              credits: dynamic.packSizeIntervalCredits,
+            }),
+            minimumPackSizeMicrocredits: creditsToMicrocredits({
+              credits: dynamic.minimumPackSizeCredits,
+            }),
+            maximumPackSizeMicrocredits:
+              dynamic.maximumPackSizeCredits === null
+                ? null
+                : creditsToMicrocredits({
+                    credits: dynamic.maximumPackSizeCredits,
+                  }),
+          },
   };
 }
 
@@ -136,26 +135,32 @@ function packSizesToCredits({
   packSizes,
 }: {
   packSizes: PlanMeter["topUpCreditPackSizes"];
-}): TopUpCreditPackSizesWire | null {
-  if (packSizes === null) {
-    return null;
-  }
+}): TopUpCreditPackSizesWire {
+  const dynamic = packSizes.dynamic;
   return {
-    static: packSizes.static.map((microcredits) =>
-      microcreditsToCredits({ microcredits }),
-    ),
-    dynamic: {
-      interval: microcreditsToCredits({
-        microcredits: packSizes.dynamic.interval,
-      }),
-      minimum: microcreditsToCredits({
-        microcredits: packSizes.dynamic.minimum,
-      }),
-      maximum:
-        packSizes.dynamic.maximum === null
-          ? null
-          : microcreditsToCredits({ microcredits: packSizes.dynamic.maximum }),
-    },
+    static:
+      packSizes.static === null
+        ? null
+        : packSizes.static.map((microcredits) =>
+            microcreditsToCredits({ microcredits }),
+          ),
+    dynamic:
+      dynamic === null
+        ? null
+        : {
+            packSizeIntervalCredits: microcreditsToCredits({
+              microcredits: dynamic.packSizeIntervalMicrocredits,
+            }),
+            minimumPackSizeCredits: microcreditsToCredits({
+              microcredits: dynamic.minimumPackSizeMicrocredits,
+            }),
+            maximumPackSizeCredits:
+              dynamic.maximumPackSizeMicrocredits === null
+                ? null
+                : microcreditsToCredits({
+                    microcredits: dynamic.maximumPackSizeMicrocredits,
+                  }),
+          },
   };
 }
 
@@ -176,13 +181,12 @@ export function planMeterInputToMicrocredits({
         : creditsToMicrocredits({ credits: meter.limitCredits }),
     reset: meter.reset,
     rollovers: meter.rollovers,
-    topUpPricesPerCredit:
-      meter.topUpPricesPerCredit === null
-        ? null
-        : meter.topUpPricesPerCredit.map((tier) => ({
-            startingAt: creditsToMicrocredits({ credits: tier.startingAt }),
-            prices: tier.prices,
-          })),
+    topUpPricesPerCredit: meter.topUpPricesPerCredit.map((tier) => ({
+      startingAtPackSizeMicrocredits: creditsToMicrocredits({
+        credits: tier.startingAtPackSizeCredits,
+      }),
+      prices: tier.prices,
+    })),
     topUpCreditPackSizes: packSizesToMicrocredits({
       packSizes: meter.topUpCreditPackSizes,
     }),
@@ -206,15 +210,12 @@ export function planMeterApiToCredits({
         : microcreditsToCredits({ microcredits: meter.limitMicrocredits }),
     reset: meter.reset,
     rollovers: meter.rollovers,
-    topUpPricesPerCredit:
-      meter.topUpPricesPerCredit === null
-        ? null
-        : meter.topUpPricesPerCredit.map((tier) => ({
-            startingAt: microcreditsToCredits({
-              microcredits: tier.startingAt,
-            }),
-            prices: tier.prices,
-          })),
+    topUpPricesPerCredit: meter.topUpPricesPerCredit.map((tier) => ({
+      startingAtPackSizeCredits: microcreditsToCredits({
+        microcredits: tier.startingAtPackSizeMicrocredits,
+      }),
+      prices: tier.prices,
+    })),
     topUpCreditPackSizes: packSizesToCredits({
       packSizes: meter.topUpCreditPackSizes,
     }),
@@ -250,27 +251,20 @@ function planCreateToMicrocredits({
 }): PlanCreateBody {
   return {
     ...plan,
-    meters:
-      plan.meters === null
-        ? null
-        : plan.meters.map((meter) => planMeterInputToMicrocredits({ meter })),
+    meters: plan.meters.map((meter) => planMeterInputToMicrocredits({ meter })),
   };
 }
 
 function planApiToCredits({ plan }: { plan: PlanApi }): PlanWireApi {
   return {
     ...plan,
-    meters:
-      plan.meters === null
-        ? null
-        : plan.meters.map((meter) => planMeterApiToCredits({ meter })),
+    meters: plan.meters.map((meter) => planMeterApiToCredits({ meter })),
   };
 }
 
-/** The plan shape the call surface reads: prices carry full values. */
+/** The plan shape the call surface reads: meters in credits. */
 const planWireApiSchema = planSchema.extend({
-  prices: z.array(priceApiSchema),
-  meters: z.array(planMeterWireApiSchema).nullable(),
+  meters: z.array(planMeterWireApiSchema),
 });
 type PlanWireApi = z.infer<typeof planWireApiSchema>;
 
@@ -282,8 +276,7 @@ const planCreateWireSchema = z
     deprecatedAt: true,
   })
   .extend({
-    prices: z.array(priceInputSchema),
-    meters: z.array(planMeterWireInputSchema).nullable(),
+    meters: z.array(planMeterWireInputSchema),
   });
 export type PlanCreateWireBody = z.infer<typeof planCreateWireSchema>;
 
