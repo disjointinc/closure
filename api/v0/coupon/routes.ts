@@ -35,17 +35,15 @@ import {
 } from "./service.ts";
 
 /** Credits granted as passed on the wire: amountCredits is in credits. */
-export const creditsGrantedWireSchema = z
-  .array(
-    z.object({
-      meterId: meterIdSchema,
-      amountCredits: creditsPositive,
-      expiration: resetSchedule.nullable(),
-      rollovers: z.number().int().nonnegative().nullable(),
-      award: awardSchema,
-    }),
-  )
-  .nullable();
+export const creditsGrantedWireSchema = z.array(
+  z.object({
+    meterId: meterIdSchema,
+    amountCredits: creditsPositive,
+    expiration: resetSchedule.nullable(),
+    rollovers: z.number().int().nonnegative().nullable(),
+    award: awardSchema,
+  }),
+);
 
 /** The service's credits-granted entry: microcredits, full award values. */
 type CreditGranted = NonNullable<CouponApi["creditsGranted"]>[number];
@@ -77,15 +75,13 @@ export function creditGrantedToCredits({
   };
 }
 
-const featuresGrantedSchema = z
-  .array(
-    z.object({
-      featureId: featureIdSchema,
-      setTo: featureSetTo,
-      award: awardSchema,
-    }),
-  )
-  .nullable();
+const featuresGrantedSchema = z.array(
+  z.object({
+    featureId: featureIdSchema,
+    setTo: featureSetTo,
+    award: awardSchema,
+  }),
+);
 
 const couponDefinitionWireFields = {
   grantableByTenants: z.boolean(),
@@ -144,24 +140,18 @@ function couponCreateToMicrocredits({
   }
   return {
     ...coupon,
-    creditsGranted:
-      coupon.creditsGranted === null
-        ? null
-        : coupon.creditsGranted.map((credit) =>
-            creditGrantedToMicrocredits({ credit }),
-          ),
+    creditsGranted: coupon.creditsGranted.map((credit) =>
+      creditGrantedToMicrocredits({ credit }),
+    ),
   };
 }
 
 function couponApiToCredits({ coupon }: { coupon: CouponApi }): CouponWireApi {
   return {
     ...coupon,
-    creditsGranted:
-      coupon.creditsGranted === null
-        ? null
-        : coupon.creditsGranted.map((credit) =>
-            creditGrantedToCredits({ credit }),
-          ),
+    creditsGranted: coupon.creditsGranted.map((credit) =>
+      creditGrantedToCredits({ credit }),
+    ),
   };
 }
 

@@ -2,9 +2,8 @@
  * v0/coupon/service.ts -- coupon business logic. Coupons are consumables
  * (deletes mark deletedAt) minted either inline or from a coupon template;
  * minting copies the template's definition, so issued coupons never change
- * when the template is edited or deprecated later. Award amounts are read
- * and written as full values; the canonical award stored in the db keeps
- * the value id.
+ * when the template is edited or deprecated later. Award amounts are stored
+ * inline.
  */
 import { eq } from "drizzle-orm";
 import { db } from "../../db/index.ts";
@@ -15,7 +14,6 @@ import {
 } from "../../db/schema.ts";
 import { generateId } from "../../lib/id.ts";
 import { type Award, type Coupon } from "../../schemas/coupon.ts";
-import { type AwardApi, expandAward, resolveAward } from "../award/service.ts";
 import { getCouponTemplate } from "../coupon-template/service.ts";
 
 /**
@@ -35,20 +33,16 @@ export type CouponCreateBody =
       reciprocalBenefitCouponId: string | null;
     };
 
-type WithAwardApi<T extends { award: Award }> = Omit<T, "award"> & {
-  award: AwardApi;
-};
-
-/** The call-surface coupon: awards carry full values instead of value ids. */
+/**
+ * The call-surface coupon: awards carry full values instead of value ids.
+ */
 export type CouponApi = Omit<
   Coupon,
   "defaultAward" | "featuresGranted" | "creditsGranted"
 > & {
-  defaultAward: AwardApi | null;
-  featuresGranted:
-    WithAwardApi<NonNullable<Coupon["featuresGranted"]>[number]>[] | null;
-  creditsGranted:
-    WithAwardApi<NonNullable<Coupon["creditsGranted"]>[number]>[] | null;
+  defaultAward: Award | null;
+  featuresGranted: Coupon["featuresGranted"];
+  creditsGranted: Coupon["creditsGranted"];
 };
 
 export async function getCoupon({
@@ -80,27 +74,19 @@ export async function getCoupon({
     limitPerGrantingTenant: row.limitPerGrantingTenant,
     name: row.name,
     description: row.description,
-    defaultAward: row.defaultAward ? await expandAward(row.defaultAward) : null,
-    featuresGranted: featureRows.length
-      ? await Promise.all(
-          featureRows.map(async (feature) => ({
-            featureId: feature.featureId,
-            setTo: feature.setTo,
-            award: await expandAward(feature.award),
-          })),
-        )
-      : null,
-    creditsGranted: creditRows.length
-      ? await Promise.all(
-          creditRows.map(async (credit) => ({
-            meterId: credit.meterId,
-            amountMicrocredits: credit.amountMicrocredits,
-            expiration: credit.expiration,
-            rollovers: credit.rollovers,
-            award: await expandAward(credit.award),
-          })),
-        )
-      : null,
+    defaultAward: row.defaultAward,
+    featuresGranted: featureRows.map((feature) => ({
+      featureId: feature.featureId,
+      setTo: feature.setTo,
+      award: feature.award,
+    })),
+    creditsGranted: creditRows.map((credit) => ({
+      meterId: credit.meterId,
+      amountMicrocredits: credit.amountMicrocredits,
+      expiration: credit.expiration,
+      rollovers: credit.rollovers,
+      award: credit.award,
+    })),
     reciprocalBenefitCouponId: row.reciprocalBenefitCouponId,
   };
 }
@@ -146,12 +132,7 @@ export async function createCoupon({
         limitPerGrantingTenant: template.limitPerGrantingTenant,
         name: template.name,
         description: template.description,
-        // The template reads back in the call-surface shape (full values),
-        // so re-resolving stores the same values and yields the canonical
-        // (value-id) award for the copy.
-        defaultAward: template.defaultAward
-          ? await resolveAward(template.defaultAward)
-          : null,
+        defaultAward: template.defaultAward,
         // A coupon's reciprocal benefit references an individual coupon, not
         // a template, so it can't be copied -- the caller sets it per coupon.
         reciprocalBenefitCouponId: coupon.reciprocalBenefitCouponId,
@@ -165,7 +146,7 @@ export async function createCoupon({
             couponId,
             featureId: feature.featureId,
             setTo: feature.setTo,
-            award: await resolveAward(feature.award),
+            award: feature.award,
           })
           .onConflictDoNothing();
       }
@@ -180,7 +161,7 @@ export async function createCoupon({
             amountMicrocredits: credit.amountMicrocredits,
             expiration: credit.expiration,
             rollovers: credit.rollovers,
-            award: await resolveAward(credit.award),
+            award: credit.award,
           })
           .onConflictDoNothing();
       }
@@ -198,9 +179,7 @@ export async function createCoupon({
       limitPerGrantingTenant: coupon.limitPerGrantingTenant,
       name: coupon.name,
       description: coupon.description,
-      defaultAward: coupon.defaultAward
-        ? await resolveAward(coupon.defaultAward)
-        : null,
+      defaultAward: coupon.defaultAward,
       reciprocalBenefitCouponId: coupon.reciprocalBenefitCouponId,
     })
     .onConflictDoNothing();
@@ -212,7 +191,7 @@ export async function createCoupon({
           couponId,
           featureId: feature.featureId,
           setTo: feature.setTo,
-          award: await resolveAward(feature.award),
+          award: feature.award,
         })
         .onConflictDoNothing();
     }
@@ -227,7 +206,7 @@ export async function createCoupon({
           amountMicrocredits: credit.amountMicrocredits,
           expiration: credit.expiration,
           rollovers: credit.rollovers,
-          award: await resolveAward(credit.award),
+          award: credit.award,
         })
         .onConflictDoNothing();
     }
