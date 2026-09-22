@@ -33,9 +33,6 @@ export type CouponCreateBody =
       reciprocalBenefitCouponId: string | null;
     };
 
-/**
- * The call-surface coupon: awards carry full values instead of value ids.
- */
 export type CouponApi = Omit<
   Coupon,
   "defaultAward" | "featuresGranted" | "creditsGranted"
