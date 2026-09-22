@@ -14,11 +14,6 @@ import {
   listAddOnTypes,
 } from "./service.ts";
 
-// The call surface for prices: an existing cycle id plus inline amounts.
-export const addOnTypeApiSchema = addOnTypeSchema;
-
-export type AddOnTypeApi = z.infer<typeof addOnTypeApiSchema>;
-
 /** Create-input: the server mints the add-on type id and stamps times. */
 const addOnTypeCreateSchema = addOnTypeSchema.omit({
   addOnTypeId: true,
@@ -41,7 +36,7 @@ const createAddOnTypeRoute = createRoute({
   },
   responses: {
     201: {
-      content: { "application/json": { schema: addOnTypeApiSchema } },
+      content: { "application/json": { schema: addOnTypeSchema } },
       description: "Created",
     },
     400: invalidResponse,
@@ -55,7 +50,7 @@ const listAddOnTypesRoute = createRoute({
   summary: "List add-on types",
   responses: {
     200: {
-      content: { "application/json": { schema: z.array(addOnTypeApiSchema) } },
+      content: { "application/json": { schema: z.array(addOnTypeSchema) } },
       description: "OK",
     },
   },
@@ -69,7 +64,7 @@ const getAddOnTypeRoute = createRoute({
   request: { params: z.object({ addOnTypeId: addOnTypeIdSchema }) },
   responses: {
     200: {
-      content: { "application/json": { schema: addOnTypeApiSchema } },
+      content: { "application/json": { schema: addOnTypeSchema } },
       description: "OK",
     },
     404: notFoundResponse,
@@ -84,7 +79,7 @@ const deprecateAddOnTypeRoute = createRoute({
   request: { params: z.object({ addOnTypeId: addOnTypeIdSchema }) },
   responses: {
     200: {
-      content: { "application/json": { schema: addOnTypeApiSchema } },
+      content: { "application/json": { schema: addOnTypeSchema } },
       description: "OK",
     },
     404: notFoundResponse,

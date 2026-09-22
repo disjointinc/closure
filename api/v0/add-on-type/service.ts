@@ -12,13 +12,14 @@ import {
   features,
 } from "../../db/schema.ts";
 import { generateId } from "../../lib/id.ts";
-import type { AddOnTypeApi, AddOnTypeCreateBody } from "./routes.ts";
+import type { AddOnType } from "../../schemas/add-on-type.ts";
+import type { AddOnTypeCreateBody } from "./routes.ts";
 
 export async function getAddOnType({
   addOnTypeId,
 }: {
   addOnTypeId: string;
-}): Promise<AddOnTypeApi | null> {
+}): Promise<AddOnType | null> {
   const [row] = await db
     .select()
     .from(addOnTypes)
@@ -52,7 +53,7 @@ export async function getAddOnType({
   };
 }
 
-export async function listAddOnTypes(): Promise<AddOnTypeApi[]> {
+export async function listAddOnTypes(): Promise<AddOnType[]> {
   const rows = await db.select().from(addOnTypes);
   const found = await Promise.all(
     rows.map((row) => getAddOnType({ addOnTypeId: row.addOnTypeId })),
@@ -64,7 +65,7 @@ export async function createAddOnType({
   addOnType,
 }: {
   addOnType: AddOnTypeCreateBody;
-}): Promise<AddOnTypeApi | { error: string }> {
+}): Promise<AddOnType | { error: string }> {
   /* Hard lock: an add-on type extends its own line's plans, so every
    * referenced feature must belong to the same line. */
   const featureIds = addOnType.features.map((feature) => feature.featureId);
@@ -119,7 +120,7 @@ export async function createAddOnType({
       .onConflictDoNothing();
   }
   // The add-on type row always exists once its id is stored.
-  return getAddOnType({ addOnTypeId }) as Promise<AddOnTypeApi>;
+  return getAddOnType({ addOnTypeId }) as Promise<AddOnType>;
 }
 
 /** Deprecate the add-on type, or return null if no such add-on type exists. */
@@ -127,7 +128,7 @@ export async function deprecateAddOnType({
   addOnTypeId,
 }: {
   addOnTypeId: string;
-}): Promise<AddOnTypeApi | null> {
+}): Promise<AddOnType | null> {
   const updated = await db
     .update(addOnTypes)
     .set({ deprecatedAt: Date.now() })
