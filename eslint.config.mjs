@@ -5,6 +5,10 @@ export default [
   {
     files: ["**/*.{js,mjs,ts,tsx}"],
     rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { ignoreRestSiblings: true },
+      ],
       curly: ["error", "all"],
     },
   },

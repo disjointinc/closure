@@ -64,23 +64,9 @@ export async function getPlan({
     deprecatedAt: row.deprecatedAt,
     name: row.name,
     description: row.description,
-    prices: priceRows.map((price) => ({
-      cycleId: price.cycleId,
-      amounts: price.amounts,
-    })),
-    features: featureRows.map((feature) => ({
-      featureId: feature.featureId,
-      setTo: feature.setTo,
-    })),
-    meters: meterRows.map((meter) => ({
-      meterId: meter.meterId,
-      defaultMicrocredits: meter.defaultMicrocredits,
-      limitMicrocredits: meter.limitMicrocredits,
-      reset: meter.reset,
-      rollovers: meter.rollovers,
-      topUpPricesPerCredit: meter.topUpPricesPerCredit,
-      topUpCreditPackSizes: meter.topUpCreditPackSizes,
-    })),
+    prices: priceRows.map(({ planId: _planId, ...price }) => price),
+    features: featureRows.map(({ planId: _planId, ...feature }) => feature),
+    meters: meterRows.map(({ planId: _planId, ...meter }) => meter),
     addOnTypeIds: addOnTypeRows.map((addOnType) => addOnType.addOnTypeId),
   };
 }
