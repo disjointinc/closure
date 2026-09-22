@@ -43,9 +43,7 @@ export async function getFeature({
           description: option.description,
         }))
       : null,
-    applicableTaxTypeIds: taxTypeRows.length
-      ? taxTypeRows.map((taxType) => taxType.taxTypeId)
-      : null,
+    applicableTaxTypeIds: taxTypeRows.map((taxType) => taxType.taxTypeId),
   };
 }
 
