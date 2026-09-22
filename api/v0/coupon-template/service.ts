@@ -2,8 +2,7 @@
  * v0/coupon-template/service.ts -- coupon template business logic.
  * Templates are reusable coupon definitions (e.g. "the referral coupon")
  * that coupons mint from; they're deprecated, never deleted. Award amounts
- * are read and written as full values; the canonical award stored in the db
- * keeps the value id.
+ * are stored inline.
  */
 import { eq } from "drizzle-orm";
 import { db } from "../../db/index.ts";
@@ -15,7 +14,6 @@ import {
 import { generateId } from "../../lib/id.ts";
 import type { Award } from "../../schemas/coupon.ts";
 import type { CouponTemplate } from "../../schemas/coupon-template.ts";
-import { type AwardApi, expandAward, resolveAward } from "../award/service.ts";
 
 /** The create-input template: microcredits, awards as full values. */
 export type CouponTemplateCreateBody = Omit<
@@ -23,22 +21,13 @@ export type CouponTemplateCreateBody = Omit<
   "couponTemplateId" | "createdAt" | "deprecatedAt"
 >;
 
-type WithAwardApi<T extends { award: Award }> = Omit<T, "award"> & {
-  award: AwardApi;
-};
-
-/** The call-surface template: awards carry full values, not value ids. */
 export type CouponTemplateApi = Omit<
   CouponTemplate,
   "defaultAward" | "featuresGranted" | "creditsGranted"
 > & {
-  defaultAward: AwardApi | null;
-  featuresGranted:
-    | WithAwardApi<NonNullable<CouponTemplate["featuresGranted"]>[number]>[]
-    | null;
-  creditsGranted:
-    | WithAwardApi<NonNullable<CouponTemplate["creditsGranted"]>[number]>[]
-    | null;
+  defaultAward: Award | null;
+  featuresGranted: CouponTemplate["featuresGranted"];
+  creditsGranted: CouponTemplate["creditsGranted"];
 };
 
 export async function getCouponTemplate({
@@ -71,27 +60,19 @@ export async function getCouponTemplate({
     limitPerGrantingTenant: row.limitPerGrantingTenant,
     name: row.name,
     description: row.description,
-    defaultAward: row.defaultAward ? await expandAward(row.defaultAward) : null,
-    featuresGranted: featureRows.length
-      ? await Promise.all(
-          featureRows.map(async (feature) => ({
-            featureId: feature.featureId,
-            setTo: feature.setTo,
-            award: await expandAward(feature.award),
-          })),
-        )
-      : null,
-    creditsGranted: creditRows.length
-      ? await Promise.all(
-          creditRows.map(async (credit) => ({
-            meterId: credit.meterId,
-            amountMicrocredits: credit.amountMicrocredits,
-            expiration: credit.expiration,
-            rollovers: credit.rollovers,
-            award: await expandAward(credit.award),
-          })),
-        )
-      : null,
+    defaultAward: row.defaultAward,
+    featuresGranted: featureRows.map((feature) => ({
+      featureId: feature.featureId,
+      setTo: feature.setTo,
+      award: feature.award,
+    })),
+    creditsGranted: creditRows.map((credit) => ({
+      meterId: credit.meterId,
+      amountMicrocredits: credit.amountMicrocredits,
+      expiration: credit.expiration,
+      rollovers: credit.rollovers,
+      award: credit.award,
+    })),
     reciprocalBenefitCouponTemplateId: row.reciprocalBenefitCouponTemplateId,
   };
 }
@@ -122,9 +103,7 @@ export async function createCouponTemplate({
       limitPerGrantingTenant: template.limitPerGrantingTenant,
       name: template.name,
       description: template.description,
-      defaultAward: template.defaultAward
-        ? await resolveAward(template.defaultAward)
-        : null,
+      defaultAward: template.defaultAward,
       reciprocalBenefitCouponTemplateId:
         template.reciprocalBenefitCouponTemplateId,
     })
@@ -137,7 +116,7 @@ export async function createCouponTemplate({
           couponTemplateId,
           featureId: feature.featureId,
           setTo: feature.setTo,
-          award: await resolveAward(feature.award),
+          award: feature.award,
         })
         .onConflictDoNothing();
     }
@@ -152,7 +131,7 @@ export async function createCouponTemplate({
           amountMicrocredits: credit.amountMicrocredits,
           expiration: credit.expiration,
           rollovers: credit.rollovers,
-          award: await resolveAward(credit.award),
+          award: credit.award,
         })
         .onConflictDoNothing();
     }
