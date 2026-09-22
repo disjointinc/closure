@@ -7,7 +7,6 @@ import { z } from "zod";
 import { notFoundResponse } from "../../../lib/http.ts";
 import { refundIdSchema, tenantIdSchema } from "../../../schemas/ids.ts";
 import { refundSchema } from "../../../schemas/refund.ts";
-import { valueCreateSchema, valueSchema } from "../../../schemas/value.ts";
 import { LoanServicingError } from "../loan/servicing.ts";
 import {
   createRefund,
@@ -16,28 +15,18 @@ import {
   patchRefund,
 } from "./service.ts";
 
-// The call-surface refund: the refunded amount is an owned value passed
-// inline, never a reference to one.
-export const refundApiSchema = refundSchema
-  .omit({ valueId: true })
-  .extend({ value: valueSchema });
-export type RefundApi = z.infer<typeof refundApiSchema>;
-
-// The tenant is the one in the path; the server mints the refund and
-// value ids and stamps createdAt, so the body carries none of them.
-const refundCreateSchema = refundSchema
-  .omit({
-    refundId: true,
-    tenantId: true,
-    valueId: true,
-    createdAt: true,
-    startedProcessingAt: true,
-    succeededAt: true,
-    failedAt: true,
-    loanPrincipalAmount: true,
-    loanInterestAmount: true,
-  })
-  .extend({ value: valueCreateSchema });
+// The tenant is the one in the path; the server mints the refund id and
+// stamps createdAt, so the body carries neither.
+const refundCreateSchema = refundSchema.omit({
+  refundId: true,
+  tenantId: true,
+  createdAt: true,
+  startedProcessingAt: true,
+  succeededAt: true,
+  failedAt: true,
+  loanPrincipalAmount: true,
+  loanInterestAmount: true,
+});
 
 const refundPatchSchema = z.object({
   event: z.enum(["started_processing", "succeeded", "failed"]),
@@ -60,7 +49,7 @@ const createRefundRoute = createRoute({
   },
   responses: {
     201: {
-      content: { "application/json": { schema: refundApiSchema } },
+      content: { "application/json": { schema: refundSchema } },
       description: "Created",
     },
     404: notFoundResponse,
@@ -77,7 +66,7 @@ const listRefundsRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: z.array(refundApiSchema) } },
+      content: { "application/json": { schema: z.array(refundSchema) } },
       description: "OK",
     },
   },
@@ -93,7 +82,7 @@ const getRefundRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: refundApiSchema } },
+      content: { "application/json": { schema: refundSchema } },
       description: "OK",
     },
     404: notFoundResponse,
@@ -114,7 +103,7 @@ const patchRefundRoute = createRoute({
   },
   responses: {
     200: {
-      content: { "application/json": { schema: refundApiSchema } },
+      content: { "application/json": { schema: refundSchema } },
       description: "OK",
     },
     404: notFoundResponse,

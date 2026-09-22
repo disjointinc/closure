@@ -1,37 +1,21 @@
 /**
- * v0/tenant/refund/service.ts -- refund business logic. The refunded amount
- * is an owned value: the call surface passes it inline and reads it back as a
- * full object, while the db stores only the value id. The server mints the
- * refund and value ids and stamps createdAt; lifecycle timestamps are
- * stamped by PATCH transitions as the 3P provider reports them.
+ * v0/tenant/refund/service.ts -- refund business logic. The refunded amounts
+ * are stored inline on the refund. The server mints the refund id and stamps
+ * createdAt; lifecycle timestamps are stamped by PATCH transitions as the 3P
+ * provider reports them.
  */
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "../../../db/index.ts";
-import {
-  loans,
-  paymentLoans,
-  payments,
-  refunds,
-  values,
-} from "../../../db/schema.ts";
+import { loans, paymentLoans, payments, refunds } from "../../../db/schema.ts";
 import { generateId } from "../../../lib/id.ts";
-import { type Refund } from "../../../schemas/refund.ts";
-import { type Value } from "../../../schemas/value.ts";
-import type { RefundApi, RefundCreateBody, RefundPatchBody } from "./routes.ts";
+import type { Amounts } from "../../../schemas/common.ts";
+import type { Refund } from "../../../schemas/refund.ts";
+import type { RefundCreateBody, RefundPatchBody } from "./routes.ts";
 import {
   LoanServicingError,
   reverseLoanPayment,
   type LoanTransaction,
 } from "../loan/servicing.ts";
-
-async function expandRefund(row: Refund): Promise<RefundApi> {
-  const [value] = await db
-    .select()
-    .from(values)
-    .where(eq(values.valueId, row.valueId));
-  // refunds.value_id FKs values, so the row always exists.
-  return { ...row, value: value as Value };
-}
 
 export async function getRefund({
   refundId,
@@ -39,25 +23,24 @@ export async function getRefund({
 }: {
   refundId: string;
   tenantId: string;
-}): Promise<RefundApi | null> {
+}): Promise<Refund | null> {
   const [row] = await db
     .select()
     .from(refunds)
     .where(and(eq(refunds.refundId, refundId), eq(refunds.tenantId, tenantId)));
-  return row ? await expandRefund(row) : null;
+  return row ?? null;
 }
 
 export async function listRefunds({
   tenantId,
 }: {
   tenantId: string;
-}): Promise<RefundApi[]> {
-  const rows = await db
+}): Promise<Refund[]> {
+  return db
     .select()
     .from(refunds)
     .where(eq(refunds.tenantId, tenantId))
     .orderBy(desc(refunds.createdAt));
-  return Promise.all(rows.map(expandRefund));
 }
 
 export async function createRefund({
@@ -66,15 +49,8 @@ export async function createRefund({
 }: {
   refund: RefundCreateBody;
   tenantId: string;
-}): Promise<RefundApi | null> {
+}): Promise<Refund | null> {
   const refundId = generateId({ prefix: "refund" });
-  const { value, ...rest } = refund;
-  const fullValue: Value = {
-    ...value,
-    valueId: generateId({ prefix: "value" }),
-    createdAt: Date.now(),
-    deprecatedAt: null,
-  };
   const createdAt = Date.now();
   return db.transaction(async (tx) => {
     if (refund.paymentId !== null) {
@@ -91,11 +67,15 @@ export async function createRefund({
       if (!payment) {
         return null;
       }
-      await refundAllocation({ payment, tenantId, tx, value });
+      await refundAllocation({
+        payment,
+        tenantId,
+        tx,
+        amounts: refund.amounts,
+      });
     }
-    await tx.insert(values).values(fullValue);
-    await tx.insert(refunds).values({
-      ...rest,
+    const stored: Refund = {
+      ...refund,
       refundId,
       tenantId,
       createdAt,
@@ -104,20 +84,9 @@ export async function createRefund({
       failedAt: null,
       loanPrincipalAmount: null,
       loanInterestAmount: null,
-      valueId: fullValue.valueId,
-    });
-    return {
-      ...rest,
-      refundId,
-      tenantId,
-      createdAt,
-      startedProcessingAt: null,
-      succeededAt: null,
-      failedAt: null,
-      loanPrincipalAmount: null,
-      loanInterestAmount: null,
-      value: fullValue,
     };
+    await tx.insert(refunds).values(stored);
+    return stored;
   });
 }
 
@@ -128,12 +97,12 @@ async function refundAllocation({
   payment,
   tenantId,
   tx,
-  value,
+  amounts,
 }: {
   payment: typeof payments.$inferSelect;
   tenantId: string;
   tx: LoanTransaction;
-  value: RefundCreateBody["value"];
+  amounts: Amounts;
 }) {
   const [link] = await tx
     .select()
@@ -151,9 +120,9 @@ async function refundAllocation({
       message: "refund requires a successful loan payment",
     });
   }
-  const amount = value.amounts[0];
+  const amount = amounts[0];
   if (
-    value.amounts.length !== 1 ||
+    amounts.length !== 1 ||
     !amount ||
     amount.currency !== link.amount.currency ||
     amount.unit !== link.amount.unit ||
@@ -181,9 +150,8 @@ async function refundAllocation({
     });
   }
   const prior = await tx
-    .select({ refund: refunds, value: values })
+    .select()
     .from(refunds)
-    .innerJoin(values, eq(refunds.valueId, values.valueId))
     .where(
       and(
         eq(refunds.paymentId, payment.paymentId),
@@ -191,10 +159,10 @@ async function refundAllocation({
         isNotNull(refunds.succeededAt),
       ),
     );
-  for (const item of prior) {
-    const principal = item.refund.loanPrincipalAmount;
-    const interest = item.refund.loanInterestAmount;
-    const refunded = item.value.amounts[0];
+  for (const priorRefund of prior) {
+    const principal = priorRefund.loanPrincipalAmount;
+    const interest = priorRefund.loanInterestAmount;
+    const refunded = priorRefund.amounts[0];
     if (
       principal === null ||
       interest === null ||
@@ -204,8 +172,8 @@ async function refundAllocation({
       interest < 0 ||
       principal > principalAmount ||
       interest > interestAmount ||
-      item.refund.failedAt !== null ||
-      item.value.amounts.length !== 1 ||
+      priorRefund.failedAt !== null ||
+      priorRefund.amounts.length !== 1 ||
       !refunded ||
       refunded.currency !== amount.currency ||
       refunded.unit !== amount.unit ||
@@ -248,7 +216,7 @@ export async function patchRefund({
   patch: RefundPatchBody;
   refundId: string;
   tenantId: string;
-}): Promise<RefundApi | null> {
+}): Promise<Refund | null> {
   const found = await db.transaction(async (tx) => {
     const scope = and(
       eq(refunds.refundId, refundId),
@@ -294,17 +262,12 @@ export async function patchRefund({
     const at = Date.now();
     let allocation = null;
     if (patch.event === "succeeded" && payment) {
-      const [value] = await tx
-        .select()
-        .from(values)
-        .where(eq(values.valueId, row.valueId));
-      if (!value) {
-        throw new LoanServicingError({
-          code: "invalid_state",
-          message: "refund value is missing",
-        });
-      }
-      allocation = await refundAllocation({ payment, tenantId, tx, value });
+      allocation = await refundAllocation({
+        payment,
+        tenantId,
+        tx,
+        amounts: row.amounts,
+      });
       const [link] = await tx
         .select()
         .from(paymentLoans)
