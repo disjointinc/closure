@@ -87,8 +87,8 @@ describe("experiment enrollment", () => {
       limitMicrocredits: null,
       reset: null,
       rollovers: null,
-      topUpPricesPerCredit: null,
-      topUpCreditPackSizes: null,
+      topUpPricesPerCredit: [],
+      topUpCreditPackSizes: { static: null, dynamic: null },
     });
     const tenantA = await makeTenant();
     const tenantB = await makeTenant();
@@ -155,7 +155,7 @@ describe("experiment enrollment", () => {
             tenantPercentage: 50,
             assignedTenantIds: [tenantId],
           },
-          { planIds: [planA2], tenantPercentage: 50, assignedTenantIds: null },
+          { planIds: [planA2], tenantPercentage: 50, assignedTenantIds: [] },
         ],
       }),
     });
@@ -171,8 +171,8 @@ describe("experiment enrollment", () => {
       experiment: createBody({
         assignmentTerms: null,
         treatments: [
-          { planIds: [planA1], tenantPercentage: 50, assignedTenantIds: null },
-          { planIds: [planA2], tenantPercentage: 50, assignedTenantIds: null },
+          { planIds: [planA1], tenantPercentage: 50, assignedTenantIds: [] },
+          { planIds: [planA2], tenantPercentage: 50, assignedTenantIds: [] },
         ],
       }),
     });
@@ -213,7 +213,7 @@ describe("experiment enrollment", () => {
             tenantPercentage: 50,
             assignedTenantIds: [tenantId],
           },
-          { planIds: [planA2], tenantPercentage: 50, assignedTenantIds: null },
+          { planIds: [planA2], tenantPercentage: 50, assignedTenantIds: [] },
         ],
       }),
     });
@@ -304,7 +304,7 @@ describe("experiment conclusion", () => {
             tenantPercentage: 50,
             assignedTenantIds: [tenantId],
           },
-          { planIds: [planA2], tenantPercentage: 50, assignedTenantIds: null },
+          { planIds: [planA2], tenantPercentage: 50, assignedTenantIds: [] },
         ],
       }),
     });
@@ -338,8 +338,8 @@ describe("experiment conclusion", () => {
       limitMicrocredits: null,
       reset: null,
       rollovers: null,
-      topUpPricesPerCredit: null,
-      topUpCreditPackSizes: null,
+      topUpPricesPerCredit: [],
+      topUpCreditPackSizes: { static: null, dynamic: null },
     });
     const tenantId = await makeTenant();
     const cycleId = await makeCycle();
@@ -371,7 +371,7 @@ describe("experiment conclusion", () => {
             tenantPercentage: 50,
             assignedTenantIds: [tenantId],
           },
-          { planIds: [planA2], tenantPercentage: 50, assignedTenantIds: null },
+          { planIds: [planA2], tenantPercentage: 50, assignedTenantIds: [] },
         ],
       }),
     });
@@ -422,7 +422,7 @@ describe("experiment conclusion", () => {
             tenantPercentage: 50,
             assignedTenantIds: [tenantId],
           },
-          { planIds: [planA2], tenantPercentage: 50, assignedTenantIds: null },
+          { planIds: [planA2], tenantPercentage: 50, assignedTenantIds: [] },
         ],
       }),
     });
@@ -474,7 +474,7 @@ describe("experiment conclusion", () => {
           {
             planIds: [planA2, planB2],
             tenantPercentage: 50,
-            assignedTenantIds: null,
+            assignedTenantIds: [],
           },
         ],
       }),

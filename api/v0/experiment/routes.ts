@@ -64,7 +64,7 @@ const experimentCreateSchema = experimentSchema
 export type ExperimentCreateBody = z.infer<typeof experimentCreateSchema>;
 
 const concludeSchema = z.object({
-  concludingPlans: experimentSchema.shape.concludingPlans.unwrap(),
+  concludingPlans: experimentSchema.shape.concludingPlans,
 });
 
 export type ConcludeExperimentBody = z.infer<typeof concludeSchema>;

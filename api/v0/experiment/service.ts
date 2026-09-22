@@ -65,9 +65,7 @@ async function listTreatments({
         .filter((plan) => plan.treatmentId === treatment.treatmentId)
         .map((plan) => plan.planId),
       tenantPercentage: treatment.tenantPercentage,
-      assignedTenantIds: assignedTenantRows.length
-        ? assignedTenantRows.map((tenant) => tenant.tenantId)
-        : null,
+      assignedTenantIds: assignedTenantRows.map((tenant) => tenant.tenantId),
     };
   });
 }
@@ -194,7 +192,7 @@ export async function createExperiment({
     return { error: "treatments must touch the same product lines" };
   }
   const tenantIds = experiment.treatments.flatMap(
-    (treatment) => treatment.assignedTenantIds ?? [],
+    (treatment) => treatment.assignedTenantIds,
   );
   if (new Set(tenantIds).size !== tenantIds.length) {
     return { error: "each tenant must be assigned at most once" };
@@ -209,7 +207,7 @@ export async function createExperiment({
     return { error: "treatments must reference known tenants" };
   }
   const enrollments = experiment.treatments.flatMap((treatment) =>
-    (treatment.assignedTenantIds ?? []).flatMap((tenantId) =>
+    treatment.assignedTenantIds.flatMap((tenantId) =>
       treatment.planIds.map((planId) => ({ planId, tenantId })),
     ),
   );
@@ -242,7 +240,7 @@ export async function createExperiment({
       experimentId,
       createdAt: Date.now(),
       concludedAt: null,
-      concludingPlans: null,
+      concludingPlans: [],
       name: experiment.name,
       description: experiment.description,
     });
@@ -387,9 +385,7 @@ export async function concludeExperiment({
   }
   const assignedTenantIds = [
     ...new Set(
-      experiment.treatments.flatMap(
-        (treatment) => treatment.assignedTenantIds ?? [],
-      ),
+      experiment.treatments.flatMap((treatment) => treatment.assignedTenantIds),
     ),
   ];
   /* Roll every assigned tenant onto the concluding plans. Untouched lines in
