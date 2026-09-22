@@ -26,7 +26,7 @@ export const experimentSchema = z.object({
   experimentId: experimentIdSchema,
   createdAt: epochMs,
   concludedAt: epochMs.nullable(),
-  concludingPlans: z.array(concludingPlanSchema).nullable(),
+  concludingPlans: z.array(concludingPlanSchema),
   name: z.string().min(1),
   description: z.string().nullable(),
   treatments: z.array(treatmentSchema).min(2),

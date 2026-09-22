@@ -36,7 +36,7 @@ export const taskTypeSchema = z.object({
   createdAt: epochMs,
   deprecatedAt: epochMs.nullable(),
   defaultAssigneeTeamMemberId: teamMemberIdSchema.nullable(),
-  integrations: z.array(integrationTargetSchema).nullable(),
+  integrations: z.array(integrationTargetSchema),
   name: z.string().min(1),
   description: z.string().nullable(),
 });

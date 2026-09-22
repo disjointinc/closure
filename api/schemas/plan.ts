@@ -77,7 +77,7 @@ export const planMeterFields = {
   /** Reset periods unused credits roll over into. Null means unlimited. */
   rollovers: z.number().int().nonnegative().nullable(),
   /** Usage tiers with their own prices. */
-  topUpPricesPerCredit: z.array(topUpTierSchema).min(1).nullable(),
+  topUpPricesPerCredit: z.array(topUpTierSchema),
   topUpCreditPackSizes: topUpCreditPackSizesSchema,
 };
 
@@ -198,8 +198,8 @@ export const planSchema = z.object({
   name: z.string().min(1),
   description: z.string().nullable(),
   prices: z.array(priceSchema),
-  features: z.array(planFeatureSchema).nullable(),
-  meters: z.array(planMeterSchema).nullable(),
-  addOnTypeIds: z.array(addOnTypeIdSchema).nullable(),
+  features: z.array(planFeatureSchema),
+  meters: z.array(planMeterSchema),
+  addOnTypeIds: z.array(addOnTypeIdSchema),
 });
 export type Plan = z.infer<typeof planSchema>;

@@ -7,7 +7,7 @@ export const taxationAmountSchema = z.object({
   taxationAmountId: taxationAmountIdSchema,
   taxId: taxIdSchema,
   /** Null means the tax applies to the whole invoice. */
-  appliesToItemIds: z.array(itemIdSchema).nullable(),
+  onlyApplyToItemIds: z.array(itemIdSchema).min(1).nullable(),
   description: z.string().nullable(),
   /** The tax owed, in the invoice's smallest billable currency unit. */
   amount: currencyAmountSchema,

@@ -6,6 +6,6 @@ export const treatmentSchema = z.object({
   treatmentId: treatmentIdSchema,
   planIds: z.array(planIdSchema).min(1),
   tenantPercentage: z.number().min(0).max(100),
-  assignedTenantIds: z.array(tenantIdSchema).nullable(),
+  assignedTenantIds: z.array(tenantIdSchema),
 });
 export type Treatment = z.infer<typeof treatmentSchema>;

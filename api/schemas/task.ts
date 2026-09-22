@@ -36,6 +36,6 @@ export const taskSchema = z.object({
   description: z.string().nullable(),
   assignedToTeamMemberId: teamMemberIdSchema.nullable(),
   completedAt: epochMs.nullable(),
-  externalRefs: z.array(externalRefSchema).nullable(),
+  externalRefs: z.array(externalRefSchema),
 });
 export type Task = z.infer<typeof taskSchema>;

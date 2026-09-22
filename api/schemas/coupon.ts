@@ -50,28 +50,24 @@ export type Award = z.infer<typeof awardSchema>;
  * The features/credits a coupon (or coupon template) grants. Shared: a
  * template's definition is copied verbatim into coupons minted from it.
  */
-export const couponFeaturesGrantedSchema = z
-  .array(
-    z.object({
-      featureId: featureIdSchema,
-      setTo: featureSetTo,
-      award: awardSchema,
-    }),
-  )
-  .nullable();
-export const couponCreditsGrantedSchema = z
-  .array(
-    z.object({
-      meterId: meterIdSchema,
-      amountMicrocredits: microcredits.positive(),
-      /** Null means the credits never expire. */
-      expiration: resetSchedule.nullable(),
-      /** Null means unlimited rollovers. */
-      rollovers: z.number().int().nonnegative().nullable(),
-      award: awardSchema,
-    }),
-  )
-  .nullable();
+export const couponFeaturesGrantedSchema = z.array(
+  z.object({
+    featureId: featureIdSchema,
+    setTo: featureSetTo,
+    award: awardSchema,
+  }),
+);
+export const couponCreditsGrantedSchema = z.array(
+  z.object({
+    meterId: meterIdSchema,
+    amountMicrocredits: microcredits.positive(),
+    /** Null means the credits never expire. */
+    expiration: resetSchedule.nullable(),
+    /** Null means unlimited rollovers. */
+    rollovers: z.number().int().nonnegative().nullable(),
+    award: awardSchema,
+  }),
+);
 
 /**
  * The definition shared by coupons and coupon templates: a template's

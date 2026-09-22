@@ -20,20 +20,18 @@ export const tenantSchema = z
     /** External systems' ids for this tenant, keyed by system name. */
     externalIds: z.record(z.string(), z.string()),
     assignments: z.array(assignmentSchema),
-    invoices: z.array(invoiceSchema).nullable(),
-    paymentMethods: z.array(paymentMethodSchema).nullable(),
-    payments: z.array(paymentSchema).nullable(),
-    refunds: z.array(refundSchema).nullable(),
-    featureOverrides: z.array(featureOverrideSchema).nullable(),
+    invoices: z.array(invoiceSchema),
+    paymentMethods: z.array(paymentMethodSchema),
+    payments: z.array(paymentSchema),
+    refunds: z.array(refundSchema),
+    featureOverrides: z.array(featureOverrideSchema),
     meterOverrides: z.array(meterOverrideSchema),
     creditGrants: z.array(creditGrantSchema),
     couponsReceived: z.array(couponReceiptSchema),
     couponsGranted: z.array(couponGrantSchema),
   })
   .superRefine((tenant, ctx) => {
-    const defaults = (tenant.paymentMethods ?? []).filter(
-      (method) => method.isDefault,
-    );
+    const defaults = tenant.paymentMethods.filter((method) => method.isDefault);
     if (defaults.length > 1) {
       ctx.addIssue({
         code: "custom",

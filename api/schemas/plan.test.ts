@@ -17,7 +17,7 @@ const base = {
   limitMicrocredits: 100_000_000,
   reset: null,
   rollovers: null,
-  topUpPricesPerCredit: null,
+  topUpPricesPerCredit: [],
   topUpCreditPackSizes: { static: [1_000_000, 100_000_000], dynamic: null },
 };
 
