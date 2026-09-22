@@ -1415,10 +1415,7 @@ export const meterSpends = pgTable(
     spendMicrocredits: microcredits("spend_microcredits").notNull(),
     updatedAt: epochMs("updated_at").notNull(),
   },
-  (t) => [
-    primaryKey({ columns: [t.tenantId, t.meterId] }),
-    check("meter_spends_nonnegative", sql`spend_microcredits >= 0`),
-  ],
+  (t) => [primaryKey({ columns: [t.tenantId, t.meterId] })],
 );
 
 /**

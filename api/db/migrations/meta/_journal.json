@@ -260,6 +260,20 @@
       "when": 1789921378160,
       "tag": "0036_peaceful_ink",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1789929553897,
+      "tag": "0037_easy_professor_monster",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1789947444870,
+      "tag": "0038_normal_purple_man",
+      "breakpoints": true
     }
   ]
 }

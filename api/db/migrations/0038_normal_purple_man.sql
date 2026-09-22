@@ -1,0 +1,1 @@
+ALTER TABLE "meter_spends" DROP CONSTRAINT "meter_spends_nonnegative";
