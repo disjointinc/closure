@@ -18,8 +18,7 @@ import {
   planMeterApiToCredits,
   planMeterInputToMicrocredits,
   planMeterWireFields,
-  topUpTierWireApiSchema,
-  topUpTierWireInputSchema,
+  topUpTierWireSchema,
 } from "../../plan/routes.ts";
 import { createMeterOverride, listMeterOverrides } from "./service.ts";
 
@@ -27,7 +26,7 @@ import { createMeterOverride, listMeterOverrides } from "./service.ts";
 const meterOverrideCreateWireSchema = z
   .object({
     ...planMeterWireFields,
-    topUpPricesPerCredit: z.array(topUpTierWireInputSchema).min(1).nullable(),
+    topUpPricesPerCredit: z.array(topUpTierWireSchema),
     byTeamMemberId: teamMemberIdSchema,
     reason: z.string().nullable(),
   })
@@ -36,7 +35,7 @@ const meterOverrideCreateWireSchema = z
 /** The call-surface override: credits on the wire, full top-up values. */
 const meterOverrideWireApiSchema = z.object({
   ...planMeterWireFields,
-  topUpPricesPerCredit: z.array(topUpTierWireApiSchema).min(1).nullable(),
+  topUpPricesPerCredit: z.array(topUpTierWireSchema),
   meterOverrideId: meterOverrideIdSchema,
   tenantId: tenantIdSchema,
   createdAt: epochMs,
