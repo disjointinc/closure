@@ -52,7 +52,7 @@ import { keys } from "../keys.ts";
 
 /** The subset of a rule relevant to a single tenant+meter, scope-resolved. */
 export type WatchedRule = {
-  /** The canonical stored rule (carries actions with value ids for firing). */
+  /** The canonical stored rule */
   rule: Rule;
   /**
    * For microcredits_remaining / microcredits_spent: the absolute threshold,

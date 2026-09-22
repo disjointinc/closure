@@ -14,7 +14,7 @@ import {
 } from "../../schemas/coupon-template.ts";
 import { featureSetTo } from "../../schemas/common.ts";
 import { couponTemplateIdSchema, featureIdSchema } from "../../schemas/ids.ts";
-import { awardApiSchema } from "../award/service.ts";
+import { awardSchema } from "../../schemas/coupon.ts";
 import {
   creditGrantedToCredits,
   creditGrantedToMicrocredits,
@@ -29,20 +29,18 @@ import {
   listCouponTemplates,
 } from "./service.ts";
 
-const featuresGrantedApiSchema = z
-  .array(
-    z.object({
-      featureId: featureIdSchema,
-      setTo: featureSetTo,
-      award: awardApiSchema,
-    }),
-  )
-  .nullable();
+const featuresGrantedApiSchema = z.array(
+  z.object({
+    featureId: featureIdSchema,
+    setTo: featureSetTo,
+    award: awardSchema,
+  }),
+);
 
 /** The template shape the call surface reads: credits, full award values. */
 const couponTemplateWireApiSchema = z.object({
   ...couponTemplateSchema.shape,
-  defaultAward: awardApiSchema.nullable(),
+  defaultAward: awardSchema.nullable(),
   featuresGranted: featuresGrantedApiSchema,
   creditsGranted: creditsGrantedWireSchema,
 });
@@ -51,7 +49,7 @@ type CouponTemplateWireApi = z.infer<typeof couponTemplateWireApiSchema>;
 const couponTemplateCreateWireSchema = z
   .object({
     ...couponTemplateSchema.shape,
-    defaultAward: awardApiSchema.nullable(),
+    defaultAward: awardSchema.nullable(),
     featuresGranted: featuresGrantedApiSchema,
     creditsGranted: creditsGrantedWireSchema,
   })
@@ -69,12 +67,9 @@ function templateCreateToMicrocredits({
 }): CouponTemplateCreateBody {
   return {
     ...template,
-    creditsGranted:
-      template.creditsGranted === null
-        ? null
-        : template.creditsGranted.map((credit) =>
-            creditGrantedToMicrocredits({ credit }),
-          ),
+    creditsGranted: template.creditsGranted.map((credit) =>
+      creditGrantedToMicrocredits({ credit }),
+    ),
   };
 }
 
@@ -85,12 +80,9 @@ function templateApiToCredits({
 }): CouponTemplateWireApi {
   return {
     ...template,
-    creditsGranted:
-      template.creditsGranted === null
-        ? null
-        : template.creditsGranted.map((credit) =>
-            creditGrantedToCredits({ credit }),
-          ),
+    creditsGranted: template.creditsGranted.map((credit) =>
+      creditGrantedToCredits({ credit }),
+    ),
   };
 }
 

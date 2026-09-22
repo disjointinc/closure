@@ -201,7 +201,7 @@ function templatePlaceholders(template: string): string[] {
 }
 
 /**
- * RuleAction without the server-minted value id, so the create schema can
+ * RuleAction without the server-minted amount, so the create schema can
  * validate before the id exists. Derived by omission so new fields and
  * variants on RuleAction flow through automatically.
  */
