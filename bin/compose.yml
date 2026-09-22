@@ -107,6 +107,7 @@ services:
       # to the bundle (web/src/lib/api.ts). Follows CLOSURE_API_PORT unless
       # VITE_CLOSURE_API_URL is set directly.
       VITE_CLOSURE_API_URL: ${VITE_CLOSURE_API_URL:-http://localhost:${CLOSURE_API_PORT:-3216}}
+      VITE_CLOSURE_DOCS_URL: ${VITE_CLOSURE_DOCS_URL:-http://localhost:${CLOSURE_DOCS_PORT:-3236}}
   closure-docs:
     image: node:24-alpine
     working_dir: /closure/docs
