@@ -1,11 +1,10 @@
 import { z } from "zod";
-import { epochMs } from "./common.ts";
+import { amountsSchema, epochMs } from "./common.ts";
 import {
   paymentIdSchema,
   refundIdSchema,
   teamMemberIdSchema,
   tenantIdSchema,
-  valueIdSchema,
 } from "./ids.ts";
 
 export const refundSchema = z.object({
@@ -19,7 +18,7 @@ export const refundSchema = z.object({
   succeededAt: epochMs.nullable(),
   failedAt: epochMs.nullable(),
   byTeamMemberId: teamMemberIdSchema,
-  valueId: valueIdSchema,
+  amounts: amountsSchema,
   reason: z.string().nullable(),
 });
 export type Refund = z.infer<typeof refundSchema>;

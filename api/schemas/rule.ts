@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  amountsSchema,
   durationSchema,
   epochMs,
   microcredits,
@@ -13,7 +14,6 @@ import {
   taskTypeIdSchema,
   teamMemberIdSchema,
   tenantIdSchema,
-  valueIdSchema,
 } from "./ids.ts";
 
 /**
@@ -147,12 +147,12 @@ const createTaskActionSchema = z.object({
 const addInvoiceItemActionSchema = z
   .object({
     type: z.literal("add_invoice_item"),
-    fixedValueId: valueIdSchema.nullable(),
+    fixedAmounts: amountsSchema.nullable(),
     percentageOfInvoice: z.number().positive().nullable(),
   })
   .refine(
     (action) =>
-      action.fixedValueId !== null || action.percentageOfInvoice !== null,
+      action.fixedAmounts !== null || action.percentageOfInvoice !== null,
     {
       message: "add_invoice_item requires a flat fee and/or a percentage",
     },
