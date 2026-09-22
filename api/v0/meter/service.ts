@@ -32,9 +32,7 @@ export async function getMeter({
     deprecatedAt: row.deprecatedAt,
     name: row.name,
     description: row.description,
-    applicableTaxTypeIds: taxTypeRows.length
-      ? taxTypeRows.map((taxType) => taxType.taxTypeId)
-      : null,
+    applicableTaxTypeIds: taxTypeRows.map((taxType) => taxType.taxTypeId),
   };
 }
 
