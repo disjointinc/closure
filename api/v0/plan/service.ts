@@ -17,10 +17,7 @@ import {
   productLines,
 } from "../../db/schema.ts";
 import { generateId } from "../../lib/id.ts";
-import type { Plan, PlanMeter } from "../../schemas/plan.ts";
-
-/** The create-input plan meter entry: microcredits. */
-export type PlanMeterInput = PlanMeter;
+import type { Plan } from "../../schemas/plan.ts";
 
 /** The create-input plan: microcredits; server mints planId and stamps times. */
 export type PlanCreateBody = Omit<
@@ -28,14 +25,11 @@ export type PlanCreateBody = Omit<
   "planId" | "createdAt" | "deprecatedAt"
 >;
 
-export type PlanMeterApi = PlanMeter;
-export type PlanApi = Plan;
-
 export async function getPlan({
   planId,
 }: {
   planId: string;
-}): Promise<PlanApi | null> {
+}): Promise<Plan | null> {
   const [row] = await db.select().from(plans).where(eq(plans.planId, planId));
   if (!row) {
     return null;
@@ -71,7 +65,7 @@ export async function getPlan({
   };
 }
 
-export async function listPlans(): Promise<PlanApi[]> {
+export async function listPlans(): Promise<Plan[]> {
   const rows = await db.select().from(plans);
   const found = await Promise.all(
     rows.map((row) => getPlan({ planId: row.planId })),
@@ -83,7 +77,7 @@ export async function createPlan({
   plan,
 }: {
   plan: PlanCreateBody;
-}): Promise<PlanApi | { error: string }> {
+}): Promise<Plan | { error: string }> {
   /* Hard lock: a plan sells its own product line only, so every referenced
    * feature, meter, and add-on type must belong to plan.productLineId. */
   const [lineRow] = await db
@@ -205,7 +199,7 @@ export async function createPlan({
       .onConflictDoNothing();
   }
   // The plan row always exists once its id is stored.
-  return getPlan({ planId }) as Promise<PlanApi>;
+  return getPlan({ planId }) as Promise<Plan>;
 }
 
 /** Deprecate the plan, or return null if no such plan exists. */
@@ -213,7 +207,7 @@ export async function deprecatePlan({
   planId,
 }: {
   planId: string;
-}): Promise<PlanApi | null> {
+}): Promise<Plan | null> {
   const updated = await db
     .update(plans)
     .set({ deprecatedAt: Date.now() })

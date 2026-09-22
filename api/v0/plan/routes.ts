@@ -20,6 +20,7 @@ import { priceSchema } from "../../schemas/common.ts";
 import { planIdSchema } from "../../schemas/ids.ts";
 import {
   checkPlanMeter,
+  type Plan,
   type PlanMeter,
   planMeterFields,
   planSchema,
@@ -29,10 +30,7 @@ import {
   deprecatePlan,
   getPlan,
   listPlans,
-  type PlanApi,
   type PlanCreateBody,
-  type PlanMeterApi,
-  type PlanMeterInput,
 } from "./service.ts";
 
 // Prices reference first-class cycles by id and carry their amounts inline.
@@ -169,7 +167,7 @@ export function planMeterInputToMicrocredits({
   meter,
 }: {
   meter: PlanMeterWireInput;
-}): PlanMeterInput {
+}): PlanMeter {
   return {
     meterId: meter.meterId,
     defaultMicrocredits: creditsToMicrocredits({
@@ -197,7 +195,7 @@ export function planMeterInputToMicrocredits({
 export function planMeterApiToCredits({
   meter,
 }: {
-  meter: PlanMeterApi;
+  meter: PlanMeter;
 }): PlanMeterWireApi {
   return {
     meterId: meter.meterId,
@@ -255,7 +253,7 @@ function planCreateToMicrocredits({
   };
 }
 
-function planApiToCredits({ plan }: { plan: PlanApi }): PlanWireApi {
+function planApiToCredits({ plan }: { plan: Plan }): PlanWireApi {
   return {
     ...plan,
     meters: plan.meters.map((meter) => planMeterApiToCredits({ meter })),
