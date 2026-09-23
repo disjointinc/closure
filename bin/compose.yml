@@ -59,6 +59,8 @@ services:
     ports:
       - "${CLOSURE_API_PORT:-3216}:3216"
     environment:
+      # Development unless CLOSURE_ENV is set (shell or bin/.env).
+      CLOSURE_ENV: "${CLOSURE_ENV:-development}"
       CLOSURE_API_PORT: "3216"
       CLOSURE_POSTGRES_HOST: closure-db
       CLOSURE_POSTGRES_PORT: "5432"
@@ -110,16 +112,19 @@ services:
       VITE_CLOSURE_DOCS_URL: ${VITE_CLOSURE_DOCS_URL:-http://localhost:${CLOSURE_DOCS_PORT:-3236}}
   closure-docs:
     image: node:24-alpine
-    working_dir: /closure/docs
+    working_dir: /closure
     volumes:
       - ..:/closure
       # Container-local node_modules (see closure-migrate above).
-      - closure-docs-node-modules:/closure/docs/node_modules
-    # sync-openapi --once writes docs/openapi.json before mint boots (mint
-    # requires referenced spec files to exist at startup); the background
-    # poller keeps it in sync so mint rebuilds the API reference on change.
-    command: sh -c "npm install && node sync-openapi.mjs --once && (node sync-openapi.mjs &) && exec npm run dev"
+      - closure-docs-node-modules:/closure/node_modules
+    # npm install / --ignore-scripts: see closure-migrate. sync-openapi
+    # --once writes docs/openapi.json before mint boots (mint requires
+    # referenced spec files to exist at startup); the background poller
+    # keeps it in sync so mint rebuilds the API reference on change.
+    command: sh -c "npm install --ignore-scripts && node docs/sync-openapi.ts --once && (node docs/sync-openapi.ts &) && exec npm run dev -w docs"
     environment:
+      # A container has no TTY for mint's TUI; CI mode logs plainly instead.
+      CI: "true"
       CLOSURE_API_URL: http://closure-api:3216/openapi.json
       CLOSURE_DOCS_PORT: "3236"
     ports:
