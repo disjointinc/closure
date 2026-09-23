@@ -30,7 +30,8 @@
     "lint:fix": "turbo run lint:fix",
     "start": "turbo run start",
     "test": "turbo run test",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "validate": "turbo run validate"
   },
   "devDependencies": {
     "@types/node": "^24.12.0",

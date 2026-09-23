@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "mint dev --port ${CLOSURE_DOCS_PORT:-3236}",
+    "start": "node sync-openapi.ts --once && mint dev --port ${CLOSURE_DOCS_PORT:-3236}",
+    "validate": "mint validate",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
