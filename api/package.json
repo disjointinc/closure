@@ -9,7 +9,8 @@
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node db/migrate.ts"
+    "db:migrate": "node db/migrate.ts",
+    "garbage-collect": "node garbage-collection/collect.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
