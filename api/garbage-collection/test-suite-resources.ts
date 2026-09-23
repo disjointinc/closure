@@ -1,8 +1,8 @@
 /**
  * garbage-collection/test-suite-resources.ts -- hard-deletes resources
- * created by test suites (docs/quickstart.test.ts today). The API's delete
- * routes only soft-delete (deprecated_at / deleted_at), so this is the only
- * path that actually frees the rows.
+ * created by test suites (docs/guide/quickstart.test.ts today). The API's
+ * delete routes only soft-delete (deprecated_at / deleted_at), so this is
+ * the only path that actually frees the rows.
  *
  * The marker contract is shared with the test suites: every resource a test
  * suite creates carries TEST_SUITE_RESOURCE_MARKER -- as a name prefix, or
