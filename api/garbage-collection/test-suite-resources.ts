@@ -61,9 +61,12 @@ export async function collectTestSuiteResources(): Promise<void> {
       .from(tenants)
       .where(sql`${tenants.externalIds} ? ${TEST_SUITE_RESOURCE_MARKER}`)
   ).map((row) => row.tenantId);
-  const redisKeysToDelete: { keys: string[]; trackedMembers: string[] } =
+  const redisCleanup: {
+    keysToDelete: string[];
+    keysToRemoveFromTrackedMeterBalancesSet: string[];
+  } =
     markedTenantIds.length === 0
-      ? { keys: [], trackedMembers: [] }
+      ? { keysToDelete: [], keysToRemoveFromTrackedMeterBalancesSet: [] }
       : await markedRedisKeys({ markedTenantIds });
 
   const counts = await db.transaction(async (tx) => {
@@ -233,13 +236,13 @@ export async function collectTestSuiteResources(): Promise<void> {
    * tenants and meters, so the checkpoint loop must never resurrect a
    * balance row for a deleted graph -- removing the keys (and their
    * mbal:tracked membership) is what stops that. */
-  if (redisKeysToDelete.keys.length > 0) {
-    await redis.del(...redisKeysToDelete.keys);
+  if (redisCleanup.keysToDelete.length > 0) {
+    await redis.del(...redisCleanup.keysToDelete);
   }
-  if (redisKeysToDelete.trackedMembers.length > 0) {
+  if (redisCleanup.keysToRemoveFromTrackedMeterBalancesSet.length > 0) {
     await redis.srem(
       keys.trackedMeterBalances,
-      ...redisKeysToDelete.trackedMembers,
+      ...redisCleanup.keysToRemoveFromTrackedMeterBalancesSet,
     );
   }
 
@@ -254,7 +257,10 @@ async function markedRedisKeys({
   markedTenantIds,
 }: {
   markedTenantIds: string[];
-}): Promise<{ keys: string[]; trackedMembers: string[] }> {
+}): Promise<{
+  keysToDelete: string[];
+  keysToRemoveFromTrackedMeterBalancesSet: string[];
+}> {
   /* Group event externalIds by tenant+meter pair. Neither source table
    * alone covers every pair: events may not be checkpointed to
    * meter_balances yet, and a balance initialized at assignment has no
@@ -297,31 +303,32 @@ async function markedRedisKeys({
     }
   }
 
-  const redisKeys: string[] = [];
+  const keysToDelete: string[] = [];
   for (const { tenantId, meterId, externalIds } of pairsToClean.values()) {
-    redisKeys.push(
+    keysToDelete.push(
       keys.meterBalance({ meterId, tenantId }),
       keys.meterSpend({ meterId, tenantId }),
       keys.lastActivity({ meterId, tenantId }),
       keys.ruleWatchSet({ meterId, tenantId }),
     );
     for (const externalId of externalIds) {
-      redisKeys.push(
+      keysToDelete.push(
         keys.meterEventIdempotency({ externalId, meterId, tenantId }),
       );
     }
   }
 
-  /* mbal:tracked members are balance key strings; membership must go too,
-   * or the checkpoint loop would resurrect the row in pg (see above). */
-  const trackedMembers: string[] = [];
+  /* mbal:tracked is the checkpoint loop's work list of balance key names;
+   * a marked tenant's entries must come off it, or the loop would
+   * resurrect the row in pg (see above). */
+  const keysToRemoveFromTrackedMeterBalancesSet: string[] = [];
   for (const member of await redis.smembers(keys.trackedMeterBalances)) {
     const [, tenantId] = member.split(":");
     if (tenantId && markedTenantIds.includes(tenantId)) {
-      trackedMembers.push(member);
+      keysToRemoveFromTrackedMeterBalancesSet.push(member);
     }
   }
-  return { keys: redisKeys, trackedMembers };
+  return { keysToDelete, keysToRemoveFromTrackedMeterBalancesSet };
 }
 
 const GARBAGE_COLLECTION_INTERVAL_MS = 60 * 60 * 1000;
