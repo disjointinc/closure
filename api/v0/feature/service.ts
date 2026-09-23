@@ -85,7 +85,7 @@ export async function createFeature({
       .values(options.map((option) => ({ ...option, featureId })))
       .onConflictDoNothing();
   }
-  if (feature.applicableTaxTypeIds) {
+  if (feature.applicableTaxTypeIds.length > 0) {
     await db
       .insert(featureTaxTypes)
       .values(

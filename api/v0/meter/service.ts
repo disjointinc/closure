@@ -62,7 +62,7 @@ export async function createMeter({
       description: meter.description,
     })
     .onConflictDoNothing();
-  if (meter.applicableTaxTypeIds) {
+  if (meter.applicableTaxTypeIds.length > 0) {
     await db
       .insert(meterTaxTypes)
       .values(
