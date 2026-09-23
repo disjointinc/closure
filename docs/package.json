@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "mint dev --port ${CLOSURE_DOCS_PORT:-3236}",
-    "start": "node sync-openapi.ts --once && mint dev --port ${CLOSURE_DOCS_PORT:-3236}",
+    "preview": "mint dev --port ${CLOSURE_DOCS_PORT:-3236}",
+    "poll": "node sync-openapi.ts",
+    "start": "npm run poll -- --once && npm run preview",
     "validate": "mint validate",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

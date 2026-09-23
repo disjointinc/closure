@@ -117,11 +117,10 @@ services:
       - ..:/closure
       # Container-local node_modules (see closure-migrate above).
       - closure-docs-node-modules:/closure/node_modules
-    # npm install / --ignore-scripts: see closure-migrate. sync-openapi
-    # --once writes docs/openapi.json before mint boots (mint requires
-    # referenced spec files to exist at startup); the background poller
-    # keeps it in sync so mint rebuilds the API reference on change.
-    command: sh -c "npm install --ignore-scripts && node docs/sync-openapi.ts --once && (node docs/sync-openapi.ts &) && exec npm run dev -w docs"
+    # npm install / --ignore-scripts: see closure-migrate. The background
+    # poller keeps docs/openapi.json in sync so mint rebuilds the API
+    # reference on change (local dev only; start syncs once at boot).
+    command: sh -c "npm install --ignore-scripts && (npm run poll -w docs &) && exec npm run start -w docs"
     environment:
       # A container has no TTY for mint's TUI; CI mode logs plainly instead.
       CI: "true"
