@@ -14,7 +14,7 @@ import {
 import { startMeteringReconcileLoop } from "./cache/meter/reconcile.ts";
 import { startRuleExecutorLoop } from "./cache/rule/execute.ts";
 import { startRuleSchedulerLoop } from "./cache/rule/schedule.ts";
-import { startGarbageCollectionLoop } from "./garbage-collection/test-suite-resources.ts";
+import { startTestSuiteResourceCollectionLoop } from "./garbage-collection/test-suite-resources.ts";
 import app from "./handler.ts";
 
 await rebuildMissingMeterBalances();
@@ -22,8 +22,8 @@ startMeteringFlushLoop();
 startMeteringReconcileLoop();
 startRuleSchedulerLoop();
 startRuleExecutorLoop();
-if (config.garbageCollection.enabled) {
-  startGarbageCollectionLoop();
+if (config.garbageCollection.testSuiteResources.enabled) {
+  startTestSuiteResourceCollectionLoop();
 }
 
 serve(

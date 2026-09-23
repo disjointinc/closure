@@ -337,7 +337,7 @@ const GARBAGE_COLLECTION_INTERVAL_MS = 60 * 60 * 1000;
  * Start the periodic collector. Interval is unref'd and errors are logged,
  * never thrown -- a failed pass just defers collection to the next one.
  */
-export function startGarbageCollectionLoop(): void {
+export function startTestSuiteResourceCollectionLoop(): void {
   const collect = setInterval(() => {
     collectTestSuiteResources().catch((error) =>
       console.error("garbage collection failed", error),
