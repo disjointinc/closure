@@ -9,8 +9,17 @@
   },
   "workspaces": [
     "api",
-    "web"
+    "web",
+    "docs"
   ],
+  "overrides": {
+    "@mintlify/cli": {
+      "react": "^19.2.8"
+    },
+    "@mintlify/previewing": {
+      "react": "^19.2.8"
+    }
+  },
   "scripts": {
     "prepare": "lefthook install",
     "build": "turbo run build",
