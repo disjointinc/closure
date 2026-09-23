@@ -4,3 +4,4 @@ api/db/migrations/meta/
 web/dist/
 web/routeTree.gen.ts
 web/.tanstack/
+docs/openapi.json
