@@ -100,7 +100,7 @@ services:
       - closure-web-node-modules:/closure/node_modules
     # --ignore-scripts: skips the repo's "prepare" hook (lefthook), which
     # has no .git to install into here.
-    command: sh -c "npm ci --ignore-scripts && exec npm run dev -w web"
+    command: sh -c "npm install --ignore-scripts && exec npm run dev -w web"
     ports:
       - "${CLOSURE_WEB_PORT:-3226}:3226"
     environment:
