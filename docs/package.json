@@ -1,10 +1,16 @@
 {
-  "name": "closure-docs",
+  "name": "@closure/docs",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "mint dev --port ${CLOSURE_DOCS_PORT:-3236}"
+    "dev": "mint dev --port ${CLOSURE_DOCS_PORT:-3236}",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix"
   },
   "devDependencies": {
-    "mint": "^4.2.894"
+    "mint": "^4.2.894",
+    "vitest": "^4.1.11"
   }
 }
