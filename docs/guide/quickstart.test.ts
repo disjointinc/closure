@@ -409,11 +409,11 @@ describe("quickstart", () => {
       path: `/v0/tenant/${created.tenantId}/meter-entitlements`,
     });
     expect(status, JSON.stringify(body)).toBe(200);
-    const seats = body.find(
+    const meter = body.find(
       (entitlement) => entitlement.meterId === created.meterId,
     );
-    expect(seats?.defaultCredits).toBe(15);
-    expect(seats?.limitCredits).toBe(30);
+    expect(meter?.defaultCredits).toBe(15);
+    expect(meter?.limitCredits).toBe(30);
   });
 
   it("reads the meter balance", async () => {
