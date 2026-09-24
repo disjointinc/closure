@@ -55,3 +55,5 @@ Log all errors, even if they should never occur in a try-catch block. Log anythi
 Don't use magic numbers. Use constants.
 
 The DB is a strict dependency of the cache. The cache and DB are strict dependencies of API routes. The API routes are strict dependencies of clients, such as the web client. The web client and API routes are strict dependencies of the docs.
+
+Every handwritten guide in the docs should have a test, making sure the exact flow outlined in the guide works. Every route in the API should have at least 1 happy path and at least 1 failure case test. Other than this, tests should only test nonobvious behavior that's prone to breakage because of careless or uninformed edits. Bias against writing unit tests unless absolutely necessary; integration tests are preferred. The point of a test is to raise an alert that critical functionality, somewhere, is breaking, not to cover every possible edge case for every single line of code.
