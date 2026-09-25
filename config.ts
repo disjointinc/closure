@@ -12,14 +12,6 @@ function envPort(key: string, fallback: number): number {
   return port;
 }
 
-function envBoolean(key: string, fallback: boolean): boolean {
-  const raw = env(key, String(fallback));
-  if (raw !== "true" && raw !== "false") {
-    throw new Error(`invalid boolean in ${key}: ${JSON.stringify(raw)}`);
-  }
-  return raw === "true";
-}
-
 const environment = env("CLOSURE_ENV", "development");
 
 export const config = {
@@ -43,17 +35,6 @@ export const config = {
   web: {
     host: env("CLOSURE_WEB_HOST", "0.0.0.0"),
     port: envPort("CLOSURE_WEB_PORT", 3226),
-  },
-  garbageCollection: {
-    /* Test suites shouldn't run in production, so their leftovers
-     * (api/garbage-collection/test-suite-resources.ts) are only collected
-     * elsewhere by default. */
-    testSuiteResources: {
-      enabled: envBoolean(
-        "CLOSURE_GARBAGE_COLLECTION_TEST_SUITE_RESOURCES_ENABLED",
-        environment !== "production",
-      ),
-    },
   },
 } as const;
 
