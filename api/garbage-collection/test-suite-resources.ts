@@ -1,20 +1,27 @@
 /**
  * garbage-collection/test-suite-resources.ts -- hard-deletes resources
- * created by test suites (docs/guide/quickstart.test.ts today). The API's
- * delete routes only soft-delete (deprecated_at / deleted_at), so this is
- * the only path that actually frees the rows.
+ * created by test suites (docs/guide/quickstart.test.ts, and the api test
+ * below). The API's delete routes only soft-delete (deprecated_at /
+ * deleted_at), so this is the only path that actually frees the rows.
+ *
+ * This is invoked by test suites directly (each collects only its own
+ * marker, so concurrent suites never delete each other's in-flight
+ * resources). It is deliberately NOT registered in the production
+ * garbage-collection loop (loop.ts): test-scoped collection is not
+ * production behavior.
  *
  * The marker contract is shared with the test suites: every resource a test
- * suite creates carries TEST_SUITE_RESOURCE_MARKER -- as a name prefix, or
- * as an externalIds key on tenants (tenants have no name column) -- so
- * collection can find it with zero ambiguity. If another marker format is
- * ever added, update both sides together.
+ * suite creates carries TEST_SUITE_RESOURCE_MARKER plus its suite name --
+ * as a name prefix (`<marker>-<suite>:`), or as the externalIds VALUE on
+ * tenants (tenants have no name column; the key stays the base marker so
+ * the jsonb exact-key lookup still works). If the marker format changes,
+ * update the test suites too.
  *
  * One pass deletes in FK-safe order inside a single transaction. On any
  * error (e.g. real data has since referenced a marked resource) the pass
- * rolls back and the loop defers collection to the next one.
+ * rolls back and the caller decides whether to retry.
  */
-import { inArray, like, sql } from "drizzle-orm";
+import { and, inArray, like, sql } from "drizzle-orm";
 import { redis } from "../cache/index.ts";
 import { keys } from "../cache/keys.ts";
 import { db } from "../db/index.ts";
@@ -37,6 +44,8 @@ import {
   planPrices,
   plans,
   productLines,
+  ruleRuns,
+  tasks,
   teamMembers,
   tenantLastActivity,
   tenants,
@@ -50,8 +59,12 @@ interface MarkedTenantMeter {
   externalIds: string[];
 }
 
-export async function collectTestSuiteResources(): Promise<void> {
-  const markedName = `${TEST_SUITE_RESOURCE_MARKER}%`;
+export async function collectTestSuiteResources({
+  suite,
+}: {
+  suite: string;
+}): Promise<void> {
+  const markedName = `${TEST_SUITE_RESOURCE_MARKER}-${suite}:%`;
 
   /* Read the Redis key set (per marked tenant+meter, plus event idempotency
    * markers) before the rows they're derived from are deleted. */
@@ -59,7 +72,12 @@ export async function collectTestSuiteResources(): Promise<void> {
     await db
       .select({ tenantId: tenants.tenantId })
       .from(tenants)
-      .where(sql`${tenants.externalIds} ? ${TEST_SUITE_RESOURCE_MARKER}`)
+      .where(
+        and(
+          sql`${tenants.externalIds} ? ${TEST_SUITE_RESOURCE_MARKER}`,
+          sql`${tenants.externalIds} ->> ${TEST_SUITE_RESOURCE_MARKER} = ${suite}`,
+        ),
+      )
   ).map((row) => row.tenantId);
   const redisCleanup: {
     keysToDelete: string[];
@@ -92,6 +110,20 @@ export async function collectTestSuiteResources(): Promise<void> {
     const counts: Record<string, number> = {};
 
     if (markedTenantIds.length > 0) {
+      /* Rule activity references tenants too: a marked tenant whose rule
+       * fired (or had a task created) is otherwise uncollectable. */
+      counts.ruleRuns = (
+        await tx
+          .delete(ruleRuns)
+          .where(inArray(ruleRuns.tenantId, markedTenantIds))
+          .returning({ ruleRunId: ruleRuns.ruleRunId })
+      ).length;
+      counts.tasks = (
+        await tx
+          .delete(tasks)
+          .where(inArray(tasks.tenantId, markedTenantIds))
+          .returning({ taskId: tasks.taskId })
+      ).length;
       counts.meterEvents = (
         await tx
           .delete(meterEvents)
@@ -329,19 +361,4 @@ async function markedRedisKeys({
     }
   }
   return { keysToDelete, keysToRemoveFromTrackedMeterBalancesSet };
-}
-
-const GARBAGE_COLLECTION_INTERVAL_MS = 60 * 60 * 1000;
-
-/**
- * Start the periodic collector. Interval is unref'd and errors are logged,
- * never thrown -- a failed pass just defers collection to the next one.
- */
-export function startTestSuiteResourceCollectionLoop(): void {
-  const collect = setInterval(() => {
-    collectTestSuiteResources().catch((error) =>
-      console.error("garbage collection failed", error),
-    );
-  }, GARBAGE_COLLECTION_INTERVAL_MS);
-  collect.unref();
 }
