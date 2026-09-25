@@ -17,9 +17,10 @@
  *                                      balance key is rebuilt from pg
  * rwatch:{tenantId}:{meterId}  string  cached rule watch set for the
  *                                      tenant+meter (scope-resolved thresholds)
- * mspend:{tenantId}:{meterId}  string  running spend since a base checkpoint,
- *                                      in microcredits; INCRBY'd atomically
- *                                      with the balance on ingest
+ * mspend:{tenantId}:{meterId}  string  cumulative spend in microcredits;
+ *                                      INCRBY'd atomically with the balance
+ *                                      on ingest, never reset; the
+ *                                      checkpoint only snapshots it
  * rquota:{ruleId}:{tenantId}:{windowStart}
  *                              string  firing count this window for a capped
  *                                      rule; cached from rule_runs, TTL'd to
