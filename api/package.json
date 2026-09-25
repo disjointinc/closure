@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.ts",
-    "test": "CLOSURE_POSTGRES_DB=closure_test CLOSURE_REDIS_PORT=64001 CLOSURE_TEST_ALLOW_DESTRUCTIVE=1 vitest run",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
