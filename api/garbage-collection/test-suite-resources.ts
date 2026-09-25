@@ -59,12 +59,23 @@ interface MarkedTenantMeter {
   externalIds: string[];
 }
 
+export const createMarkedResource = ({
+  name,
+  suite,
+}: {
+  name: string;
+  suite: string;
+}) => `${TEST_SUITE_RESOURCE_MARKER}-${suite}: ${name}`;
+
+const matchMarkedResource = ({ suite }: { suite: string }) =>
+  `${TEST_SUITE_RESOURCE_MARKER}-${suite}:%`;
+
 export async function collectTestSuiteResources({
   suite,
 }: {
   suite: string;
 }): Promise<void> {
-  const markedName = `${TEST_SUITE_RESOURCE_MARKER}-${suite}:%`;
+  const markedResourcesMatcher = matchMarkedResource({ suite });
 
   /* Read the Redis key set (per marked tenant+meter, plus event idempotency
    * markers) before the rows they're derived from are deleted. */
@@ -92,19 +103,19 @@ export async function collectTestSuiteResources({
       await tx
         .select({ planId: plans.planId })
         .from(plans)
-        .where(like(plans.name, markedName))
+        .where(like(plans.name, markedResourcesMatcher))
     ).map((row) => row.planId);
     const markedFeatureIds = (
       await tx
         .select({ featureId: features.featureId })
         .from(features)
-        .where(like(features.name, markedName))
+        .where(like(features.name, markedResourcesMatcher))
     ).map((row) => row.featureId);
     const markedMeterIds = (
       await tx
         .select({ meterId: meters.meterId })
         .from(meters)
-        .where(like(meters.name, markedName))
+        .where(like(meters.name, markedResourcesMatcher))
     ).map((row) => row.meterId);
 
     const counts: Record<string, number> = {};
@@ -244,20 +255,23 @@ export async function collectTestSuiteResources({
     }
 
     counts.cycles = (
-      await tx.delete(cycles).where(like(cycles.name, markedName)).returning({
-        cycleId: cycles.cycleId,
-      })
+      await tx
+        .delete(cycles)
+        .where(like(cycles.name, markedResourcesMatcher))
+        .returning({
+          cycleId: cycles.cycleId,
+        })
     ).length;
     counts.teamMembers = (
       await tx
         .delete(teamMembers)
-        .where(like(teamMembers.name, markedName))
+        .where(like(teamMembers.name, markedResourcesMatcher))
         .returning({ teamMemberId: teamMembers.teamMemberId })
     ).length;
     counts.productLines = (
       await tx
         .delete(productLines)
-        .where(like(productLines.name, markedName))
+        .where(like(productLines.name, markedResourcesMatcher))
         .returning({ productLineId: productLines.productLineId })
     ).length;
 
