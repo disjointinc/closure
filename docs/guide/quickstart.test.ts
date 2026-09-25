@@ -11,7 +11,10 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { redis } from "../../api/cache/index.ts";
 import { db } from "../../api/db/index.ts";
-import { collectTestSuiteResources } from "../../api/garbage-collection/test-suite-resources.ts";
+import {
+  collectTestSuiteResources,
+  createMarkedResource,
+} from "../../api/garbage-collection/test-suite-resources.ts";
 
 const API_URL = `http://localhost:${process.env.CLOSURE_API_PORT ?? "3216"}`;
 
@@ -19,8 +22,6 @@ const API_URL = `http://localhost:${process.env.CLOSURE_API_PORT ?? "3216"}`;
 const TEST_SUITE_RESOURCE_MARKER = "resource-created-by-test-suite";
 const SUITE = "quickstart-test";
 const RUN_ID = `${Date.now()}`;
-const markedName = (name: string) =>
-  `${TEST_SUITE_RESOURCE_MARKER}-${SUITE}: ${name}`;
 
 afterAll(async () => {
   /* Self-collect this suite's marked resources: every suite collects only
@@ -119,7 +120,10 @@ describe("quickstart", () => {
     const { status, body } = await post<ProductLine>({
       path: "/v0/product-line",
       body: {
-        name: markedName("Default product line"),
+        name: createMarkedResource({
+          name: "Default product line",
+          suite: SUITE,
+        }),
         description: "The product line where all our plans live",
         forceBillingCycleSynchronizationWithProductLineIds: [],
       },
@@ -134,7 +138,7 @@ describe("quickstart", () => {
       path: "/v0/feature",
       body: {
         productLineId: created.productLineId,
-        name: markedName("Slack alerts"),
+        name: createMarkedResource({ name: "Slack alerts", suite: SUITE }),
         description: "Send the tenant alerts in Slack",
         options: null,
         applicableTaxTypeIds: [],
@@ -150,7 +154,7 @@ describe("quickstart", () => {
       path: "/v0/feature",
       body: {
         productLineId: created.productLineId,
-        name: markedName("CRM"),
+        name: createMarkedResource({ name: "CRM", suite: SUITE }),
         description: "CRMs that can be connected",
         options: [
           { name: "hubspot", description: null },
@@ -171,7 +175,7 @@ describe("quickstart", () => {
       path: "/v0/meter",
       body: {
         productLineIds: [created.productLineId],
-        name: markedName("Seats"),
+        name: createMarkedResource({ name: "Seats", suite: SUITE }),
         description: "The number of users on a tenant",
         applicableTaxTypeIds: [],
       },
@@ -188,7 +192,7 @@ describe("quickstart", () => {
         charged: "upfront",
         cycleLength: { days: null, months: 1 },
         defaultDiscountPercentage: null,
-        name: markedName("Monthly"),
+        name: createMarkedResource({ name: "Monthly", suite: SUITE }),
         description: "Monthly billing cycle",
       },
     });
@@ -206,7 +210,7 @@ describe("quickstart", () => {
         creditPeriod: { days: 30, months: null },
         gracePeriod: { days: 5, months: null },
         defaultDiscountPercentage: 20,
-        name: markedName("Annual"),
+        name: createMarkedResource({ name: "Annual", suite: SUITE }),
         description: "Annual billing cycle",
       },
     });
@@ -222,7 +226,7 @@ describe("quickstart", () => {
         /* The email carries the marker only for per-run uniqueness (email
          * has a unique constraint); garbage collection matches on name. */
         email: `${TEST_SUITE_RESOURCE_MARKER}-${SUITE}-${RUN_ID}@example.com`,
-        name: markedName("Colin"),
+        name: createMarkedResource({ name: "Colin", suite: SUITE }),
         profilePictureUrl: null,
       },
     });
@@ -237,7 +241,7 @@ describe("quickstart", () => {
       body: {
         productLineId: created.productLineId,
         derivedFromPlanId: null,
-        name: markedName("Starter"),
+        name: createMarkedResource({ name: "Starter", suite: SUITE }),
         description: "The starter plan",
         prices: [
           {
