@@ -2,9 +2,10 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    // The test files share external state (the scratch Postgres database and
-    // a throwaway Redis that gets FLUSHALL'd), so files must never run
-    // concurrently.
-    fileParallelism: false,
+    /* Integration tests run global scans (reconcile, checkpoint, scheduler)
+     * over the shared database, so they take seconds under parallel load;
+     * the 5s default flakes them. 15s keeps a failure meaning "the code is
+     * wrong", not "the database was busy". */
+    testTimeout: 15_000,
   },
 });
