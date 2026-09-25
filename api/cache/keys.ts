@@ -1,6 +1,12 @@
 /**
  * cache/keys.ts -- Closure's Redis key layout.
  *
+ * We use short prefixes (mbal instead of meter-balance) because Redis stores the
+ * full key string in every entry. A metering system has per-tenant x per-meter
+ * cardinality, so keys like mbal:{tenantId}:{meterId} can number in the
+ * millions+. Every byte shaved off the prefix saves RAM at that scale; shorter
+ * keys also slightly reduce replication + AOF payload size.
+ *
  * mbal:{tenantId}:{meterId}    string  current balance in microcredits
  * midem:{tenantId}:{meterId}:{externalId}
  *                              string  idempotency marker for a meter event;
