@@ -309,7 +309,9 @@ describe("quickstart", () => {
       path: "/v0/tenant",
       body: {
         externalIds: {
-          [TEST_SUITE_RESOURCE_MARKER]: RUN_ID,
+          /* The value is the suite name: the marker key is shared, so
+           * suite-scoped collection filters on the value. */
+          [TEST_SUITE_RESOURCE_MARKER]: SUITE,
           userId: `${SUITE}-${RUN_ID}-user`,
           stripeCustomerId: `${SUITE}-${RUN_ID}-customer`,
         },
