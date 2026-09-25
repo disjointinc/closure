@@ -8,7 +8,10 @@
  * can hard-delete it later; the marker contract lives in that file. Garbage
  * collection is on by default outside production (config.ts).
  */
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
+import { redis } from "../../api/cache/index.ts";
+import { db } from "../../api/db/index.ts";
+import { collectTestSuiteResources } from "../../api/garbage-collection/test-suite-resources.ts";
 
 const API_URL = `http://localhost:${process.env.CLOSURE_API_PORT ?? "3216"}`;
 
@@ -18,6 +21,16 @@ const SUITE = "quickstart-test";
 const RUN_ID = `${Date.now()}`;
 const markedName = (name: string) =>
   `${TEST_SUITE_RESOURCE_MARKER}-${SUITE}: ${name}`;
+
+afterAll(async () => {
+  /* Self-collect this suite's marked resources: every suite collects only
+   * its own, so this never touches another suite's in-flight resources.
+   * (The collect lives in the api package; it runs against the same
+   * database the stack serves.) */
+  await collectTestSuiteResources({ suite: SUITE });
+  redis.quit();
+  await db.$client.end();
+});
 
 interface ProductLine {
   productLineId: string;
