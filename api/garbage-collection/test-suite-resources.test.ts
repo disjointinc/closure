@@ -23,6 +23,7 @@ import {
   makePlan,
   makeProductLine,
   makeRule,
+  makeTaskType,
   makeTeamMember,
   makeTenant,
   newMeterEventId,
@@ -46,7 +47,6 @@ import {
   productLines,
   ruleRuns,
   tasks,
-  taskTypes,
   teamMembers,
   tenants,
 } from "../db/schema.ts";
@@ -178,6 +178,7 @@ async function makeGraph({ markedAs }: { markedAs: string | null }) {
   /* Rule activity: collection must delete a marked tenant's rule_runs and
    * tasks (FK to tenants) or the tenant delete violates the constraint. The
    * rule_run is future-dated so the executor never claims it mid-test. */
+  const taskTypeId = await makeTaskType();
   const ruleId = await makeRule({
     rule: {
       scope: { kind: "global" },
@@ -186,7 +187,7 @@ async function makeGraph({ markedAs }: { markedAs: string | null }) {
       actions: [
         {
           type: "create_task",
-          taskTypeId: "task_type_gcfixture00000",
+          taskTypeId,
           title: "fixture",
           description: null,
           assignToTeamMemberId: null,
@@ -195,16 +196,6 @@ async function makeGraph({ markedAs }: { markedAs: string | null }) {
       name: "GC test rule",
       description: null,
     },
-  });
-  const taskTypeId = `task_type_${suffix({ length: 20 })}`;
-  await db.insert(taskTypes).values({
-    taskTypeId,
-    createdAt: Date.now(),
-    deprecatedAt: null,
-    defaultAssigneeTeamMemberId: null,
-    integrations: [],
-    name: "GC test task type",
-    description: null,
   });
   await db.insert(ruleRuns).values({
     ruleRunId: `rule_run_${suffix({ length: 27 })}`,
