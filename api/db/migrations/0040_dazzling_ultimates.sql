@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "meter_events_dlq_payload" ON "meter_events_dlq" USING btree ("payload");

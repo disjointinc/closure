@@ -1448,19 +1448,29 @@ export const tenantLastActivity = pgTable(
  * rebuild balances too high. Deliberately no FK constraints: the reason a
  * row lands here may be that its tenant/meter reference is invalid.
  */
-export const meterEventsDlq = pgTable("meter_events_dlq", {
-  meterEventDlqId: bigint("meter_event_dlq_id", { mode: "number" })
-    .generatedAlwaysAsIdentity()
-    .primaryKey(),
-  /** The raw payload JSON from the pending stream, unmodified. */
-  payload: text("payload").notNull(),
-  /** Columns below are extracted when the payload parses; null otherwise. */
-  status: meterEventStatusEnum("status"),
-  tenantId: text("tenant_id"),
-  meterId: text("meter_id"),
-  amountMicrocredits: microcredits("amount_microcredits"),
-  receivedAtMicros: bigint("received_at_micros", { mode: "number" }),
-  /** Why the flush gave up (pg error code + message). */
-  error: text("error").notNull(),
-  failedAt: epochMs("failed_at").notNull(),
-});
+export const meterEventsDlq = pgTable(
+  "meter_events_dlq",
+  {
+    meterEventDlqId: bigint("meter_event_dlq_id", { mode: "number" })
+      .generatedAlwaysAsIdentity()
+      .primaryKey(),
+    /** The raw payload JSON from the pending stream, unmodified. */
+    payload: text("payload").notNull(),
+    /** Columns below are extracted when the payload parses; null otherwise. */
+    status: meterEventStatusEnum("status"),
+    tenantId: text("tenant_id"),
+    meterId: text("meter_id"),
+    amountMicrocredits: microcredits("amount_microcredits"),
+    receivedAtMicros: bigint("received_at_micros", { mode: "number" }),
+    /** Why the flush gave up (pg error code + message). */
+    error: text("error").notNull(),
+    failedAt: epochMs("failed_at").notNull(),
+  },
+  (t) => [
+    /* Two flushes processing the same stream entry (concurrent replicas, or
+     * a re-read after a crash between insert and XDEL) must not double-DLQ:
+     * the rebuild path sums this table, so a duplicate row double-counts.
+     * The payload is identical for the same entry, so it dedupes exactly. */
+    uniqueIndex("meter_events_dlq_payload").on(t.payload),
+  ],
+);

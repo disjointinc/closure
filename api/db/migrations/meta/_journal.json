@@ -281,6 +281,20 @@
       "when": 1790101783740,
       "tag": "0039_curious_james_howlett",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1790353082390,
+      "tag": "0040_dazzling_ultimates",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1790353312884,
+      "tag": "0041_cumulative_meter_spends",
+      "breakpoints": true
     }
   ]
 }
