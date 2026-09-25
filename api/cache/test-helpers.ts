@@ -22,6 +22,10 @@ import {
   assignments,
   creditGrants,
   cycles,
+  experiments,
+  experimentTreatmentPlans,
+  experimentTreatmentTenants,
+  experimentTreatments,
   meterBalances,
   meterEvents,
   meterEventsDlq,
@@ -30,8 +34,10 @@ import {
   plans,
   productLines,
   ruleRuns,
+  ruleSchedulerState,
   rules,
   tasks,
+  taskTypes,
   teamMembers,
   tenantLastActivity,
   tenants,
@@ -181,6 +187,35 @@ export async function makeTeamMember(): Promise<string> {
   return teamMemberId;
 }
 
+/** Task type ids created by this file, for cleanupTestState. */
+const testTaskTypeIds = new Set<string>();
+
+export async function makeTaskType(): Promise<string> {
+  const taskTypeId = newTaskTypeId();
+  await db.insert(taskTypes).values({
+    taskTypeId,
+    createdAt: Date.now(),
+    deprecatedAt: null,
+    defaultAssigneeTeamMemberId: null,
+    integrations: [],
+    name: "Test task type",
+    description: null,
+  });
+  testTaskTypeIds.add(taskTypeId);
+  return taskTypeId;
+}
+
+/** Experiment ids created by this file, for cleanupTestState. */
+const testExperimentIds = new Set<string>();
+
+/** Registers an experiment for cleanupTestState; returns it for inline use. */
+export function trackExperiment<T extends { experimentId: string }>(
+  experiment: T,
+): T {
+  testExperimentIds.add(experiment.experimentId);
+  return experiment;
+}
+
 /** Rule ids created by this file, for cleanupTestState. */
 const testRuleIds = new Set<string>();
 
@@ -275,16 +310,24 @@ export async function resetTestState(): Promise<void> {
 export async function cleanupTestState(): Promise<void> {
   const tenantIds = [...testTenantIds];
   const ruleIds = [...testRuleIds];
+  const experimentIds = [...testExperimentIds];
+  const taskTypeIds = [...testTaskTypeIds];
   if (ruleIds.length > 0) {
     /* A rule's side effects outlive its tenants: a global rule fires for
      * every tenant in the database, so clean up by rule too. Deprecate
-     * (never delete) so the dev stack's own scheduler stops firing them. */
-    await db.delete(tasks).where(inArray(tasks.sourceRuleId, ruleIds));
-    await db.delete(ruleRuns).where(inArray(ruleRuns.ruleId, ruleIds));
+     * first to stop new firings, then drain the queue and the tasks, then
+     * delete the rules themselves (a firing racing the delete hits the
+     * rule_id FK and is skipped by recordFiring). */
     await db
       .update(rules)
       .set({ deprecatedAt: Date.now() })
       .where(inArray(rules.ruleId, ruleIds));
+    await db.delete(ruleRuns).where(inArray(ruleRuns.ruleId, ruleIds));
+    await db
+      .delete(ruleSchedulerState)
+      .where(inArray(ruleSchedulerState.ruleId, ruleIds));
+    await db.delete(tasks).where(inArray(tasks.sourceRuleId, ruleIds));
+    await db.delete(rules).where(inArray(rules.ruleId, ruleIds));
   }
   if (tenantIds.length > 0) {
     await db.delete(ruleRuns).where(inArray(ruleRuns.tenantId, tenantIds));
@@ -308,8 +351,33 @@ export async function cleanupTestState(): Promise<void> {
       .delete(tenantLastActivity)
       .where(inArray(tenantLastActivity.tenantId, tenantIds));
     await db
+      .delete(experimentTreatmentTenants)
+      .where(inArray(experimentTreatmentTenants.tenantId, tenantIds));
+    await db
       .delete(assignments)
       .where(inArray(assignments.tenantId, tenantIds));
+  }
+  if (taskTypeIds.length > 0) {
+    await db
+      .delete(taskTypes)
+      .where(inArray(taskTypes.taskTypeId, taskTypeIds));
+  }
+  if (experimentIds.length > 0) {
+    // FK order: treatment plans/tenants reference treatments; treatments
+    // reference experiments; assignments (deleted above) reference
+    // experiments.
+    await db
+      .delete(experimentTreatmentPlans)
+      .where(inArray(experimentTreatmentPlans.experimentId, experimentIds));
+    await db
+      .delete(experimentTreatmentTenants)
+      .where(inArray(experimentTreatmentTenants.experimentId, experimentIds));
+    await db
+      .delete(experimentTreatments)
+      .where(inArray(experimentTreatments.experimentId, experimentIds));
+    await db
+      .delete(experiments)
+      .where(inArray(experiments.experimentId, experimentIds));
   }
   for (const tenantId of tenantIds) {
     const tenantKeys = await redis.keys(`*:${tenantId}:*`);
