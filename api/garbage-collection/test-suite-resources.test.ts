@@ -1,24 +1,28 @@
 /**
- * garbage-collection/test-suite-resources.test.ts -- seeds a marker-tagged
- * graph plus an unmarked control graph, then asserts collection removes
- * exactly the marked one (pg rows and Redis keys alike).
+ * garbage-collection/test-suite-resources.test.ts -- seeds a graph tagged
+ * with this file's suite marker plus a control graph tagged with a
+ * different suite's, then asserts a scoped collection removes exactly this
+ * suite's graph (pg rows and Redis keys alike) and leaves the other
+ * suite's alone -- the isolation property that lets every suite collect
+ * its own resources in parallel.
  *
- * Shares the scratch Postgres + throwaway Redis with the other api tests;
- * see cache/test-helpers.ts for setup requirements. Files run sequentially
- * (api/vitest.config.ts), and the scratch pg persists across runs, so
- * assertions are scoped to fixture ids rather than global counts.
+ * Shares Postgres + Redis with the other integration tests, running in
+ * parallel; see cache/test-helpers.ts for the fixture-scoping contract
+ * that makes that safe. Assertions are scoped to fixture ids rather than
+ * global counts.
  */
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { redis } from "../cache/index.ts";
 import { keys } from "../cache/keys.ts";
 import {
-  closeTestState,
+  cleanupTestState,
   makeAssignment,
   makeCycle,
   makeMeter,
   makePlan,
   makeProductLine,
+  makeRule,
   makeTeamMember,
   makeTenant,
   newMeterEventId,
@@ -32,33 +36,42 @@ import {
   featureOptions,
   featureOverrides,
   features,
-  meterBalances,
   meterEvents,
   meterOverrides,
   meters,
-  meterSpends,
   planFeatures,
   planMeters,
   planPrices,
   plans,
   productLines,
+  ruleRuns,
+  tasks,
+  taskTypes,
   teamMembers,
-  tenantLastActivity,
   tenants,
 } from "../db/schema.ts";
 import {
   collectTestSuiteResources,
+  createMarkedResource,
   TEST_SUITE_RESOURCE_MARKER,
 } from "./test-suite-resources.ts";
 
 beforeAll(resetTestState);
-afterAll(closeTestState);
+afterAll(cleanupTestState);
 
-const markedName = (name: string) =>
-  `${TEST_SUITE_RESOURCE_MARKER}-quickstart-test: ${name}`;
-
-/** A full quickstart-style graph, marker-tagged unless control. */
-async function makeGraph({ marked }: { marked: boolean }) {
+/** A full quickstart-style graph, tagged with the given suite marker (or
+ * left unmarked when null).
+ *
+ * These test fixtures deliberately don't include metering state (no
+ * meter_balances/meter_spends/tenant_last_activity rows, no Redis balance
+ * keys). If they did, the checkpoint and reconciler loops would try to
+ * write that state for a tenant that's being hard-deleted by the
+ * collection. That write would fail the tenant FK, because the tenant row
+ * is gone. The fixtures still include enough Redis state (an event row,
+ * an idempotency marker, tracked-set membership) to prove the collect
+ * cleans up Redis.
+ */
+async function makeGraph({ markedAs }: { markedAs: string | null }) {
   const productLineId = await makeProductLine();
   const meterId = await makeMeter({ productLineId });
   const cycleId = await makeCycle();
@@ -66,6 +79,13 @@ async function makeGraph({ marked }: { marked: boolean }) {
   const teamMemberId = await makeTeamMember();
   const tenantId = await makeTenant();
   const assignmentId = await makeAssignment({ planId, tenantId });
+  /* Ended, so the rule scheduler never picks this tenant as a candidate:
+   * collection hard-deletes the graph, and a scheduler pass firing a rule
+   * for a tenant mid-deletion violates the rule_runs tenant FK. */
+  await db
+    .update(assignments)
+    .set({ endsAt: Date.now() })
+    .where(eq(assignments.assignmentId, assignmentId));
 
   const featureId = `feature_${suffix({ length: 20 })}`;
   await db.insert(features).values({
@@ -148,60 +168,135 @@ async function makeGraph({ marked }: { marked: boolean }) {
     amountMicrocredits: 1_000_000,
     status: "succeeded",
   });
-  await db.insert(meterBalances).values({
-    tenantId,
-    meterId,
-    balanceMicrocredits: 14_000_000,
-    updatedAt: Date.now(),
-  });
-  await db.insert(meterSpends).values({
-    tenantId,
-    meterId,
-    spendMicrocredits: 1_000_000,
-    updatedAt: Date.now(),
-  });
-  await db.insert(tenantLastActivity).values({
-    tenantId,
-    meterId,
-    lastEventAtMicros: Date.now() * 1000,
-  });
-
-  const balanceKey = keys.meterBalance({ meterId, tenantId });
-  await redis.set(balanceKey, "14000000");
-  await redis.sadd(keys.trackedMeterBalances, balanceKey);
+  /* Tracked-set membership is added by the test body, not here; it carries
+   * no balance value, so concurrent checkpoint passes skip it. */
   await redis.set(
     keys.meterEventIdempotency({ externalId, meterId, tenantId }),
     "succeeded",
   );
 
-  if (marked) {
+  /* Rule activity: collection must delete a marked tenant's rule_runs and
+   * tasks (FK to tenants) or the tenant delete violates the constraint. The
+   * rule_run is future-dated so the executor never claims it mid-test. */
+  const ruleId = await makeRule({
+    rule: {
+      scope: { kind: "global" },
+      trigger: { type: "microcredits_spent", meterId, at: { absolute: 1 } },
+      recurrence: { window: null, rearmOnRecover: false, limitRecurrences: 1 },
+      actions: [
+        {
+          type: "create_task",
+          taskTypeId: "task_type_gcfixture00000",
+          title: "fixture",
+          description: null,
+          assignToTeamMemberId: null,
+        },
+      ],
+      name: "GC test rule",
+      description: null,
+    },
+  });
+  const taskTypeId = `task_type_${suffix({ length: 20 })}`;
+  await db.insert(taskTypes).values({
+    taskTypeId,
+    createdAt: Date.now(),
+    deprecatedAt: null,
+    defaultAssigneeTeamMemberId: null,
+    integrations: [],
+    name: "GC test task type",
+    description: null,
+  });
+  await db.insert(ruleRuns).values({
+    ruleRunId: `rule_run_${suffix({ length: 27 })}`,
+    createdAt: Date.now(),
+    ruleId,
+    tenantId,
+    triggerKey: "gc-test",
+    actionIndex: 0,
+    payload: {
+      type: "microcredits_spent",
+      meterId,
+      spentMicrocredits: 1,
+      thresholdMicrocredits: 1,
+    },
+    attempts: 0,
+    availableAt: Date.now() + 3_600_000,
+    succeededAt: null,
+    failedAt: null,
+    lastError: null,
+  });
+  await db.insert(tasks).values({
+    taskId: `task_${suffix({ length: 25 })}`,
+    createdAt: Date.now(),
+    deletedAt: null,
+    taskTypeId,
+    tenantId,
+    sourceRuleId: ruleId,
+    title: "GC test task",
+    description: null,
+    assignedToTeamMemberId: null,
+    completedAt: null,
+    externalRefs: [],
+  });
+
+  if (markedAs !== null) {
     await db
       .update(productLines)
-      .set({ name: markedName("Default product line") })
+      .set({
+        name: createMarkedResource({
+          name: "Default product line",
+          suite: markedAs,
+        }),
+      })
       .where(eq(productLines.productLineId, productLineId));
     await db
       .update(features)
-      .set({ name: markedName("CRM") })
+      .set({
+        name: createMarkedResource({
+          name: "CRM",
+          suite: markedAs,
+        }),
+      })
       .where(eq(features.featureId, featureId));
     await db
       .update(meters)
-      .set({ name: markedName("Seats") })
+      .set({
+        name: createMarkedResource({
+          name: "Seats",
+          suite: markedAs,
+        }),
+      })
       .where(eq(meters.meterId, meterId));
     await db
       .update(cycles)
-      .set({ name: markedName("Monthly") })
+      .set({
+        name: createMarkedResource({
+          name: "Monthly",
+          suite: markedAs,
+        }),
+      })
       .where(eq(cycles.cycleId, cycleId));
     await db
       .update(plans)
-      .set({ name: markedName("Starter") })
+      .set({
+        name: createMarkedResource({
+          name: "Starter",
+          suite: markedAs,
+        }),
+      })
       .where(eq(plans.planId, planId));
     await db
       .update(teamMembers)
-      .set({ name: markedName("Colin") })
+      .set({
+        name: createMarkedResource({
+          name: "Colin",
+          suite: markedAs,
+        }),
+      })
       .where(eq(teamMembers.teamMemberId, teamMemberId));
     await db
       .update(tenants)
-      .set({ externalIds: { [TEST_SUITE_RESOURCE_MARKER]: "1" } })
+      .set({ externalIds: { [TEST_SUITE_RESOURCE_MARKER]: markedAs } })
       .where(eq(tenants.tenantId, tenantId));
   }
 
@@ -217,19 +312,47 @@ async function makeGraph({ marked }: { marked: boolean }) {
     meterOverrideId,
     planId,
     productLineId,
+    ruleId,
+    taskTypeId,
     teamMemberId,
     tenantId,
   };
 }
 
 describe("garbage collection", () => {
-  it("collects marked resources and leaves unmarked ones alone", async () => {
-    const marked = await makeGraph({ marked: true });
-    const control = await makeGraph({ marked: false });
+  it("collects its own suite's resources and leaves other suites' alone", async () => {
+    const marked = await makeGraph({
+      markedAs: "test-suite-resources-test-suite",
+    });
+    /* The control graph carries a different suite's marker: the scoped pass
+     * must leave it entirely alone -- that is the isolation property that
+     * lets every suite collect its own resources in parallel. */
+    const control = await makeGraph({ markedAs: "other-suite" });
 
-    await collectTestSuiteResources();
+    /* The marked tracked-set membership exists only for the duration of the
+     * collection pass: a concurrent checkpoint pass would otherwise pick the
+     * key up and upsert a meter_balances row for a tenant mid-deletion.
+     * (The pass would still see the key here, but with no balance value and
+     * no checkpoint rows -- see makeGraph -- there is nothing to upsert.) */
+    await redis.sadd(
+      keys.trackedMeterBalances,
+      keys.meterBalance({ meterId: marked.meterId, tenantId: marked.tenantId }),
+    );
+    await redis.sadd(
+      keys.trackedMeterBalances,
+      keys.meterBalance({
+        meterId: control.meterId,
+        tenantId: control.tenantId,
+      }),
+    );
 
-    /* Every marked row is gone... */
+    // Scoped to this suite: the pass can't touch any other suite's
+    // resources, in-flight or not.
+    await collectTestSuiteResources({
+      suite: "test-suite-resources-test-suite",
+    });
+
+    /* Every marked row is gone */
     expect(await tenantRow({ tenantId: marked.tenantId })).toBeUndefined();
     expect(
       await db
@@ -258,7 +381,16 @@ describe("garbage collection", () => {
         .where(eq(meterEvents.meterEventId, marked.meterEventId)),
     ).toHaveLength(0);
     expect(
-      await pgPair({ meterId: marked.meterId, tenantId: marked.tenantId }),
+      await db
+        .select()
+        .from(ruleRuns)
+        .where(eq(ruleRuns.ruleId, marked.ruleId)),
+    ).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.taskTypeId, marked.taskTypeId)),
     ).toHaveLength(0);
     expect(
       await db.select().from(plans).where(eq(plans.planId, marked.planId)),
@@ -312,15 +444,8 @@ describe("garbage collection", () => {
         .where(eq(productLines.productLineId, marked.productLineId)),
     ).toHaveLength(0);
 
-    /* ...and its Redis keys with it. */
-    expect(
-      await redis.exists(
-        keys.meterBalance({
-          meterId: marked.meterId,
-          tenantId: marked.tenantId,
-        }),
-      ),
-    ).toBe(0);
+    /* Redis keys are gone too. (No meter_balance assertion here. The
+     * marked graph has no balance value by design; see makeGraph.) */
     expect(
       await redis.exists(
         keys.meterEventIdempotency({
@@ -354,17 +479,22 @@ describe("garbage collection", () => {
         .from(teamMembers)
         .where(eq(teamMembers.teamMemberId, control.teamMemberId)),
     ).toHaveLength(1);
+    /* Scoped to the fixture's own ids: other rules may legitimately fire
+     * for the control tenant on a shared database. */
     expect(
-      await pgPair({ meterId: control.meterId, tenantId: control.tenantId }),
+      await db
+        .select()
+        .from(ruleRuns)
+        .where(eq(ruleRuns.ruleId, control.ruleId)),
     ).toHaveLength(1);
     expect(
-      await redis.exists(
-        keys.meterBalance({
-          meterId: control.meterId,
-          tenantId: control.tenantId,
-        }),
-      ),
-    ).toBe(1);
+      await db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.taskTypeId, control.taskTypeId)),
+    ).toHaveLength(1);
+    /* (No meter_balance row or balance value for the control graph either:
+     * see makeGraph. Its tracked-set membership is what must survive.) */
     expect(await redis.smembers(keys.trackedMeterBalances)).toContain(
       keys.meterBalance({
         meterId: control.meterId,
@@ -372,92 +502,11 @@ describe("garbage collection", () => {
       }),
     );
 
-    /* Keep cross-run state clean: the marked graph is collected by the pass
-     * itself; the control graph is removed by hand. */
-    await deleteGraph({ graph: control });
-    expect(await tenantRow({ tenantId: control.tenantId })).toBeUndefined();
+    /* cleanupTestState (afterAll) removes the control graph's tenant-scoped
+     * rows and Redis keys; the marked graph is collected by the pass
+     * itself. */
   });
 });
 
 const tenantRow = async ({ tenantId }: { tenantId: string }) =>
   (await db.select().from(tenants).where(eq(tenants.tenantId, tenantId)))[0];
-
-const pgPair = async ({
-  meterId,
-  tenantId,
-}: {
-  meterId: string;
-  tenantId: string;
-}) =>
-  db
-    .select()
-    .from(meterBalances)
-    .where(
-      and(
-        eq(meterBalances.tenantId, tenantId),
-        eq(meterBalances.meterId, meterId),
-      ),
-    );
-
-/** Remove a makeGraph fixture by hand (the control graph's cleanup path). */
-async function deleteGraph({
-  graph,
-}: {
-  graph: Awaited<ReturnType<typeof makeGraph>>;
-}) {
-  /* makeAssignment mints its own cycle, distinct from graph.cycleId. */
-  const [assignment] = await db
-    .select()
-    .from(assignments)
-    .where(eq(assignments.assignmentId, graph.assignmentId));
-  await db.delete(meterEvents).where(eq(meterEvents.tenantId, graph.tenantId));
-  await db
-    .delete(meterBalances)
-    .where(eq(meterBalances.tenantId, graph.tenantId));
-  await db.delete(meterSpends).where(eq(meterSpends.tenantId, graph.tenantId));
-  await db
-    .delete(tenantLastActivity)
-    .where(eq(tenantLastActivity.tenantId, graph.tenantId));
-  await db
-    .delete(featureOverrides)
-    .where(eq(featureOverrides.tenantId, graph.tenantId));
-  await db
-    .delete(meterOverrides)
-    .where(eq(meterOverrides.tenantId, graph.tenantId));
-  await db.delete(assignments).where(eq(assignments.tenantId, graph.tenantId));
-  await db.delete(tenants).where(eq(tenants.tenantId, graph.tenantId));
-  await db.delete(planFeatures).where(eq(planFeatures.planId, graph.planId));
-  await db.delete(planMeters).where(eq(planMeters.planId, graph.planId));
-  await db.delete(planPrices).where(eq(planPrices.planId, graph.planId));
-  await db.delete(plans).where(eq(plans.planId, graph.planId));
-  await db
-    .delete(featureOptions)
-    .where(eq(featureOptions.featureId, graph.featureId));
-  await db.delete(features).where(eq(features.featureId, graph.featureId));
-  await db.delete(meters).where(eq(meters.meterId, graph.meterId));
-  await db.delete(cycles).where(eq(cycles.cycleId, graph.cycleId));
-  if (assignment) {
-    await db.delete(cycles).where(eq(cycles.cycleId, assignment.cycleId));
-  }
-  await db
-    .delete(teamMembers)
-    .where(eq(teamMembers.teamMemberId, graph.teamMemberId));
-  await db
-    .delete(productLines)
-    .where(eq(productLines.productLineId, graph.productLineId));
-  await redis.del(
-    keys.meterBalance({ meterId: graph.meterId, tenantId: graph.tenantId }),
-    keys.meterSpend({ meterId: graph.meterId, tenantId: graph.tenantId }),
-    keys.lastActivity({ meterId: graph.meterId, tenantId: graph.tenantId }),
-    keys.ruleWatchSet({ meterId: graph.meterId, tenantId: graph.tenantId }),
-    keys.meterEventIdempotency({
-      externalId: graph.externalId,
-      meterId: graph.meterId,
-      tenantId: graph.tenantId,
-    }),
-  );
-  await redis.srem(
-    keys.trackedMeterBalances,
-    keys.meterBalance({ meterId: graph.meterId, tenantId: graph.tenantId }),
-  );
-}
