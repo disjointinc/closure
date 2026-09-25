@@ -1,27 +1,44 @@
 /**
  * cache/test_helpers.ts -- shared fixtures for the cache integration tests.
- * Both test files run against the same scratch Postgres + throwaway Redis;
- * api/vitest.config.ts runs files sequentially because they share that
- * external state (a FLUSHALL must never race another file).
+ * Test files run in parallel against the same Postgres + Redis the app uses.
+ * That only works because every file scopes its assertions to its own
+ * fixtures (random-suffixed ids, tenant-scoped counts, per-key reads) and
+ * never asserts global state (flush counts, stream length, table-wide
+ * updates): the flush/checkpoint/reconcile machinery is idempotent, so any
+ * worker's pass converges any fixture to the same durable state. Keep that
+ * contract when adding tests here.
+ *
+ * Nothing global is ever wiped. cleanupTestState deletes only what a file
+ * created: tenant-scoped rows for its tenants, those tenants' Redis keys,
+ * their mbal:tracked memberships, and their entries on the pending stream.
+ * Root entities (tenants, meters, plans, rules, ...) stay: they're tiny,
+ * never globally scanned, and hard-deleting them mid-run is what races the
+ * checkpoint/reconcile machinery into FK violations.
  */
 import { randomInt } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
-import { config } from "../../config.ts";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/index.ts";
 import {
   assignments,
+  creditGrants,
   cycles,
   meterBalances,
   meterEvents,
+  meterEventsDlq,
   meters,
+  meterSpends,
   plans,
   productLines,
+  ruleRuns,
   rules,
+  tasks,
   teamMembers,
+  tenantLastActivity,
   tenants,
 } from "../db/schema.ts";
 import type { Rule } from "../schemas/rule.ts";
 import { redis } from "./index.ts";
+import { keys } from "./keys.ts";
 import type { MeterEventPayload } from "./meter/index.ts";
 
 export function suffix({ length }: { length: number }): string {
@@ -43,6 +60,9 @@ export const newCycleId = () => `cycle_${suffix({ length: 20 })}`;
 export const newPlanId = () => `plan_${suffix({ length: 20 })}`;
 export const newAssignmentId = () => `assignment_${suffix({ length: 24 })}`;
 
+/** Tenant ids created by this file, for cleanupTestState. */
+const testTenantIds = new Set<string>();
+
 export async function makeTenant({
   tenantId,
 }: { tenantId?: string } = {}): Promise<string> {
@@ -53,6 +73,7 @@ export async function makeTenant({
     deletedAt: null,
     externalIds: {},
   });
+  testTenantIds.add(resolvedTenantId);
   return resolvedTenantId;
 }
 
@@ -160,6 +181,9 @@ export async function makeTeamMember(): Promise<string> {
   return teamMemberId;
 }
 
+/** Rule ids created by this file, for cleanupTestState. */
+const testRuleIds = new Set<string>();
+
 /** Insert a rule directly (bypassing the API) for evaluation tests. */
 export async function makeRule({
   rule,
@@ -179,6 +203,7 @@ export async function makeRule({
     name: rule.name,
     description: rule.description,
   });
+  testRuleIds.add(ruleId);
   return ruleId;
 }
 
@@ -235,26 +260,80 @@ export async function pgCheckpoint({
   return row;
 }
 
-/**
- * Guard + reset shared by both test files: refuse to run against anything
- * but a local throwaway Redis, then FLUSHALL so every run starts clean
- * Redis-side. (The scratch pg database persists fixtures across runs.)
- */
+/** Fail fast if pg or Redis isn't reachable. */
 export async function resetTestState(): Promise<void> {
-  if (process.env.CLOSURE_TEST_ALLOW_DESTRUCTIVE !== "1") {
-    throw new Error(
-      "set CLOSURE_TEST_ALLOW_DESTRUCTIVE=1 (tests FLUSHALL Redis)",
-    );
-  }
-  if (!["localhost", "127.0.0.1"].includes(config.redis.host)) {
-    throw new Error("tests must run against a local, throwaway Redis");
-  }
   await redis.ping();
   await db.execute(sql`select 1`);
-  await redis.flushall();
 }
 
-export async function closeTestState(): Promise<void> {
+/**
+ * Delete only what this file created (see the header), then close the
+ * connections. Concurrent global scans tolerate the row deletions: every
+ * scanner either skips gone rows or re-derives them harmlessly, and tenants
+ * are never deleted, so no FK can trip.
+ */
+export async function cleanupTestState(): Promise<void> {
+  const tenantIds = [...testTenantIds];
+  const ruleIds = [...testRuleIds];
+  if (ruleIds.length > 0) {
+    /* A rule's side effects outlive its tenants: a global rule fires for
+     * every tenant in the database, so clean up by rule too. Deprecate
+     * (never delete) so the dev stack's own scheduler stops firing them. */
+    await db.delete(tasks).where(inArray(tasks.sourceRuleId, ruleIds));
+    await db.delete(ruleRuns).where(inArray(ruleRuns.ruleId, ruleIds));
+    await db
+      .update(rules)
+      .set({ deprecatedAt: Date.now() })
+      .where(inArray(rules.ruleId, ruleIds));
+  }
+  if (tenantIds.length > 0) {
+    await db.delete(ruleRuns).where(inArray(ruleRuns.tenantId, tenantIds));
+    await db.delete(tasks).where(inArray(tasks.tenantId, tenantIds));
+    await db
+      .delete(meterEventsDlq)
+      .where(inArray(meterEventsDlq.tenantId, tenantIds));
+    await db
+      .delete(meterEvents)
+      .where(inArray(meterEvents.tenantId, tenantIds));
+    await db
+      .delete(creditGrants)
+      .where(inArray(creditGrants.tenantId, tenantIds));
+    await db
+      .delete(meterBalances)
+      .where(inArray(meterBalances.tenantId, tenantIds));
+    await db
+      .delete(meterSpends)
+      .where(inArray(meterSpends.tenantId, tenantIds));
+    await db
+      .delete(tenantLastActivity)
+      .where(inArray(tenantLastActivity.tenantId, tenantIds));
+    await db
+      .delete(assignments)
+      .where(inArray(assignments.tenantId, tenantIds));
+  }
+  for (const tenantId of tenantIds) {
+    const tenantKeys = await redis.keys(`*:${tenantId}:*`);
+    const balanceKeys = tenantKeys.filter((key) => key.startsWith("mbal:"));
+    if (balanceKeys.length > 0) {
+      await redis.srem(keys.trackedMeterBalances, ...balanceKeys);
+    }
+    if (tenantKeys.length > 0) {
+      await redis.del(...tenantKeys);
+    }
+  }
+  if (tenantIds.length > 0) {
+    const pending = await redis.xrange(keys.pendingMeterEvents, "-", "+");
+    const ours = pending
+      .filter(([, fields]) =>
+        fields.some((field) =>
+          tenantIds.some((tenantId) => field.includes(tenantId)),
+        ),
+      )
+      .map(([entryId]) => entryId);
+    if (ours.length > 0) {
+      await redis.xdel(keys.pendingMeterEvents, ...ours);
+    }
+  }
   redis.quit();
   await db.$client.end();
 }
