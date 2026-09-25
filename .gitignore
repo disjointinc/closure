@@ -2,3 +2,4 @@ node_modules/
 .turbo/
 web/dist/
 web/.tanstack/
+.DS_Store
