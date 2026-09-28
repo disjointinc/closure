@@ -46,7 +46,7 @@ import { generateId } from "../../lib/id.ts";
 import type { Duration } from "../../schemas/common.ts";
 import type { MeterEvent } from "../../schemas/meter-event.ts";
 import type { Rule, FiringPayload } from "../../schemas/rule.ts";
-import { spendSince } from "../meter/index.ts";
+import { pgErrorCode, spendSince } from "../meter/index.ts";
 import { redis } from "../index.ts";
 import { keys } from "../keys.ts";
 
@@ -406,7 +406,21 @@ export async function recordFiring({
   if (rows.length === 0) {
     return;
   }
-  await db.insert(ruleRuns).values(rows).onConflictDoNothing();
+  try {
+    await db.insert(ruleRuns).values(rows).onConflictDoNothing();
+  } catch (error) {
+    /* A tenant garbage-collected between the candidate scan and the firing:
+     * the run can't reference it, so drop this firing and keep the pass
+     * going for everyone else. */
+    if (pgErrorCode({ error }) === "23503") {
+      console.error("rule firing skipped: tenant or rule gone mid-firing", {
+        ruleId: firing.rule.ruleId,
+        tenantId: firing.tenantId,
+      });
+      return;
+    }
+    throw error;
+  }
 }
 
 /** The start of the rule's current recurrence window, in ms since epoch. */
@@ -651,10 +665,9 @@ function baseTriggerKeyFor({ payload }: { payload: FiringPayload }): string {
  * The watch set carries the canonical stored rules and the billing cycle, so
  * evaluation needs no pg read for config -- only the synchronous rule_runs
  * insert on a firing. A microcredits_spent rule additionally needs the
- * cumulative spend for the current cycle, read from the mspend: counter
- * (durable meter_spends base + the Redis delta, already INCRBY'd by this
- * event) rather than a per-event pg sum; the only pg read is the bounded
- * pre-window gap when a cycle start landed after the last checkpoint.
+ * cumulative spend for the current cycle: counter(now) - counter(cycle
+ * start), where the mspend: counter is cumulative and counter(cycle start)
+ * is derived from the meter_spends checkpoint plus the durable event log.
  */
 export async function evaluateMeterEventRules({
   event,
