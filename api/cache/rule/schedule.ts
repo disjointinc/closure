@@ -12,8 +12,9 @@
  *     not with the event history, and windows are unbounded.
  *   - relative_to_lifecycle_event keeps a per-rule high-water mark
  *     (rule_scheduler_state, committed per chunk), so each tick scans only
- *     invoices finalized since the last tick, in bounded keyset-paged chunks,
- *     instead of the full finalized history.
+ *     the lifecycle rows (invoices finalized, assignments started) since
+ *     the last tick, in bounded keyset-paged chunks, instead of the full
+ *     history.
  *   - Per-tenant billing cycles are batched into one query
  *     (getBillingCycles), so a tick does O(1) pg round-trips, not
  *     O(candidates).
@@ -171,6 +172,122 @@ async function evaluateInactive(): Promise<void> {
   }
 }
 
+/**
+ * A lifecycle event instance surfaced by a scheduler scan, normalized off
+ * its source row so the chunk loop below is source-agnostic.
+ */
+type LifecycleEvent = {
+  /** When the event happened; the rule's offset is applied to this. */
+  eventAtMs: number;
+  /** Unique per event instance: the keyset tiebreaker and firing id. */
+  eventId: string;
+  tenantId: string;
+  /** The event row's plan (assignments); null when the row has none. */
+  planId: string | null;
+};
+
+/** One keyset page of finalized invoices whose offset has elapsed. */
+async function scanDueInvoices({
+  cursorAt,
+  cursorId,
+  threshold,
+}: {
+  cursorAt: number;
+  cursorId: string;
+  threshold: number;
+}): Promise<LifecycleEvent[]> {
+  const due = await db
+    .select()
+    .from(invoices)
+    .where(
+      and(
+        isNotNull(invoices.finalizedAt),
+        or(
+          gt(invoices.finalizedAt, cursorAt),
+          and(
+            eq(invoices.finalizedAt, cursorAt),
+            gt(invoices.invoiceId, cursorId),
+          ),
+        ),
+        lte(invoices.finalizedAt, threshold),
+      ),
+    )
+    .orderBy(asc(invoices.finalizedAt), asc(invoices.invoiceId))
+    .limit(LIFECYCLE_CHUNK_SIZE);
+  const events: LifecycleEvent[] = [];
+  for (const invoice of due) {
+    if (invoice.finalizedAt === null) {
+      continue;
+    }
+    events.push({
+      eventAtMs: invoice.finalizedAt,
+      eventId: invoice.invoiceId,
+      tenantId: invoice.tenantId,
+      planId: null,
+    });
+  }
+  return events;
+}
+
+/** One keyset page of assignments whose start plus offset has elapsed. */
+async function scanDueAssignments({
+  cursorAt,
+  cursorId,
+  threshold,
+}: {
+  cursorAt: number;
+  cursorId: string;
+  threshold: number;
+}): Promise<LifecycleEvent[]> {
+  const due = await db
+    .select()
+    .from(assignments)
+    .where(
+      and(
+        or(
+          gt(assignments.startsAt, cursorAt),
+          and(
+            eq(assignments.startsAt, cursorAt),
+            gt(assignments.assignmentId, cursorId),
+          ),
+        ),
+        lte(assignments.startsAt, threshold),
+      ),
+    )
+    .orderBy(asc(assignments.startsAt), asc(assignments.assignmentId))
+    .limit(LIFECYCLE_CHUNK_SIZE);
+  return due.map((assignment) => ({
+    eventAtMs: assignment.startsAt,
+    eventId: assignment.assignmentId,
+    tenantId: assignment.tenantId,
+    planId: assignment.planId,
+  }));
+}
+
+/**
+ * Scope filter for assignment events, matched directly on the row: an
+ * assignment for the scoped tenant / on a scoped plan started. The
+ * assignment row carries its plan, so -- unlike invoices -- no candidate
+ * lookup is needed.
+ */
+function assignmentScopeFilter({
+  rule,
+}: {
+  rule: Rule;
+}): ({ event }: { event: LifecycleEvent }) => boolean {
+  const scope = rule.scope;
+  if (scope.kind === "tenant") {
+    const tenantId = scope.tenantId;
+    return ({ event }) => event.tenantId === tenantId;
+  }
+  if (scope.kind === "plan") {
+    const planIds = scope.planIds;
+    return ({ event }) =>
+      event.planId !== null && planIds.includes(event.planId);
+  }
+  return () => true;
+}
+
 /** Fire relative_to_lifecycle_event rules whose lifecycle event + offset has passed. */
 async function evaluateLifecycle(): Promise<void> {
   const timeRules = await db
@@ -187,23 +304,23 @@ async function evaluateLifecycle(): Promise<void> {
       continue;
     }
     const { relativeTo, offset } = rule.trigger;
-    const offsetMs = durationToMs(offset);
-    const threshold = Date.now() - offsetMs;
-    // invoice_finalized / invoice_due key off invoices; the offset is applied
-    // to the lifecycle timestamp. assignment_started / cycle_end follow the
-    // same pattern once those lifecycle events are queryable.
-    if (relativeTo !== "invoice_finalized" && relativeTo !== "invoice_due") {
+    /* cycle_end has no timestamped row to scan -- cycle boundaries are
+     * computed per tenant, not stored -- so it is skipped until one
+     * exists. */
+    if (relativeTo === "cycle_end") {
       continue;
     }
-    /* High-water mark: only scan invoices finalized since the last tick, in
-     * fixed-size chunks paged by a (finalizedAt, invoiceId) keyset cursor --
-     * the partial invoices_finalized index serves the range scan, and the
-     * composite cursor makes same-millisecond finalizes paginate correctly
-     * (a bare finalized_at cursor would skip or repeat them at chunk
-     * boundaries). The mark is committed per chunk, so a crash resumes at
-     * the last committed chunk rather than re-scanning the whole delta,
-     * and a tick processes at most MAX_CHUNKS_PER_TICK, converting bursts
-     * and outage backlogs into a drain-rate question. */
+    const offsetMs = durationToMs(offset);
+    const threshold = Date.now() - offsetMs;
+    /* High-water mark: only scan events since the last tick, in fixed-size
+     * chunks paged by an (event time, event id) keyset cursor -- the
+     * source's index serves the range scan, and the composite cursor makes
+     * same-millisecond events paginate correctly (a bare timestamp cursor
+     * would skip or repeat them at chunk boundaries). The mark is committed
+     * per chunk, so a crash resumes at the last committed chunk rather than
+     * re-scanning the whole delta, and a tick processes at most
+     * MAX_CHUNKS_PER_TICK, converting bursts and outage backlogs into a
+     * drain-rate question. */
     const [stateRow] = await db
       .select()
       .from(ruleSchedulerState)
@@ -211,22 +328,36 @@ async function evaluateLifecycle(): Promise<void> {
       .limit(1);
     let cursorAt = stateRow?.evaluatedThroughMs ?? 0;
     let cursorId = "";
-    /* Scope lookup once per rule. Global rules skip it entirely: the open-
-     * assignment set would be loaded and then ignored for every chunk. */
-    const candidates =
-      rule.scope.kind === "global"
-        ? null
-        : await scopeCandidateTenants({ rule });
+    /* The event source and scope filter per lifecycle event. Assignment
+     * rows carry their tenant and plan, so they match the scope directly;
+     * invoice rows carry no plan, so their filter stays membership in the
+     * open-assignment set, loaded once per rule (global rules skip it
+     * entirely: the set would be loaded and then ignored for every chunk). */
+    const scan =
+      relativeTo === "assignment_started"
+        ? scanDueAssignments
+        : scanDueInvoices;
+    let inScope: ({ event }: { event: LifecycleEvent }) => boolean;
+    if (relativeTo === "assignment_started") {
+      inScope = assignmentScopeFilter({ rule });
+    } else {
+      const candidates =
+        rule.scope.kind === "global"
+          ? null
+          : await scopeCandidateTenants({ rule });
+      inScope = ({ event }) =>
+        candidates === null || candidates.has(event.tenantId);
+    }
     /* A billing_cycle_end window counts firings per billing period, so it
      * needs each candidate's current period boundary ("anchor"). Period
      * boundaries exist only per product line -- a tenant holds at most one
      * open assignment per line -- and two upstream checks pin this rule to
      * one line: createRule rejects cycle-windowed lifecycle rules whose
-     * scope plans span lines, and scopeCandidateTenants surfaced exactly
-     * the tenants with an open assignment on those plans. So every
-     * candidate has an open assignment in the anchor line, and this one
-     * lookup covers them all. Rules with rolling/permanent windows never
-     * read the cycle. */
+     * scope plans span lines, and the scope filter surfaced only tenants
+     * with an open assignment on those plans (invoices) or assignments on
+     * those plans (assignment_started). So every in-scope event has an
+     * open assignment in the anchor line, and this one lookup covers them
+     * all. Rules with rolling/permanent windows never read the cycle. */
     let anchorProductLineId: string | null = null;
     if (rule.scope.kind === "plan") {
       const planRows = await db
@@ -237,55 +368,30 @@ async function evaluateLifecycle(): Promise<void> {
       anchorProductLineId = lines.size === 1 ? [...lines][0] : null;
     }
     for (let chunk = 0; chunk < MAX_CHUNKS_PER_TICK; chunk++) {
-      const due = await db
-        .select()
-        .from(invoices)
-        .where(
-          and(
-            isNotNull(invoices.finalizedAt),
-            or(
-              gt(invoices.finalizedAt, cursorAt),
-              and(
-                eq(invoices.finalizedAt, cursorAt),
-                gt(invoices.invoiceId, cursorId),
-              ),
-            ),
-            lte(invoices.finalizedAt, threshold),
-          ),
-        )
-        .orderBy(asc(invoices.finalizedAt), asc(invoices.invoiceId))
-        .limit(LIFECYCLE_CHUNK_SIZE);
+      const due = await scan({ cursorAt, cursorId, threshold });
       if (due.length === 0) {
         break;
       }
-      const inScope = due.filter((invoice) => {
-        if (candidates === null) {
-          return true;
-        }
-        return candidates.has(invoice.tenantId);
-      });
+      const scoped = due.filter((event) => inScope({ event }));
       const cyclesByTenant = anchorProductLineId
         ? await getBillingCycles({
             productLineIds: [anchorProductLineId],
-            tenantIds: inScope.map((invoice) => invoice.tenantId),
+            tenantIds: scoped.map((event) => event.tenantId),
           })
         : new Map();
-      for (const invoice of due) {
-        if (invoice.finalizedAt === null) {
-          continue;
-        }
-        /* Advance the mark over every scanned invoice, even out-of-scope
+      for (const event of due) {
+        /* Advance the mark over every scanned row, even out-of-scope
          * ones, so a tenant leaving a plan doesn't wedge it. */
-        cursorAt = Math.max(cursorAt, invoice.finalizedAt);
-        cursorId = invoice.invoiceId;
-        if (!inScope.includes(invoice)) {
+        cursorAt = Math.max(cursorAt, event.eventAtMs);
+        cursorId = event.eventId;
+        if (!scoped.includes(event)) {
           continue;
         }
-        const tenantId = invoice.tenantId;
+        const tenantId = event.tenantId;
         const triggerKey = await firingKey({
-          baseTriggerKey: `${relativeTo}:${invoice.invoiceId}`,
+          baseTriggerKey: `${relativeTo}:${event.eventId}`,
           cycle: cyclesByTenant.get(tenantId) ?? null,
-          firingId: invoice.invoiceId,
+          firingId: event.eventId,
           rule,
           tenantId,
         });
@@ -299,14 +405,17 @@ async function evaluateLifecycle(): Promise<void> {
             triggerKey,
             payload: {
               type: "relative_to_lifecycle_event",
-              invoiceId: invoice.invoiceId,
+              invoiceId:
+                relativeTo === "assignment_started" ? null : event.eventId,
+              assignmentId:
+                relativeTo === "assignment_started" ? event.eventId : null,
             },
           },
         });
       }
       /* Commit the mark per chunk, so resume starts at the last processed
        * chunk rather than the start of the delta. Boundary rows at the same
-       * finalizedAt re-scan on crash; the idempotency index dedupes them. */
+       * timestamp re-scan on crash; the idempotency index dedupes them. */
       await db
         .insert(ruleSchedulerState)
         .values({ ruleId: rule.ruleId, evaluatedThroughMs: cursorAt })
