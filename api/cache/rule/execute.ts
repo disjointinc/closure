@@ -58,7 +58,14 @@ function substitutions({
     out.thresholdMicrocredits = String(payload.thresholdMicrocredits);
   }
   if (payload.type === "relative_to_lifecycle_event") {
-    out.invoiceId = payload.invoiceId;
+    if (payload.type === "relative_to_lifecycle_event") {
+      if (payload.invoiceId !== null) {
+        out.invoiceId = payload.invoiceId;
+      }
+      if (payload.assignmentId !== null) {
+        out.assignmentId = payload.assignmentId;
+      }
+    }
   }
   return out;
 }
