@@ -656,7 +656,7 @@ function baseTriggerKeyFor({ payload }: { payload: FiringPayload }): string {
     case "inactive_for":
       return "inactive_for";
     case "relative_to_lifecycle_event":
-      return `relative_to_lifecycle_event:${payload.invoiceId}`;
+      return `relative_to_lifecycle_event:${payload.invoiceId ?? payload.assignmentId}`;
   }
 }
 
