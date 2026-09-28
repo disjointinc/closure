@@ -184,18 +184,28 @@ type LifecycleEvent = {
   tenantId: string;
   /** The event row's plan (assignments); null when the row has none. */
   planId: string | null;
+  /** Payload fact: the invoice the event is on (invoice events only). */
+  invoiceId: string | null;
+  /** Payload fact: the assignment the event is on (assignment events only). */
+  assignmentId: string | null;
 };
+
+/** Where a lifecycle scan resumes, and how far it may read. */
+type ScanCursor = {
+  cursorAt: number;
+  cursorId: string;
+  threshold: number;
+};
+
+/** One keyset page of lifecycle events at or before the threshold. */
+type LifecycleScan = (cursor: ScanCursor) => Promise<LifecycleEvent[]>;
 
 /** One keyset page of finalized invoices whose offset has elapsed. */
 async function scanDueInvoices({
   cursorAt,
   cursorId,
   threshold,
-}: {
-  cursorAt: number;
-  cursorId: string;
-  threshold: number;
-}): Promise<LifecycleEvent[]> {
+}: ScanCursor): Promise<LifecycleEvent[]> {
   const due = await db
     .select()
     .from(invoices)
@@ -224,6 +234,8 @@ async function scanDueInvoices({
       eventId: invoice.invoiceId,
       tenantId: invoice.tenantId,
       planId: null,
+      invoiceId: invoice.invoiceId,
+      assignmentId: null,
     });
   }
   return events;
@@ -234,11 +246,7 @@ async function scanDueAssignments({
   cursorAt,
   cursorId,
   threshold,
-}: {
-  cursorAt: number;
-  cursorId: string;
-  threshold: number;
-}): Promise<LifecycleEvent[]> {
+}: ScanCursor): Promise<LifecycleEvent[]> {
   const due = await db
     .select()
     .from(assignments)
@@ -261,31 +269,9 @@ async function scanDueAssignments({
     eventId: assignment.assignmentId,
     tenantId: assignment.tenantId,
     planId: assignment.planId,
+    invoiceId: null,
+    assignmentId: assignment.assignmentId,
   }));
-}
-
-/**
- * Scope filter for assignment events, matched directly on the row: an
- * assignment for the scoped tenant / on a scoped plan started. The
- * assignment row carries its plan, so -- unlike invoices -- no candidate
- * lookup is needed.
- */
-function assignmentScopeFilter({
-  rule,
-}: {
-  rule: Rule;
-}): ({ event }: { event: LifecycleEvent }) => boolean {
-  const scope = rule.scope;
-  if (scope.kind === "tenant") {
-    const tenantId = scope.tenantId;
-    return ({ event }) => event.tenantId === tenantId;
-  }
-  if (scope.kind === "plan") {
-    const planIds = scope.planIds;
-    return ({ event }) =>
-      event.planId !== null && planIds.includes(event.planId);
-  }
-  return () => true;
 }
 
 /** Fire relative_to_lifecycle_event rules whose lifecycle event + offset has passed. */
@@ -304,14 +290,47 @@ async function evaluateLifecycle(): Promise<void> {
       continue;
     }
     const { relativeTo, offset } = rule.trigger;
-    /* cycle_end has no timestamped row to scan -- cycle boundaries are
-     * computed per tenant, not stored -- so it is skipped until one
-     * exists. */
-    if (relativeTo === "cycle_end") {
-      continue;
-    }
     const offsetMs = durationToMs(offset);
     const threshold = Date.now() - offsetMs;
+    /* The event source and scope filter per lifecycle event.
+     * invoice_finalized / invoice_due key off invoices: the rows carry no
+     * plan, so the scope check is membership in the open-assignment set
+     * (loaded once here; global rules skip it). assignment_started keys off
+     * assignments: the row carries its tenant and plan, so it matches the
+     * scope directly. cycle_end has no timestamped row to scan -- cycle
+     * boundaries are computed per tenant, not stored -- so it is skipped
+     * until one exists. */
+    let scan: LifecycleScan;
+    let inScope: ({ event }: { event: LifecycleEvent }) => boolean;
+    if (relativeTo === "invoice_finalized" || relativeTo === "invoice_due") {
+      scan = scanDueInvoices;
+      if (rule.scope.kind === "global") {
+        inScope = () => true;
+      } else {
+        const candidates = await scopeCandidateTenants({ rule });
+        inScope = ({ event }) => candidates.has(event.tenantId);
+      }
+    } else if (relativeTo === "assignment_started") {
+      scan = scanDueAssignments;
+      const scope = rule.scope;
+      if (scope.kind === "global") {
+        inScope = () => true;
+      } else if (scope.kind === "tenant") {
+        const { tenantId } = scope;
+        inScope = ({ event }) => event.tenantId === tenantId;
+      } else {
+        const { planIds } = scope;
+        inScope = ({ event }) =>
+          event.planId !== null && planIds.includes(event.planId);
+      }
+    } else if (relativeTo === "cycle_end") {
+      continue;
+    } else {
+      /* A lifecycle event added to the schema without a scan here: the
+       * never assignment trips typecheck, and this throws if it's ignored. */
+      const exhaustive: never = relativeTo;
+      throw new Error(`unknown lifecycle event: ${JSON.stringify(exhaustive)}`);
+    }
     /* High-water mark: only scan events since the last tick, in fixed-size
      * chunks paged by an (event time, event id) keyset cursor -- the
      * source's index serves the range scan, and the composite cursor makes
@@ -328,26 +347,6 @@ async function evaluateLifecycle(): Promise<void> {
       .limit(1);
     let cursorAt = stateRow?.evaluatedThroughMs ?? 0;
     let cursorId = "";
-    /* The event source and scope filter per lifecycle event. Assignment
-     * rows carry their tenant and plan, so they match the scope directly;
-     * invoice rows carry no plan, so their filter stays membership in the
-     * open-assignment set, loaded once per rule (global rules skip it
-     * entirely: the set would be loaded and then ignored for every chunk). */
-    const scan =
-      relativeTo === "assignment_started"
-        ? scanDueAssignments
-        : scanDueInvoices;
-    let inScope: ({ event }: { event: LifecycleEvent }) => boolean;
-    if (relativeTo === "assignment_started") {
-      inScope = assignmentScopeFilter({ rule });
-    } else {
-      const candidates =
-        rule.scope.kind === "global"
-          ? null
-          : await scopeCandidateTenants({ rule });
-      inScope = ({ event }) =>
-        candidates === null || candidates.has(event.tenantId);
-    }
     /* A billing_cycle_end window counts firings per billing period, so it
      * needs each candidate's current period boundary ("anchor"). Period
      * boundaries exist only per product line -- a tenant holds at most one
@@ -405,10 +404,8 @@ async function evaluateLifecycle(): Promise<void> {
             triggerKey,
             payload: {
               type: "relative_to_lifecycle_event",
-              invoiceId:
-                relativeTo === "assignment_started" ? null : event.eventId,
-              assignmentId:
-                relativeTo === "assignment_started" ? event.eventId : null,
+              invoiceId: event.invoiceId,
+              assignmentId: event.assignmentId,
             },
           },
         });
