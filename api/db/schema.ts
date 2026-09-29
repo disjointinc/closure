@@ -756,6 +756,8 @@ export const assignments = pgTable(
   (t) => [
     idFormatCheck("assignment", t.assignmentId),
     index("assignments_tenant").on(t.tenantId),
+    /* The assignment_started scheduler scan pages by (starts_at, id). */
+    index("assignments_started").on(t.startsAt),
     /* A tenant may hold several open assignments, but at most one per product
      * line: overlapping lines would make meters and cycles ambiguous. */
     uniqueIndex("assignments_one_open_per_line")
@@ -1437,7 +1439,64 @@ export const tenantLastActivity = pgTable(
       mode: "number",
     }).notNull(),
   },
-  (t) => [primaryKey({ columns: [t.tenantId, t.meterId] })],
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.meterId] }),
+    /* The inactivity sweep range-scans stale rows per meter. */
+    index("tenant_last_activity_meter_stale").on(
+      t.meterId,
+      t.lastEventAtMicros,
+    ),
+  ],
+);
+
+/**
+ * One row per billing period per tenant per product line ("receipts"), so
+ * cycle_end rules can look up period boundaries with an index scan instead
+ * of computing them per tenant (boundaries derive from assignment start +
+ * cycle length, which isn't searchable).
+ *
+ * Freshness: a row is written when its period STARTS. Assignment
+ * creation writes the first, then each cycle_end tick appends the next
+ * row when a period ends. The table therefore lags reality only in the
+ * window between a period ending and the next tick (at most
+ * CYCLE_END_TICK_INTERVAL_MS). Nothing reads the table during that
+ * window: the tick is the only reader, and it appends the new row before
+ * running detection in the same pass. While no live cycle_end rule
+ * exists, no rows are appended; the first tick after one is created
+ * writes every period elapsed since.
+ *
+ * is_current marks the one period currently underway per tenant + product
+ * line combination; the partial unique index enforces it. Rows are otherwise
+ * immutable.
+ */
+export const billingPeriods = pgTable(
+  "billing_periods",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.tenantId),
+    productLineId: text("product_line_id")
+      .notNull()
+      .references(() => productLines.productLineId),
+    /** The assignment whose cycle anchors this period run. */
+    assignmentId: text("assignment_id")
+      .notNull()
+      .references(() => assignments.assignmentId),
+    periodStart: epochMs("period_start").notNull(),
+    periodEnd: epochMs("period_end").notNull(),
+    /** Denormalized cycle length so trigger keys derive from the row alone. */
+    windowMs: bigint("window_ms", { mode: "number" }).notNull(),
+    isCurrent: boolean("is_current").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.productLineId, t.periodStart] }),
+    /* cycle_end detection range-scans period_end; the advance step scans
+     * current rows whose period_end has passed. */
+    index("billing_periods_end").on(t.periodEnd),
+    uniqueIndex("billing_periods_one_current_per_line")
+      .on(t.tenantId, t.productLineId)
+      .where(sql`${t.isCurrent}`),
+  ],
 );
 
 /**

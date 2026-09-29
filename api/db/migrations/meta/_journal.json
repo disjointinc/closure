@@ -295,6 +295,27 @@
       "when": 1790353312884,
       "tag": "0041_cumulative_meter_spends",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1790617530137,
+      "tag": "0042_confused_wraith",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1790647124467,
+      "tag": "0043_big_hitman",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1790647130988,
+      "tag": "0044_backfill_deadline_seeds",
+      "breakpoints": true
     }
   ]
 }

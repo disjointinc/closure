@@ -1,0 +1,1 @@
+CREATE INDEX "assignments_started" ON "assignments" USING btree ("starts_at");
