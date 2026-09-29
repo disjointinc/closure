@@ -7,6 +7,7 @@ import {
   resetSchedule,
 } from "./common.ts";
 import {
+  assignmentIdSchema,
   invoiceIdSchema,
   meterIdSchema,
   planIdSchema,
@@ -54,9 +55,34 @@ const inactiveForTriggerSchema = z.object({
 });
 
 /**
+ * A lifecycle trigger's offset. May be negative ("fire 7 days BEFORE the
+ * event"), so it can't share durationSchema's positive-only constraint
+ * (cycle lengths etc. must stay positive). Shared by the internal schema
+ * and the wire schema (v0/rule/routes.ts).
+ */
+export const lifecycleOffsetSchema = z
+  .object({
+    days: z
+      .number()
+      .int()
+      .refine((value) => value !== 0, { message: "must be nonzero" })
+      .nullable(),
+    months: z
+      .number()
+      .int()
+      .refine((value) => value !== 0, { message: "must be nonzero" })
+      .nullable(),
+  })
+  .refine(
+    (duration) =>
+      Object.values(duration).filter((value) => value !== null).length === 1,
+    { message: "exactly one of days or months must be set" },
+  );
+
+/**
  * Fires relative to a lifecycle event; offset is added to the event time
- * (negative offsets fire before). Subsumes dunning, e.g.
- * { relativeTo: "invoice_due", offset: { days: 3 } }.
+ * (negative offsets fire before, e.g. "7 days before cycle end"). Subsumes
+ * dunning, e.g. { relativeTo: "invoice_due", offset: { days: 3 } }.
  */
 const relativeToLifecycleEventTriggerSchema = z.object({
   type: z.literal("relative_to_lifecycle_event"),
@@ -66,7 +92,7 @@ const relativeToLifecycleEventTriggerSchema = z.object({
     "cycle_end",
     "assignment_started",
   ]),
-  offset: durationSchema,
+  offset: lifecycleOffsetSchema,
 });
 
 export const ruleTriggerSchema = z.discriminatedUnion("type", [
@@ -100,7 +126,10 @@ export const firingPayloadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("inactive_for"), meterId: meterIdSchema }),
   z.object({
     type: z.literal("relative_to_lifecycle_event"),
-    invoiceId: invoiceIdSchema,
+    /** Set for invoice_finalized / invoice_due firings; null otherwise. */
+    invoiceId: invoiceIdSchema.nullable(),
+    /** Set for assignment_started firings; null otherwise. */
+    assignmentId: assignmentIdSchema.nullable(),
   }),
 ]);
 export type FiringPayload = z.infer<typeof firingPayloadSchema>;
@@ -127,7 +156,7 @@ export const PLACEHOLDERS_BY_TRIGGER: Record<
     "thresholdMicrocredits",
   ],
   inactive_for: ["tenantId", "meterId"],
-  relative_to_lifecycle_event: ["tenantId", "invoiceId"],
+  relative_to_lifecycle_event: ["tenantId", "invoiceId", "assignmentId"],
 };
 
 /** Create an internal task (routes to the type's external integrations). */
