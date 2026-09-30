@@ -931,6 +931,11 @@ export const items = pgTable(
     units: doublePrecision("units").notNull(),
     name: text("name").notNull(),
     description: text("description"),
+    /* Set when a rule's add_invoice_item action created the item: the rule,
+     * and the values it observed when it fired. Null for items created by
+     * hand. */
+    sourceRuleId: text("source_rule_id").references(() => rules.ruleId),
+    sourceFiring: jsonb("source_firing").$type<FiringPayload>(),
   },
   (t) => [
     idFormatCheck("item", t.itemId),
@@ -1198,6 +1203,9 @@ export const tasks = pgTable(
       .notNull()
       .references(() => tenants.tenantId),
     sourceRuleId: text("source_rule_id").references(() => rules.ruleId),
+    /* The values the source rule observed when it fired; null for tasks
+     * created by hand. */
+    sourceFiring: jsonb("source_firing").$type<FiringPayload>(),
     title: text("title").notNull(),
     description: text("description"),
     assignedToTeamMemberId: text("assigned_to_team_member_id").references(
