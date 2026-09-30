@@ -215,7 +215,15 @@ export async function executeRuleRun({
   }
 }
 
-const EXECUTOR_INTERVAL_MS = 1_000;
+/*
+ * The executor's poll interval, one term in the firing-SLA equation:
+ * worst-case latency past a rule's deadline ~= scheduler tick (100ms) +
+ * this interval + ~20ms of claim/execute work. An empty tick is one small
+ * indexed claim transaction (~1ms), so 10ms keeps ~10x headroom; tighter
+ * than this buys latency the runtime's own jitter swallows. The drain
+ * ceiling below -- not this interval -- governs backlog throughput.
+ */
+const EXECUTOR_INTERVAL_MS = 10;
 /*
  * Drain ceiling: at most CLAIM_BATCH x EXECUTOR_DRAIN_BATCHES_PER_TICK runs
  * execute per EXECUTOR_INTERVAL_MS, per worker process -- each replica runs
