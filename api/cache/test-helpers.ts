@@ -27,6 +27,7 @@ import {
   experimentTreatmentPlans,
   experimentTreatmentTenants,
   experimentTreatments,
+  invoices,
   meterBalances,
   meterEvents,
   meterEventsDlq,
@@ -48,6 +49,7 @@ import type { Rule } from "../schemas/rule.ts";
 import { redis } from "./index.ts";
 import { keys } from "./keys.ts";
 import type { MeterEventPayload } from "./meter/index.ts";
+import { MICROS_PER_MS } from "./rule/schedule.ts";
 
 export function suffix({ length }: { length: number }): string {
   const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -241,10 +243,24 @@ export function trackExperiment<T extends { experimentId: string }>(
 /** Rule ids created by this file, for cleanupTestState. */
 const testRuleIds = new Set<string>();
 
-/** Insert a rule directly (bypassing the API) for evaluation tests. */
+/** Registers a rule made through the service for cleanupTestState; returns
+ * it for inline use. */
+export function trackRule<T extends { ruleId: string }>(rule: T): T {
+  testRuleIds.add(rule.ruleId);
+  return rule;
+}
+
+/**
+ * Insert a rule directly (bypassing the API) for evaluation tests. Pass
+ * cursorAtMs to start the rule's scheduler bookmark there, as if the rule
+ * had been live since then; otherwise its first scheduler tick starts it
+ * where createRule would (see startingCursorAtMicros).
+ */
 export async function makeRule({
+  cursorAtMs,
   rule,
 }: {
+  cursorAtMs?: number;
   rule: Omit<Rule, "ruleId" | "createdAt" | "deprecatedAt"> &
     Partial<Pick<Rule, "ruleId" | "createdAt" | "deprecatedAt">>;
 }): Promise<string> {
@@ -261,6 +277,13 @@ export async function makeRule({
     description: rule.description,
   });
   testRuleIds.add(ruleId);
+  if (cursorAtMs !== undefined) {
+    await db.insert(ruleSchedulerState).values({
+      ruleId,
+      cursorAtMicros: cursorAtMs * MICROS_PER_MS,
+      cursorId: "",
+    });
+  }
   return ruleId;
 }
 
@@ -339,17 +362,11 @@ export async function cleanupTestState(): Promise<void> {
      * every tenant in the database, so clean up by rule too. Deprecate
      * first to stop new firings, then drain the queue and the tasks, then
      * delete the rules themselves (a firing racing the delete hits the
-     * rule_id FK and is skipped by recordFiring). */
+     * rule_id FK and is skipped by recordFirings). */
     await db
       .update(rules)
       .set({ deprecatedAt: Date.now() })
       .where(inArray(rules.ruleId, ruleIds));
-    for (const ruleId of ruleIds) {
-      await redis.del(
-        keys.ruleDeadlineSet({ ruleId }),
-        keys.ruleDeadlineBackfill({ ruleId }),
-      );
-    }
     await db.delete(ruleRuns).where(inArray(ruleRuns.ruleId, ruleIds));
     await db
       .delete(ruleSchedulerState)
@@ -387,6 +404,7 @@ export async function cleanupTestState(): Promise<void> {
     await db
       .delete(assignments)
       .where(inArray(assignments.tenantId, tenantIds));
+    await db.delete(invoices).where(inArray(invoices.tenantId, tenantIds));
   }
   if (taskTypeIds.length > 0) {
     await db
