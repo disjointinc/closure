@@ -216,8 +216,8 @@ export async function executeRuleRun({
 }
 
 /*
- * The executor's poll interval, one term in the firing-SLA equation:
- * worst-case latency past a rule's deadline ~= scheduler tick (100ms) +
+ * The executor's poll interval, one term in the firing-latency equation:
+ * worst-case latency past a rule's due time ~= SCHEDULER_INTERVAL_MS +
  * this interval + ~20ms of claim/execute work. An empty tick is one small
  * indexed claim transaction (~1ms), so 10ms keeps ~10x headroom; tighter
  * than this buys latency the runtime's own jitter swallows. The drain
