@@ -28,6 +28,7 @@ import {
   experimentTreatmentTenants,
   experimentTreatments,
   invoices,
+  items,
   meterBalances,
   meterEvents,
   meterEventsDlq,
@@ -372,6 +373,7 @@ export async function cleanupTestState(): Promise<void> {
       .delete(ruleSchedulerState)
       .where(inArray(ruleSchedulerState.ruleId, ruleIds));
     await db.delete(tasks).where(inArray(tasks.sourceRuleId, ruleIds));
+    await db.delete(items).where(inArray(items.sourceRuleId, ruleIds));
     await db.delete(rules).where(inArray(rules.ruleId, ruleIds));
   }
   if (tenantIds.length > 0) {
@@ -404,6 +406,17 @@ export async function cleanupTestState(): Promise<void> {
     await db
       .delete(assignments)
       .where(inArray(assignments.tenantId, tenantIds));
+    await db
+      .delete(items)
+      .where(
+        inArray(
+          items.invoiceId,
+          db
+            .select({ invoiceId: invoices.invoiceId })
+            .from(invoices)
+            .where(inArray(invoices.tenantId, tenantIds)),
+        ),
+      );
     await db.delete(invoices).where(inArray(invoices.tenantId, tenantIds));
   }
   if (taskTypeIds.length > 0) {
