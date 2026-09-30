@@ -28,8 +28,9 @@
  *                                      on ingest, never reset; the
  *                                      checkpoint only snapshots it
  * rquota:{ruleId}:{tenantId}:{windowStart}
- *                              string  firing count this window for a capped
- *                                      rule; cached from rule_runs, TTL'd to
+ *                              string  how many times a rule with a firing limit
+ *                                      has fired for a tenant in its current
+ *                                      window; cached from rule_runs, TTL'd to
  *                                      the window so keys die with it
  * mlast:{tenantId}:{meterId}   string  newest event timestamp (µs) for the
  *                                      tenant+meter; GREATEST-updated on
