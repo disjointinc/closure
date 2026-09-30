@@ -42,6 +42,8 @@ Typecasts are a code smell.
 
 Don't add comments explaining logic that should be clear from the code or common conventions. Only add comments when linking to hard-to-find documentation or explaining non-obvious or easily footgun-able architectural thinking. Don't tie comments to swappable changes (for example, including a hardcoded constant in a comment, or a 3P provider that we may swap out). Instead, reference the actual values in the comments (MY_CONSTANT rather than 5, observability provider rather than PostHog, etc).
 
+Don't add comments explaining previous versions of the code. You can't assume the reader has context on how things used to work. Comments should be explaining how nonobvious things work now. Keep your comments in plain English. Avoid jargon; use simple English that answers the question "what's the point" such that a codebase novice can follow what's going on. Use the specific names of variables, methods, objects, and constants referenced rather than shorthand (product line rather than line, MY_FULL_CONSTANT_X instead of constant x, etc).
+
 Do things correctly. Running a timer? Do a deadline rather than increments, which introduce per-tick deltas. Making a bunch of calls with an exponential backoff? Introduce randomness if thundering herd could be an issue. Even if something is a simple function, do it right from the start. Apply this rule within reason, of course; don't go overboard with wildly complex solutions.
 
 If a comment is multiline, use the multiline syntax rather than prefixing // on every line.
