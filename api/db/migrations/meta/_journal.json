@@ -330,6 +330,13 @@
       "when": 1790726300493,
       "tag": "0046_uneven_purifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1790787765653,
+      "tag": "0047_tranquil_bruce_banner",
+      "breakpoints": true
     }
   ]
 }

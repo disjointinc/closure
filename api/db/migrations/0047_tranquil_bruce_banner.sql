@@ -1,0 +1,1 @@
+CREATE INDEX "billing_periods_current_end" ON "billing_periods" USING btree ("period_end") WHERE "billing_periods"."is_current";

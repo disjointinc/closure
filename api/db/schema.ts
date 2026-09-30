@@ -1504,6 +1504,12 @@ export const billingPeriods = pgTable(
     /* cycle_end detection range-scans period_end; the advance step scans
      * current rows whose period_end has passed. */
     index("billing_periods_end").on(t.periodEnd),
+    /* The advance step's per-tick read is only ever "current rows that just
+     * ended"; without this partial index the range scan walks every ended
+     * receipt in history each tick. */
+    index("billing_periods_current_end")
+      .on(t.periodEnd)
+      .where(sql`${t.isCurrent}`),
     uniqueIndex("billing_periods_one_current_per_line")
       .on(t.tenantId, t.productLineId)
       .where(sql`${t.isCurrent}`),
