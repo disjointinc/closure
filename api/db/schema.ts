@@ -766,7 +766,7 @@ export const assignments = pgTable(
     idFormatCheck("assignment", t.assignmentId),
     index("assignments_tenant").on(t.tenantId),
     /* The assignment_started scheduler scan pages by (starts_at, id). */
-    index("assignments_started").on(t.startsAt),
+    index("assignments_started").on(t.startsAt, t.assignmentId),
     /* A tenant may hold several open assignments, but at most one per product
      * line: overlapping lines would make meters and cycles ambiguous. */
     uniqueIndex("assignments_one_open_per_line")
@@ -910,12 +910,12 @@ export const invoices = pgTable(
     idFormatCheck("invoice", t.invoiceId),
     chargingCheck("invoices"),
     index("invoices_tenant").on(t.tenantId),
-    /* The lifecycle rule scheduler scans recently-finalized invoices per
-     * tick with no tenant predicate, so the tenant-composite index can't
-     * serve that scan; a partial finalized_at index does, and stays small
-     * by covering only the rows the scan can match. */
+    /* The lifecycle rule scheduler pages recently-finalized invoices by
+     * (finalized_at, id) with no tenant predicate, so the tenant-composite
+     * index can't serve that scan; a partial index does, and stays small by
+     * covering only the rows the scan can match. */
     index("invoices_finalized")
-      .on(t.finalizedAt)
+      .on(t.finalizedAt, t.invoiceId)
       .where(sql`${t.finalizedAt} is not null`),
   ],
 );
@@ -1266,17 +1266,29 @@ export const ruleRuns = pgTable(
 );
 
 /**
- * Per-rule scheduler bookmark: the newest event time the rule has already
- * processed, so each tick reads only rows newer than that instead of the
- * full history. Used by the invoice/assignment lifecycle scans and by
- * cycle_end detection. One row per rule; absent = start at 0.
+ * Per-rule scheduler bookmark: the last source row the rule has read
+ * (invoices, assignments, billing periods, or tenant_last_activity, per the
+ * trigger), so each tick reads only rows past it instead of the full
+ * history. One row per scheduler-driven rule, written when the rule is
+ * created (or on its first tick). See cache/rule/schedule.ts.
  */
 export const ruleSchedulerState = pgTable("rule_scheduler_state", {
+  /* Cascade is inert in production (rules are deprecated, never deleted)
+   * and exists for test cleanup deleting rules while a scheduler tick
+   * re-writes their bookmark rows. */
   ruleId: text("rule_id")
     .primaryKey()
-    .references(() => rules.ruleId),
-  /** Newest lifecycle timestamp (epoch ms) already evaluated for this rule. */
-  evaluatedThroughMs: epochMs("evaluated_through_ms").notNull(),
+    .references(() => rules.ruleId, { onDelete: "cascade" }),
+  /* The last row's sort time, always in µs since the epoch (the unit of
+   * tenant_last_activity). Positions from ms sources (invoices,
+   * assignments, billing periods) are stored × 1000, which is exact. */
+  cursorAtMicros: bigint("cursor_at_micros", { mode: "number" }).notNull(),
+  /* The last row's id (invoice, assignment, or tenant), which orders rows
+   * that share a cursor_at_micros. '' sorts before every id. */
+  cursorId: text("cursor_id").notNull().default(""),
+  /* Set while a scheduler process holds the rule; a claim older than the
+   * lease is stale (its process died mid-pass) and reclaimable. */
+  claimedAt: epochMs("claimed_at"),
 });
 
 export const couponGrants = pgTable(
@@ -1451,10 +1463,12 @@ export const tenantLastActivity = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.tenantId, t.meterId] }),
-    /* The inactivity sweep range-scans stale rows per meter. */
+    /* The inactive_for scheduler scan pages each meter's rows by
+     * (last_event_at_micros, tenant_id): quietest first. */
     index("tenant_last_activity_meter_stale").on(
       t.meterId,
       t.lastEventAtMicros,
+      t.tenantId,
     ),
   ],
 );
@@ -1466,18 +1480,16 @@ export const tenantLastActivity = pgTable(
  * cycle length, which isn't searchable).
  *
  * Freshness: a row is written when its period STARTS. Assignment
- * creation writes the first, then each cycle_end tick appends the next
- * row when a period ends. The table therefore lags reality only in the
- * window between a period ending and the next tick (at most
- * CYCLE_END_INTERVAL_MS). Nothing reads the table during that
- * window: the tick is the only reader, and it appends the new row before
- * running detection in the same pass. While no live cycle_end rule
- * exists, no rows are appended; the first tick after one is created
- * writes every period elapsed since.
+ * creation writes the first in the same transaction as the assignment,
+ * then the scheduler's advance step appends the next row when a period
+ * ends. The table lags reality only between a period ending and the next
+ * advance, and cycle_end detection never reads past the oldest period that
+ * has ended but not been advanced, so lag delays firings, never drops them.
  *
  * is_current marks the one period currently underway per tenant + product
  * line combination; the partial unique index enforces it. Rows are otherwise
- * immutable.
+ * immutable, except that a new assignment starting exactly on a past
+ * period's start takes over that row (see insertFirstPeriodReceipt).
  */
 export const billingPeriods = pgTable(
   "billing_periods",
@@ -1502,9 +1514,9 @@ export const billingPeriods = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.tenantId, t.productLineId, t.periodStart] }),
-    /* cycle_end detection range-scans period_end; the advance step scans
-     * current rows whose period_end has passed. */
-    index("billing_periods_end").on(t.periodEnd),
+    /* cycle_end detection pages by (period_end, assignment_id), which is
+     * unique: an assignment has one period ending at any moment. */
+    index("billing_periods_end").on(t.periodEnd, t.assignmentId),
     /* The advance step's per-tick read is only ever "current rows that just
      * ended"; without this partial index the range scan walks every ended
      * receipt in history each tick. */
