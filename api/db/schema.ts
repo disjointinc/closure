@@ -1279,9 +1279,13 @@ export const ruleSchedulerState = pgTable("rule_scheduler_state", {
   ruleId: text("rule_id")
     .primaryKey()
     .references(() => rules.ruleId, { onDelete: "cascade" }),
-  /* The last row's sort time, always in µs since the epoch (the unit of
-   * tenant_last_activity). Positions from ms sources (invoices,
-   * assignments, billing periods) are stored × 1000, which is exact. */
+  /* Where the rule stopped reading: the time of the last row it read, in µs
+   * since the epoch. It has to be at least as precise as the times it
+   * reads, or the rule can't pick up exactly after the last row.
+   * Last-activity times are in µs (copies of metering's event stamps);
+   * every other source is in ms and converts to µs exactly (× 1000).
+   * Converting the other way, µs down to ms, would round, and the rule
+   * would re-read rows from the same millisecond every time it picks up. */
   cursorAtMicros: bigint("cursor_at_micros", { mode: "number" }).notNull(),
   /* The last row's id (invoice, assignment, or tenant), which orders rows
    * that share a cursor_at_micros. '' sorts before every id. */
@@ -1487,9 +1491,15 @@ export const tenantLastActivity = pgTable(
  * has ended but not been advanced, so lag delays firings, never drops them.
  *
  * is_current marks the one period currently underway per tenant + product
- * line combination; the partial unique index enforces it. Rows are otherwise
- * immutable, except that a new assignment starting exactly on a past
- * period's start takes over that row (see insertFirstPeriodReceipt).
+ * line combination; the partial unique index enforces it.
+ *
+ * Each line has at most one period starting at any given moment (the primary
+ * key enforces this). When a new period collides with an existing row, the
+ * newer assignment's period must replace it, never skip it: the older
+ * assignment ended at that moment, so a skipped period would stay recorded
+ * under an assignment that no longer covers it, and it would never fire.
+ * Every writer must follow this; today that's insertFirstPeriodReceipt and
+ * the scheduler's advance step.
  */
 export const billingPeriods = pgTable(
   "billing_periods",
