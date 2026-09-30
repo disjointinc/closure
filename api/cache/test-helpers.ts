@@ -48,7 +48,6 @@ import type { Rule } from "../schemas/rule.ts";
 import { redis } from "./index.ts";
 import { keys } from "./keys.ts";
 import type { MeterEventPayload } from "./meter/index.ts";
-import { expireDeadlineRulesCache } from "./rule/deadline.ts";
 
 export function suffix({ length }: { length: number }): string {
   const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -262,9 +261,6 @@ export async function makeRule({
     description: rule.description,
   });
   testRuleIds.add(ruleId);
-  /* The deadline write path caches its rules briefly; test-made rules must
-   * be visible immediately. */
-  expireDeadlineRulesCache();
   return ruleId;
 }
 
