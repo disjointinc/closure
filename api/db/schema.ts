@@ -1266,9 +1266,10 @@ export const ruleRuns = pgTable(
 );
 
 /**
- * Per-rule scheduler high-water mark: the newest lifecycle timestamp already
- * evaluated, so each tick scans only invoices finalized since the last one
- * instead of the full finalized history. One row per rule; absent = start at 0.
+ * Per-rule scheduler bookmark: the newest event time the rule has already
+ * processed, so each tick reads only rows newer than that instead of the
+ * full history. Used by the invoice/assignment lifecycle scans and by
+ * cycle_end detection. One row per rule; absent = start at 0.
  */
 export const ruleSchedulerState = pgTable("rule_scheduler_state", {
   ruleId: text("rule_id")
