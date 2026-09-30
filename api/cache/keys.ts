@@ -35,18 +35,6 @@
  *                                      tenant+meter; GREATEST-updated on
  *                                      ingest, checkpointed to
  *                                      tenant_last_activity
- * rdeadline:{ruleId}           zset    tenant -> ms when the tenant goes
- *                                      stale for this inactive_for rule
- *                                      (last activity + window); drained by
- *                                      the deadline loop, rebuilt by the
- *                                      sweep/reconcile from
- *                                      tenant_last_activity
- * rbackfill:{ruleId}           string  flag: this rule's deadline set still
- *                                      needs its first full populate from
- *                                      pg (set at rule creation, cleared by
- *                                      the sweep)
- * rsweep:{meterId}             string  inactivity sweep's page cursor over
- *                                      tenant_last_activity for this meter
  */
 export const keys = {
   meterBalance: ({
@@ -103,11 +91,6 @@ export const keys = {
     meterId: string;
     tenantId: string;
   }) => `mlast:${tenantId}:${meterId}`,
-  ruleDeadlineSet: ({ ruleId }: { ruleId: string }) => `rdeadline:${ruleId}`,
-  ruleDeadlineBackfill: ({ ruleId }: { ruleId: string }) =>
-    `rbackfill:${ruleId}`,
-  inactivitySweepCursor: ({ meterId }: { meterId: string }) =>
-    `rsweep:${meterId}`,
 } as const;
 
 /**
