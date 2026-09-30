@@ -14,6 +14,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db/index.ts";
 import { tasks, taskTypes } from "../../db/schema.ts";
+import type { FiringPayload } from "../../schemas/rule.ts";
 import type { Task } from "../../schemas/task.ts";
 import type { TaskType } from "../../schemas/task-type.ts";
 
@@ -94,6 +95,7 @@ export type TaskCreateInput = {
   createdAt: number;
   taskTypeId: string;
   sourceRuleId: string | null;
+  sourceFiring: FiringPayload | null;
   title: string;
   description: string | null;
   assignedToTeamMemberId: string | null;
