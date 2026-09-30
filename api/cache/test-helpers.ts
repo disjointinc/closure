@@ -20,6 +20,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/index.ts";
 import {
   assignments,
+  billingPeriods,
   creditGrants,
   cycles,
   experiments,
@@ -31,6 +32,7 @@ import {
   meterEventsDlq,
   meters,
   meterSpends,
+  planMeters,
   plans,
   productLines,
   ruleRuns,
@@ -46,6 +48,7 @@ import type { Rule } from "../schemas/rule.ts";
 import { redis } from "./index.ts";
 import { keys } from "./keys.ts";
 import type { MeterEventPayload } from "./meter/index.ts";
+import { expireDeadlineRulesCache } from "./rule/deadline.ts";
 
 export function suffix({ length }: { length: number }): string {
   const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -112,6 +115,26 @@ export async function makeMeter({
     description: null,
   });
   return resolvedMeterId;
+}
+
+/** Attach a meter to a plan (allocation rows the assignment service seeds from). */
+export async function makePlanMeter({
+  meterId,
+  planId,
+}: {
+  meterId: string;
+  planId: string;
+}): Promise<void> {
+  await db.insert(planMeters).values({
+    planId,
+    meterId,
+    defaultMicrocredits: 1_000_000,
+    limitMicrocredits: null,
+    reset: null,
+    rollovers: null,
+    topUpPricesPerCredit: [],
+    topUpCreditPackSizes: { static: null, dynamic: null },
+  });
 }
 
 export async function makeCycle(): Promise<string> {
@@ -239,6 +262,9 @@ export async function makeRule({
     description: rule.description,
   });
   testRuleIds.add(ruleId);
+  /* The deadline write path caches its rules briefly; test-made rules must
+   * be visible immediately. */
+  expireDeadlineRulesCache();
   return ruleId;
 }
 
@@ -322,6 +348,12 @@ export async function cleanupTestState(): Promise<void> {
       .update(rules)
       .set({ deprecatedAt: Date.now() })
       .where(inArray(rules.ruleId, ruleIds));
+    for (const ruleId of ruleIds) {
+      await redis.del(
+        keys.ruleDeadlineSet({ ruleId }),
+        keys.ruleDeadlineBackfill({ ruleId }),
+      );
+    }
     await db.delete(ruleRuns).where(inArray(ruleRuns.ruleId, ruleIds));
     await db
       .delete(ruleSchedulerState)
@@ -353,6 +385,9 @@ export async function cleanupTestState(): Promise<void> {
     await db
       .delete(experimentTreatmentTenants)
       .where(inArray(experimentTreatmentTenants.tenantId, tenantIds));
+    await db
+      .delete(billingPeriods)
+      .where(inArray(billingPeriods.tenantId, tenantIds));
     await db
       .delete(assignments)
       .where(inArray(assignments.tenantId, tenantIds));

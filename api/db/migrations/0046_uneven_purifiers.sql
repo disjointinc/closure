@@ -1,0 +1,1 @@
+CREATE INDEX "rules_inactive_meter" ON "rules" USING btree (("trigger" ->> 'meterId')) WHERE "rules"."deprecated_at" is null and ("rules"."trigger" ->> 'type') = 'inactive_for';

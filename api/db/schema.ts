@@ -707,7 +707,16 @@ export const rules = pgTable(
     name: text("name").notNull(),
     description: text("description"),
   },
-  (t) => [idFormatCheck("rule", t.ruleId)],
+  (t) => [
+    idFormatCheck("rule", t.ruleId),
+    /* The deadline write path asks "which inactive_for rules watch this
+     * meter?" on every meter event. */
+    index("rules_inactive_meter")
+      .on(sql`(${t.trigger} ->> 'meterId')`)
+      .where(
+        sql`${t.deprecatedAt} is null and (${t.trigger} ->> 'type') = 'inactive_for'`,
+      ),
+  ],
 );
 
 // ---------------------------------------------------------------------------
@@ -1459,7 +1468,7 @@ export const tenantLastActivity = pgTable(
  * creation writes the first, then each cycle_end tick appends the next
  * row when a period ends. The table therefore lags reality only in the
  * window between a period ending and the next tick (at most
- * CYCLE_END_TICK_INTERVAL_MS). Nothing reads the table during that
+ * CYCLE_END_INTERVAL_MS). Nothing reads the table during that
  * window: the tick is the only reader, and it appends the new row before
  * running detection in the same pass. While no live cycle_end rule
  * exists, no rows are appended; the first tick after one is created
@@ -1478,10 +1487,12 @@ export const billingPeriods = pgTable(
     productLineId: text("product_line_id")
       .notNull()
       .references(() => productLines.productLineId),
-    /** The assignment whose cycle anchors this period run. */
+    /** The assignment whose cycle anchors this period run. Cascade is inert
+     * in production (assignments are never hard-deleted) and exists for
+     * test cleanup deleting assignments while a scheduler pass races. */
     assignmentId: text("assignment_id")
       .notNull()
-      .references(() => assignments.assignmentId),
+      .references(() => assignments.assignmentId, { onDelete: "cascade" }),
     periodStart: epochMs("period_start").notNull(),
     periodEnd: epochMs("period_end").notNull(),
     /** Denormalized cycle length so trigger keys derive from the row alone. */
