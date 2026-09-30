@@ -418,12 +418,19 @@ export async function recordFirings({
     return;
   }
   try {
-    for (let start = 0; start < rows.length; start += RULE_RUN_INSERT_BATCH) {
-      await db
-        .insert(ruleRuns)
-        .values(rows.slice(start, start + RULE_RUN_INSERT_BATCH))
-        .onConflictDoNothing();
-    }
+    /* One transaction, so the page lands all or nothing. A firing's rows
+     * (one per action) can be split across two statements; if the second
+     * failed on its own, the firing would be half-recorded, and since the
+     * quota would then count it as fired, its missing actions would never
+     * be written. */
+    await db.transaction(async (tx) => {
+      for (let start = 0; start < rows.length; start += RULE_RUN_INSERT_BATCH) {
+        await tx
+          .insert(ruleRuns)
+          .values(rows.slice(start, start + RULE_RUN_INSERT_BATCH))
+          .onConflictDoNothing();
+      }
+    });
   } catch (error) {
     if (pgErrorCode({ error }) !== "23503") {
       throw error;
