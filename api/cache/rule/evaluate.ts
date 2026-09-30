@@ -23,7 +23,8 @@
  * duplicate firings, but the event-time check is an edge detector, not a
  * level check.
  *   - Periodic (inactive_for, relative_to_lifecycle_event): the scheduler
- *     loop in cache/rule/schedule.ts scans candidate tenants and fires.
+ *     loop in cache/rule/schedule.ts reads each rule's newly-due rows past
+ *     its bookmark and fires.
  *
  * Firing is durable: when a rule fires, its rule_runs rows are inserted
  * synchronously (onConflictDoNothing on the idempotency index), so a firing
@@ -378,48 +379,68 @@ export type Firing = {
 };
 
 /**
- * Durably record a firing: one rule_runs row per action, inserted
+ * rule_runs rows per insert statement: keeps a big page of firings under
+ * Postgres's bind-parameter limit (65,535; each row binds a dozen).
+ */
+const RULE_RUN_INSERT_BATCH = 1_000;
+
+/**
+ * Durably record firings: one rule_runs row per action, inserted
  * synchronously with onConflictDoNothing on the (rule, tenant, triggerKey,
  * actionIndex) idempotency index. Repeat firings of the same triggerKey
- * insert nothing, so this is safe to call on every detection.
+ * insert nothing, so this is safe to call on every detection. A scheduler
+ * page records all its firings here at once, so a page costs one insert,
+ * not one per tenant.
  */
-export async function recordFiring({
-  firing,
+export async function recordFirings({
+  firings,
 }: {
-  firing: Firing;
+  firings: Firing[];
 }): Promise<void> {
   const now = Date.now();
-  const rows = firing.rule.actions.map((_, actionIndex) => ({
-    ruleRunId: generateId({ prefix: "rule_run" }),
-    createdAt: now,
-    ruleId: firing.rule.ruleId,
-    tenantId: firing.tenantId,
-    triggerKey: firing.triggerKey,
-    actionIndex,
-    payload: firing.payload,
-    attempts: 0,
-    availableAt: now,
-    succeededAt: null,
-    failedAt: null,
-    lastError: null,
-  }));
+  const rows = firings.flatMap((firing) =>
+    firing.rule.actions.map((_, actionIndex) => ({
+      ruleRunId: generateId({ prefix: "rule_run" }),
+      createdAt: now,
+      ruleId: firing.rule.ruleId,
+      tenantId: firing.tenantId,
+      triggerKey: firing.triggerKey,
+      actionIndex,
+      payload: firing.payload,
+      attempts: 0,
+      availableAt: now,
+      succeededAt: null,
+      failedAt: null,
+      lastError: null,
+    })),
+  );
   if (rows.length === 0) {
     return;
   }
   try {
-    await db.insert(ruleRuns).values(rows).onConflictDoNothing();
+    for (let start = 0; start < rows.length; start += RULE_RUN_INSERT_BATCH) {
+      await db
+        .insert(ruleRuns)
+        .values(rows.slice(start, start + RULE_RUN_INSERT_BATCH))
+        .onConflictDoNothing();
+    }
   } catch (error) {
-    /* A tenant garbage-collected between the candidate scan and the firing:
-     * the run can't reference it, so drop this firing and keep the pass
-     * going for everyone else. */
-    if (pgErrorCode({ error }) === "23503") {
-      console.error("rule firing skipped: tenant or rule gone mid-firing", {
-        ruleId: firing.rule.ruleId,
-        tenantId: firing.tenantId,
-      });
+    if (pgErrorCode({ error }) !== "23503") {
+      throw error;
+    }
+    /* A tenant garbage-collected between the scan and the firing: its runs
+     * can't reference it. Retry one firing at a time so only that firing
+     * is dropped and the rest of the page still lands. */
+    if (firings.length > 1) {
+      for (const firing of firings) {
+        await recordFirings({ firings: [firing] });
+      }
       return;
     }
-    throw error;
+    console.error("rule firing skipped: tenant or rule gone mid-firing", {
+      ruleId: firings[0].rule.ruleId,
+      tenantId: firings[0].tenantId,
+    });
   }
 }
 
@@ -517,6 +538,34 @@ function quotaTtlMs({
     return cycle?.windowMs ?? QUOTA_TTL_CAP_MS;
   }
   return durationToMs(window);
+}
+
+/**
+ * Drop a rule+tenant's cached quota counter for the current window, so the
+ * next firingKey re-counts from rule_runs (the source of truth). For quota
+ * tokens consumed by firings whose rule_runs insert then failed: left in
+ * place, the counter would treat them as fired and suppress the retry.
+ */
+export async function forgetFiringQuota({
+  cycle,
+  rule,
+  tenantId,
+}: {
+  cycle: BillingCycle;
+  rule: Rule;
+  tenantId: string;
+}): Promise<void> {
+  await redis.del(
+    keys.ruleFiringQuota({
+      ruleId: rule.ruleId,
+      tenantId,
+      windowStart: windowStartMs({
+        cycle,
+        now: Date.now(),
+        window: rule.recurrence.window,
+      }),
+    }),
+  );
 }
 
 /**
@@ -757,13 +806,15 @@ export async function evaluateMeterEventRules({
     if (triggerKey === null) {
       continue;
     }
-    await recordFiring({
-      firing: {
-        rule: rule.rule,
-        tenantId: event.tenantId,
-        triggerKey,
-        payload,
-      },
+    await recordFirings({
+      firings: [
+        {
+          rule: rule.rule,
+          tenantId: event.tenantId,
+          triggerKey,
+          payload,
+        },
+      ],
     });
   }
 }
