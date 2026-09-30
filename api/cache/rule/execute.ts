@@ -57,6 +57,9 @@ function substitutions({
     out.spentMicrocredits = String(payload.spentMicrocredits);
     out.thresholdMicrocredits = String(payload.thresholdMicrocredits);
   }
+  if (payload.type === "inactive_for") {
+    out.backdated = String(payload.backdated);
+  }
   if (payload.type === "relative_to_lifecycle_event") {
     if (payload.type === "relative_to_lifecycle_event") {
       if (payload.invoiceId !== null) {
@@ -115,6 +118,7 @@ async function executeCreateTask({
       createdAt: Date.now(),
       taskTypeId: action.taskTypeId,
       sourceRuleId: target.ruleId,
+      sourceFiring: target.payload,
       title: substitute(action.title) ?? "",
       description: substitute(action.description),
       assignedToTeamMemberId: action.assignToTeamMemberId,
@@ -158,6 +162,8 @@ async function executeAddInvoiceItem({
       units: 1,
       name: `Late fee (${target.ruleId})`,
       description: null,
+      sourceRuleId: target.ruleId,
+      sourceFiring: target.payload,
     })
     .onConflictDoNothing();
 }
