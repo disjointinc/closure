@@ -103,6 +103,11 @@ export const grantorTypeEnum = pgEnum("grantor_type", [
   "tenant",
   "reciprocal",
 ]);
+export const ruleBackfillEnum = pgEnum("rule_backfill", [
+  "none",
+  "once_per_tenant",
+  "every_firing",
+]);
 
 /**
  * The charging columns shared by cycles and invoices, mirroring the
@@ -704,6 +709,9 @@ export const rules = pgTable(
     trigger: jsonb("trigger").$type<Rule["trigger"]>().notNull(),
     recurrence: jsonb("recurrence").$type<Rule["recurrence"]>().notNull(),
     actions: jsonb("actions").$type<Rule["actions"]>().notNull(),
+    /* Whether the rule also applies to the time before it was created. See
+     * ruleBackfillSchema (schemas/rule.ts) and cache/rule/backfill.ts. */
+    backfill: ruleBackfillEnum("backfill").notNull(),
     name: text("name").notNull(),
     description: text("description"),
   },
@@ -1233,6 +1241,9 @@ export const ruleRuns = pgTable(
   {
     ruleRunId: text("rule_run_id").primaryKey(),
     createdAt: epochMs("created_at").notNull(),
+    /* When the trigger's condition was met: the moment of detection for
+     * live firings, a time before the rule existed for backfilled ones. */
+    occurredAt: epochMs("occurred_at").notNull(),
     ruleId: text("rule_id")
       .notNull()
       .references(() => rules.ruleId),
@@ -1244,8 +1255,10 @@ export const ruleRuns = pgTable(
     payload: jsonb("payload").$type<FiringPayload>().notNull(),
     attempts: integer("attempts").notNull().default(0),
     availableAt: epochMs("available_at").notNull(),
-    /* Set while a worker holds the row; a claim older than the lease is
-     * stale (its worker died mid-execution) and reclaimable. */
+    /* When an executor claimed this run (claimDueRuns in
+     * cache/rule/execute.ts); null when no one holds it. Other executors
+     * skip it until claimed_at is CLAIM_LEASE_MS old, so a worker that dies
+     * mid-execution without clearing it is taken over after that long. */
     claimedAt: epochMs("claimed_at"),
     succeededAt: epochMs("succeeded_at"),
     failedAt: epochMs("failed_at"),
@@ -1264,11 +1277,14 @@ export const ruleRuns = pgTable(
     index("rule_runs_pending")
       .on(t.availableAt)
       .where(sql`${t.succeededAt} is null and ${t.failedAt} is null`),
-    // firingKey's per-window quota count scopes to one rule+tenant, recent rows.
-    index("rule_runs_rule_tenant_created").on(
+    /* firingKey's per-window quota count scopes to one rule+tenant and
+     * counts by when each firing happened, so a backfilled firing counts
+     * toward the window it happened in rather than the one it was
+     * recorded in. */
+    index("rule_runs_rule_tenant_occurred").on(
       t.ruleId,
       t.tenantId,
-      t.createdAt,
+      t.occurredAt,
     ),
   ],
 );
@@ -1298,9 +1314,43 @@ export const ruleSchedulerState = pgTable("rule_scheduler_state", {
   /* The last row's id (invoice, assignment, or tenant), which orders rows
    * that share a cursor_at_micros. '' sorts before every id. */
   cursorId: text("cursor_id").notNull().default(""),
-  /* Set while a scheduler process holds the rule; a claim older than the
-   * lease is stale (its process died mid-pass) and reclaimable. */
+  /* When a scheduler process claimed this rule (claimRules in
+   * cache/rule/schedule.ts); null when no one holds it. Other processes
+   * skip it until claimed_at is RULE_CLAIM_LEASE_MS old, so a process that
+   * dies mid-pass without clearing it is taken over after that long. */
   claimedAt: epochMs("claimed_at"),
+});
+
+/**
+ * Per-rule backfill progress, for rules created with backfill other than
+ * "none": the job replays the time before the rule existed one batch of
+ * tenants at a time, in tenant_id order. Written in the same transaction as
+ * the rule. See cache/rule/backfill.ts.
+ */
+export const ruleBackfills = pgTable("rule_backfills", {
+  /* Cascade is inert in production (rules are deprecated, never deleted)
+   * and exists for test cleanup deleting rules while a backfill pass
+   * re-writes their rows. */
+  ruleId: text("rule_id")
+    .primaryKey()
+    .references(() => rules.ruleId, { onDelete: "cascade" }),
+  createdAt: epochMs("created_at").notNull(),
+  /* The last tenant whose history has been fully replayed. '' sorts before
+   * every id, so a new backfill starts at the first tenant. */
+  cursorTenantId: text("cursor_tenant_id").notNull().default(""),
+  /* The available_at the backfill's next firing gets (the executor only
+   * runs a rule_run once its available_at has passed). recordBatch gives
+   * each firing the later of this and now, then moves this
+   * BACKFILL_FIRING_SPACING_MS past it, so the backfill's runs come due one
+   * at a time, BACKFILL_FIRING_SPACING_MS apart, behind live runs (which
+   * are due immediately). Starts at the rule's createdAt. */
+  nextAvailableAt: epochMs("next_available_at").notNull(),
+  /* When a process claimed this backfill (claimBackfill in
+   * cache/rule/backfill.ts); null when no one holds it. Other processes
+   * skip it until claimed_at is BACKFILL_CLAIM_LEASE_MS old, so a process
+   * that dies mid-pass without clearing it is taken over after that long. */
+  claimedAt: epochMs("claimed_at"),
+  completedAt: epochMs("completed_at"),
 });
 
 export const couponGrants = pgTable(
@@ -1387,6 +1437,13 @@ export const meterEvents = pgTable(
       .references(() => tenants.tenantId),
     amountMicrocredits: microcredits("amount_microcredits").notNull(),
     status: meterEventStatusEnum("status").notNull(),
+    /**
+     * The tenant's balance right after the ingest script decided this event
+     * (unchanged for a rejected event), so a microcredits_remaining rule can
+     * be replayed over history exactly as it would have fired live. Null
+     * for events flushed before this column existed.
+     */
+    balanceAfterMicrocredits: microcredits("balance_after_microcredits"),
   },
   (t) => [
     idFormatCheck("meter_event", t.meterEventId),
@@ -1397,13 +1454,14 @@ export const meterEvents = pgTable(
       t.meterId,
       t.externalId,
     ),
-    index("meter_events_tenant_meter_created").on(
-      t.tenantId,
+    /* One tenant's events on one meter, in the order the ingest script
+     * applied them: the flush-lag sums read a received_at range of it, and
+     * the rule backfill walks a meter's tenants in tenant_id order. */
+    index("meter_events_meter_tenant_received").on(
       t.meterId,
-      t.createdAt,
+      t.tenantId,
+      t.receivedAtMicros,
     ),
-    // The inactive_for scheduler scans recent events per meter.
-    index("meter_events_meter_received").on(t.meterId, t.receivedAtMicros),
   ],
 );
 

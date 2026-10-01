@@ -351,6 +351,13 @@
       "when": 1790806150348,
       "tag": "0049_ordinary_rhino",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1790885082776,
+      "tag": "0050_kind_doorman",
+      "breakpoints": true
     }
   ]
 }
