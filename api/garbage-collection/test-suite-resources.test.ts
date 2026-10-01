@@ -167,6 +167,7 @@ async function makeGraph({ markedAs }: { markedAs: string | null }) {
     tenantId,
     amountMicrocredits: 1_000_000,
     status: "succeeded",
+    balanceAfterMicrocredits: 0,
   });
   /* Tracked-set membership is added by the test body, not here; it carries
    * no balance value, so concurrent checkpoint passes skip it. */
@@ -200,6 +201,7 @@ async function makeGraph({ markedAs }: { markedAs: string | null }) {
   await db.insert(ruleRuns).values({
     ruleRunId: `rule_run_${suffix({ length: 27 })}`,
     createdAt: Date.now(),
+    occurredAt: Date.now(),
     ruleId,
     tenantId,
     triggerKey: "gc-test",
@@ -209,6 +211,8 @@ async function makeGraph({ markedAs }: { markedAs: string | null }) {
       meterId,
       spentMicrocredits: 1,
       thresholdMicrocredits: 1,
+      occurredAt: Date.now(),
+      backfilled: false,
     },
     attempts: 0,
     availableAt: Date.now() + 3_600_000,
