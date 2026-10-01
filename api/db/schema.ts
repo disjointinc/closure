@@ -1440,10 +1440,11 @@ export const meterEvents = pgTable(
     /**
      * The tenant's balance right after the ingest script decided this event
      * (unchanged for a rejected event), so a microcredits_remaining rule can
-     * be replayed over history exactly as it would have fired live. Null
-     * for events flushed before this column existed.
+     * be replayed over history exactly as it would have fired live.
      */
-    balanceAfterMicrocredits: microcredits("balance_after_microcredits"),
+    balanceAfterMicrocredits: microcredits(
+      "balance_after_microcredits",
+    ).notNull(),
   },
   (t) => [
     idFormatCheck("meter_event", t.meterEventId),
@@ -1627,6 +1628,9 @@ export const meterEventsDlq = pgTable(
     meterId: text("meter_id"),
     amountMicrocredits: microcredits("amount_microcredits"),
     receivedAtMicros: bigint("received_at_micros", { mode: "number" }),
+    /** Kept so bin/replay-meter-events-dlq.ts can re-drive the event into
+     * meter_events, which requires it. */
+    balanceAfterMicrocredits: microcredits("balance_after_microcredits"),
     /** Why the flush gave up (pg error code + message). */
     error: text("error").notNull(),
     failedAt: epochMs("failed_at").notNull(),
