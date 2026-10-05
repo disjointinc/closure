@@ -37,6 +37,7 @@ import {
   planMeters,
   plans,
   productLines,
+  ruleBackfills,
   ruleRuns,
   ruleSchedulerState,
   rules,
@@ -49,7 +50,7 @@ import {
 import type { Rule } from "../schemas/rule.ts";
 import { redis } from "./index.ts";
 import { keys } from "./keys.ts";
-import type { MeterEventPayload } from "./meter/index.ts";
+import { type MeterEventPayload, pgErrorCode } from "./meter/index.ts";
 import { MICROS_PER_MS } from "./rule/schedule.ts";
 
 export function suffix({ length }: { length: number }): string {
@@ -174,10 +175,13 @@ export async function makePlan({
 
 /** Assign a tenant to a plan on a fresh cycle. Returns the assignmentId. */
 export async function makeAssignment({
+  createdAt,
   planId,
   startsAt,
   tenantId,
 }: {
+  /** Defaults to now; pass a past time for an assignment with history. */
+  createdAt?: number;
   planId: string;
   /** Defaults to now; pass a future time for a not-yet-open assignment. */
   startsAt?: number;
@@ -193,7 +197,7 @@ export async function makeAssignment({
     productLineId: plan.productLineId,
     experimentId: null,
     cycleId,
-    createdAt: Date.now(),
+    createdAt: createdAt ?? Date.now(),
     startsAt: startsAt ?? Date.now(),
     endsAt: null,
   });
@@ -255,29 +259,39 @@ export function trackRule<T extends { ruleId: string }>(rule: T): T {
  * Insert a rule directly (bypassing the API) for evaluation tests. Pass
  * cursorAtMs to start the rule's scheduler bookmark there, as if the rule
  * had been live since then; otherwise its first scheduler tick starts it
- * where createRule would (see startingCursorAtMicros).
+ * where createRule would (see startingCursorAtMicros). backfill defaults to
+ * "none"; any other value also writes the backfill row createRule would,
+ * so a past createdAt backfills everything before it.
  */
 export async function makeRule({
   cursorAtMs,
   rule,
 }: {
   cursorAtMs?: number;
-  rule: Omit<Rule, "ruleId" | "createdAt" | "deprecatedAt"> &
-    Partial<Pick<Rule, "ruleId" | "createdAt" | "deprecatedAt">>;
+  rule: Omit<Rule, "ruleId" | "createdAt" | "deprecatedAt" | "backfill"> &
+    Partial<Pick<Rule, "ruleId" | "createdAt" | "deprecatedAt" | "backfill">>;
 }): Promise<string> {
   const ruleId = rule.ruleId ?? newRuleId();
+  const createdAt = rule.createdAt ?? Date.now();
+  const backfill = rule.backfill ?? "none";
   await db.insert(rules).values({
     ruleId,
-    createdAt: rule.createdAt ?? Date.now(),
+    createdAt,
     deprecatedAt: rule.deprecatedAt ?? null,
     scope: rule.scope,
     trigger: rule.trigger,
     recurrence: rule.recurrence,
     actions: rule.actions,
+    backfill,
     name: rule.name,
     description: rule.description,
   });
   testRuleIds.add(ruleId);
+  if (backfill !== "none") {
+    await db
+      .insert(ruleBackfills)
+      .values({ ruleId, createdAt, nextAvailableAt: createdAt });
+  }
   if (cursorAtMs !== undefined) {
     await db.insert(ruleSchedulerState).values({
       ruleId,
@@ -341,6 +355,10 @@ export async function pgCheckpoint({
   return row;
 }
 
+/** Rule-delete attempts in cleanupTestState, and the pause between them. */
+const CLEANUP_RULE_DELETE_ATTEMPTS = 5;
+const CLEANUP_RETRY_MS = 200;
+
 /** Fail fast if pg or Redis isn't reachable. */
 export async function resetTestState(): Promise<void> {
   await redis.ping();
@@ -368,13 +386,35 @@ export async function cleanupTestState(): Promise<void> {
       .update(rules)
       .set({ deprecatedAt: Date.now() })
       .where(inArray(rules.ruleId, ruleIds));
-    await db.delete(ruleRuns).where(inArray(ruleRuns.ruleId, ruleIds));
     await db
       .delete(ruleSchedulerState)
       .where(inArray(ruleSchedulerState.ruleId, ruleIds));
-    await db.delete(tasks).where(inArray(tasks.sourceRuleId, ruleIds));
-    await db.delete(items).where(inArray(items.sourceRuleId, ruleIds));
-    await db.delete(rules).where(inArray(rules.ruleId, ruleIds));
+    await db
+      .delete(ruleBackfills)
+      .where(inArray(ruleBackfills.ruleId, ruleIds));
+    /* An executor that claimed one of these rules' runs before the queue
+     * was drained can still write its task after the tasks delete, so the
+     * rules delete can trip the tasks FK: drain again and retry. */
+    for (let attempt = 1; attempt <= CLEANUP_RULE_DELETE_ATTEMPTS; attempt++) {
+      await db.delete(ruleRuns).where(inArray(ruleRuns.ruleId, ruleIds));
+      await db.delete(tasks).where(inArray(tasks.sourceRuleId, ruleIds));
+      await db.delete(items).where(inArray(items.sourceRuleId, ruleIds));
+      try {
+        await db.delete(rules).where(inArray(rules.ruleId, ruleIds));
+        break;
+      } catch (error) {
+        if (
+          pgErrorCode({ error }) !== "23503" ||
+          attempt === CLEANUP_RULE_DELETE_ATTEMPTS
+        ) {
+          throw error;
+        }
+        console.warn("test cleanup: a rule's run landed mid-delete; retrying", {
+          attempt,
+        });
+        await new Promise((resolve) => setTimeout(resolve, CLEANUP_RETRY_MS));
+      }
+    }
   }
   if (tenantIds.length > 0) {
     await db.delete(ruleRuns).where(inArray(ruleRuns.tenantId, tenantIds));
