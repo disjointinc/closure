@@ -55,7 +55,7 @@ import {
   PG_FOREIGN_KEY_VIOLATION,
   pgErrorCode,
 } from "./meter/index.ts";
-import { MICROS_PER_MS } from "./rule/schedule.ts";
+import { MICROSECONDS_PER_MS } from "./rule/schedule.ts";
 
 export function suffix({ length }: { length: number }): string {
   const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -261,11 +261,11 @@ export function trackRule<T extends { ruleId: string }>(rule: T): T {
 
 /**
  * Insert a rule directly (bypassing the API) for evaluation tests. Pass
- * cursorAtMs to start the rule's scheduler bookmark there, as if the rule
- * had been live since then; otherwise its first scheduler tick starts it
- * where createRule would (see startingCursorAtMicros). backfill defaults to
- * "none"; any other value also writes the backfill row createRule would,
- * so a past createdAt backfills everything before it.
+ * cursorAtMs to start the rule's scheduler bookmark there, as if the rule had
+ * been live since then; otherwise its first scheduler tick starts it where
+ * createRule would (see startingCursorAtMicroseconds). backfill defaults to
+ * "none"; any other value also writes the backfill row createRule would, so a
+ * past createdAt backfills everything before it.
  */
 export async function makeRule({
   cursorAtMs,
@@ -299,7 +299,7 @@ export async function makeRule({
   if (cursorAtMs !== undefined) {
     await db.insert(ruleSchedulerState).values({
       ruleId,
-      cursorAtMicros: cursorAtMs * MICROS_PER_MS,
+      cursorAtMicroseconds: cursorAtMs * MICROSECONDS_PER_MS,
       cursorId: "",
     });
   }
