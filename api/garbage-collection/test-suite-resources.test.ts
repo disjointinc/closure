@@ -15,7 +15,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { redis } from "../cache/index.ts";
 import { keys } from "../cache/keys.ts";
-import { redisTimeMicros } from "../cache/meter/index.ts";
+import { redisTimeMicroseconds } from "../cache/meter/index.ts";
 import {
   cleanupTestState,
   makeAssignment,
@@ -163,7 +163,7 @@ async function makeGraph({ markedAs }: { markedAs: string | null }) {
     meterEventId,
     externalId,
     createdAt: Date.now(),
-    receivedAtMicros: await redisTimeMicros(),
+    receivedAtMicroseconds: await redisTimeMicroseconds(),
     meterId,
     tenantId,
     amountMicrocredits: 1_000_000,
