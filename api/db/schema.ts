@@ -1425,10 +1425,11 @@ export const meterEvents = pgTable(
      * since the epoch on the Redis server's clock -- the same clock
      * meter_balances.updated_at uses, so rebuild replay
      * (received_at_micros > updated_at) orders events against checkpoints
-     * exactly. Null for events flushed before this column existed; those are
-     * already folded into checkpoints and excluded from replay.
+     * exactly.
      */
-    receivedAtMicros: bigint("received_at_micros", { mode: "number" }),
+    receivedAtMicros: bigint("received_at_micros", {
+      mode: "number",
+    }).notNull(),
     meterId: text("meter_id")
       .notNull()
       .references(() => meters.meterId),
