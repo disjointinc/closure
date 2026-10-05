@@ -1178,14 +1178,16 @@ export const creditGrants = pgTable(
     reason: text("reason"),
     amountMicrocredits: microcredits("amount_microcredits").notNull(),
     /**
-     * When the grant was applied to the Redis balance, in MICROseconds on
-     * the Redis server's clock (see meter_events.received_at_micros). NULL
+     * When the grant was applied to the Redis balance, in MICROseconds on the
+     * Redis server's clock (see meter_events.received_at_microseconds). NULL
      * means "never applied" -- the reconciler applies such grants
-     * (idempotently). Stamped at most once (UPDATE ... WHERE applied_at_micros
-     * IS NULL) so replay never double-counts a grant already folded into a
-     * checkpoint.
+     * (idempotently). Stamped at most once (UPDATE ... WHERE
+     * applied_at_microseconds IS NULL) so replay never double-counts a grant
+     * already folded into a checkpoint.
      */
-    appliedAtMicros: bigint("applied_at_micros", { mode: "number" }),
+    appliedAtMicroseconds: bigint("applied_at_microseconds", {
+      mode: "number",
+    }),
   },
   (t) => [
     idFormatCheck("credit_grant", t.creditGrantId),
@@ -1310,9 +1312,11 @@ export const ruleSchedulerState = pgTable("rule_scheduler_state", {
    * every other source is in ms and converts to µs exactly (× 1000).
    * Converting the other way, µs down to ms, would round, and the rule
    * would re-read rows from the same millisecond every time it picks up. */
-  cursorAtMicros: bigint("cursor_at_micros", { mode: "number" }).notNull(),
+  cursorAtMicroseconds: bigint("cursor_at_microseconds", {
+    mode: "number",
+  }).notNull(),
   /* The last row's id (invoice, assignment, or tenant), which orders rows
-   * that share a cursor_at_micros. '' sorts before every id. */
+   * that share a cursor_at_microseconds. '' sorts before every id. */
   cursorId: text("cursor_id").notNull().default(""),
   /* When a scheduler process claimed this rule (claimRules in
    * cache/rule/schedule.ts); null when no one holds it. Other processes
@@ -1423,11 +1427,11 @@ export const meterEvents = pgTable(
     /**
      * When the Redis ingest script applied the decrement, in MICROseconds
      * since the epoch on the Redis server's clock -- the same clock
-     * meter_balances.updated_at uses, so rebuild replay
-     * (received_at_micros > updated_at) orders events against checkpoints
-     * exactly.
+     * meter_balances.updated_at_microseconds uses, so rebuild replay
+     * (received_at_microseconds > updated_at_microseconds) orders events
+     * against checkpoints exactly.
      */
-    receivedAtMicros: bigint("received_at_micros", {
+    receivedAtMicroseconds: bigint("received_at_microseconds", {
       mode: "number",
     }).notNull(),
     meterId: text("meter_id")
@@ -1462,7 +1466,7 @@ export const meterEvents = pgTable(
     index("meter_events_meter_tenant_received").on(
       t.meterId,
       t.tenantId,
-      t.receivedAtMicros,
+      t.receivedAtMicroseconds,
     ),
   ],
 );
@@ -1482,7 +1486,9 @@ export const meterBalances = pgTable(
       .notNull()
       .references(() => meters.meterId),
     balanceMicrocredits: microcredits("balance_microcredits").notNull(),
-    updatedAt: epochMs("updated_at").notNull(),
+    updatedAtMicroseconds: bigint("updated_at_microseconds", {
+      mode: "number",
+    }).notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.tenantId, t.meterId] }),
@@ -1508,7 +1514,9 @@ export const meterSpends = pgTable(
       .notNull()
       .references(() => meters.meterId),
     spendMicrocredits: microcredits("spend_microcredits").notNull(),
-    updatedAt: epochMs("updated_at").notNull(),
+    updatedAtMicroseconds: bigint("updated_at_microseconds", {
+      mode: "number",
+    }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.tenantId, t.meterId] })],
 );
@@ -1529,17 +1537,17 @@ export const tenantLastActivity = pgTable(
     meterId: text("meter_id")
       .notNull()
       .references(() => meters.meterId),
-    lastEventAtMicros: bigint("last_event_at_micros", {
+    lastEventAtMicroseconds: bigint("last_event_at_microseconds", {
       mode: "number",
     }).notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.tenantId, t.meterId] }),
     /* The inactive_for scheduler scan pages each meter's rows by
-     * (last_event_at_micros, tenant_id): quietest first. */
+     * (last_event_at_microseconds, tenant_id): quietest first. */
     index("tenant_last_activity_meter_stale").on(
       t.meterId,
-      t.lastEventAtMicros,
+      t.lastEventAtMicroseconds,
       t.tenantId,
     ),
   ],
@@ -1628,7 +1636,9 @@ export const meterEventsDlq = pgTable(
     tenantId: text("tenant_id"),
     meterId: text("meter_id"),
     amountMicrocredits: microcredits("amount_microcredits"),
-    receivedAtMicros: bigint("received_at_micros", { mode: "number" }),
+    receivedAtMicroseconds: bigint("received_at_microseconds", {
+      mode: "number",
+    }),
     /** Kept so bin/replay-meter-events-dlq.ts can re-drive the event into
      * meter_events, which requires it. */
     balanceAfterMicrocredits: microcredits("balance_after_microcredits"),
