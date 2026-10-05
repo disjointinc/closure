@@ -405,7 +405,7 @@ export async function cleanupTestState(): Promise<void> {
       } catch (error) {
         if (
           pgErrorCode({ error }) !== "23503" ||
-          attempt === CLEANUP_RULE_DELETE_ATTEMPTS
+          attempt >= CLEANUP_RULE_DELETE_ATTEMPTS
         ) {
           throw error;
         }
