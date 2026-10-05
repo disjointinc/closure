@@ -50,7 +50,11 @@ import {
 import type { Rule } from "../schemas/rule.ts";
 import { redis } from "./index.ts";
 import { keys } from "./keys.ts";
-import { type MeterEventPayload, pgErrorCode } from "./meter/index.ts";
+import {
+  type MeterEventPayload,
+  PG_FOREIGN_KEY_VIOLATION,
+  pgErrorCode,
+} from "./meter/index.ts";
 import { MICROS_PER_MS } from "./rule/schedule.ts";
 
 export function suffix({ length }: { length: number }): string {
@@ -355,7 +359,9 @@ export async function pgCheckpoint({
   return row;
 }
 
-/** Rule-delete attempts in cleanupTestState, and the pause between them. */
+/** Rule-delete attempts in cleanupTestState, and the pause between them. An
+ * executor racing the delete finishes its claimed run within a few
+ * EXECUTOR_INTERVAL_MS ticks, so about a second of retries is plenty. */
 const CLEANUP_RULE_DELETE_ATTEMPTS = 5;
 const CLEANUP_RETRY_MS = 200;
 
@@ -404,7 +410,7 @@ export async function cleanupTestState(): Promise<void> {
         break;
       } catch (error) {
         if (
-          pgErrorCode({ error }) !== "23503" ||
+          pgErrorCode({ error }) !== PG_FOREIGN_KEY_VIOLATION ||
           attempt >= CLEANUP_RULE_DELETE_ATTEMPTS
         ) {
           throw error;
