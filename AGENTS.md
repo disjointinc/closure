@@ -54,7 +54,9 @@ Write code defensively. That is, include default guards on switch statements, ev
 
 Log all errors, even if they should never occur in a try-catch block. Log anything that might be an interesting metric or provide important signals. If in doubt - log it.
 
-Don't use magic numbers. Use constants.
+Don't use magic numbers. Use constants. Any constant should justify why the value is set to what it is, in a comment above the constant. Be specific, and ground the justification in real, tested numbers that make clear the tradeoffs and performance implications that lead to us setting the number to the value we did.
+
+Raw SQL is a code smell. It's easy to break, and oftentimes indicates we should've structured our data differently. If you genuinely have to write raw SWL, please write clear and explicit documentation of why this was the only and correct way to accomplish what we want to do.
 
 The DB is a strict dependency of the cache. The cache and DB are strict dependencies of API routes. The API routes are strict dependencies of clients, such as the web client. The web client and API routes are strict dependencies of the docs.
 
