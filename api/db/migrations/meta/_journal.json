@@ -379,6 +379,13 @@
       "when": 1791239986128,
       "tag": "0053_microseconds_column_names",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1791309226862,
+      "tag": "0054_invoice_due_at",
+      "breakpoints": true
     }
   ]
 }

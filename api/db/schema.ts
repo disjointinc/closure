@@ -912,11 +912,22 @@ export const invoices = pgTable(
       .references(() => tenants.tenantId),
     createdAt: epochMs("created_at").notNull(),
     finalizedAt: epochMs("finalized_at"),
+    /* When payment is due: finalized_at for upfront invoices, finalized_at
+     * plus credit_period for arrears ones. Written with finalized_at (see
+     * finalizeInvoice) rather than computed in queries, so invoice_due
+     * rules can page through it by index. */
+    dueAt: epochMs("due_at"),
     ...chargingColumns,
   },
   (t) => [
     idFormatCheck("invoice", t.invoiceId),
     chargingCheck("invoices"),
+    /* due_at is set exactly when finalized_at is, so an invoice_due rule
+     * can't skip a finalized invoice. */
+    check(
+      "invoices_due_at_with_finalized_at",
+      sql`(finalized_at is null) = (due_at is null)`,
+    ),
     index("invoices_tenant").on(t.tenantId),
     /* The lifecycle rule scheduler pages recently-finalized invoices by
      * (finalized_at, id) with no tenant predicate, so the tenant-composite
@@ -925,6 +936,10 @@ export const invoices = pgTable(
     index("invoices_finalized")
       .on(t.finalizedAt, t.invoiceId)
       .where(sql`${t.finalizedAt} is not null`),
+    /* The same for invoice_due rules, which page by (due_at, id). */
+    index("invoices_due")
+      .on(t.dueAt, t.invoiceId)
+      .where(sql`${t.dueAt} is not null`),
   ],
 );
 
