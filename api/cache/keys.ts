@@ -32,8 +32,8 @@
  *                                      has fired for a tenant in its current
  *                                      window; cached from rule_runs, TTL'd to
  *                                      the window so keys die with it
- * mlast:{tenantId}:{meterId}   string  newest event timestamp (µs) for the
- *                                      tenant+meter; GREATEST-updated on
+ * mlast:{tenantId}:{meterId}   string  newest event timestamp (microseconds) for
+ *                                      the tenant+meter; GREATEST-updated on
  *                                      ingest, checkpointed to
  *                                      tenant_last_activity
  */

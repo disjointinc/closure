@@ -1279,10 +1279,10 @@ export const ruleRuns = pgTable(
     index("rule_runs_pending")
       .on(t.availableAt)
       .where(sql`${t.succeededAt} is null and ${t.failedAt} is null`),
-    /* firingKey's per-window quota count scopes to one rule+tenant and
-     * counts by when each firing happened, so a backfilled firing counts
-     * toward the window it happened in rather than the one it was
-     * recorded in. */
+    /* takeFiringQuotaToken's per-window quota count scopes to one
+     * rule+tenant and counts by when each firing happened, so a backfilled
+     * firing counts toward the window it happened in rather than the one
+     * it was recorded in. */
     index("rule_runs_rule_tenant_occurred").on(
       t.ruleId,
       t.tenantId,
@@ -1305,13 +1305,14 @@ export const ruleSchedulerState = pgTable("rule_scheduler_state", {
   ruleId: text("rule_id")
     .primaryKey()
     .references(() => rules.ruleId, { onDelete: "cascade" }),
-  /* Where the rule stopped reading: the time of the last row it read, in µs
-   * since the epoch. It has to be at least as precise as the times it
-   * reads, or the rule can't pick up exactly after the last row.
-   * Last-activity times are in µs (copies of metering's event stamps);
-   * every other source is in ms and converts to µs exactly (× 1000).
-   * Converting the other way, µs down to ms, would round, and the rule
-   * would re-read rows from the same millisecond every time it picks up. */
+  /* Where the rule stopped reading: the time of the last row it read, in
+   * microseconds since the epoch. It has to be at least as precise as the
+   * times it reads, or the rule can't pick up exactly after the last row.
+   * Last-activity times are in microseconds (copies of metering's event
+   * stamps); every other source is in ms and converts to microseconds
+   * exactly (× 1000). Converting the other way, microseconds down to ms,
+   * would round, and the rule would re-read rows from the same millisecond
+   * every time it picks up. */
   cursorAtMicroseconds: bigint("cursor_at_microseconds", {
     mode: "number",
   }).notNull(),
@@ -1522,11 +1523,12 @@ export const meterSpends = pgTable(
 );
 
 /**
- * Last activity per tenant+meter: the newest event timestamp seen, in µs.
- * The ingest Lua keeps a Redis key (mlast:) as the hot read via a GREATEST
- * max-update; this table is the durable copy it checkpoints to and rebuilds
- * from, so the inactive_for scheduler never has to derive recency from the
- * meter_events history (an unbounded scan) — staleness is an O(1) lookup.
+ * Last activity per tenant+meter: the newest event timestamp seen, in
+ * microseconds.The ingest Lua keeps a Redis key (mlast:) as the hot read
+ * via a GREATEST max-update; this table is the durable copy it checkpoints
+ * to and rebuilds from, so the inactive_for scheduler never has to derive
+ * recency from the meter_events history (an unbounded scan) — staleness is
+ * an O(1) lookup.
  */
 export const tenantLastActivity = pgTable(
   "tenant_last_activity",
