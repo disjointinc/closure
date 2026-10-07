@@ -77,15 +77,16 @@ import {
 /*
  * The scheduler's tick, one term in the firing-latency equation: worst-case
  * latency past a rule's due time ~= this interval + EXECUTOR_INTERVAL_MS +
- * the tick's own work. A quiet tick (nothing due) costs one claim per
- * RULE_CLAIM_BATCH rules plus one indexed read per rule, whatever the
- * tenant count: measured at ~1ms plus ~0.3ms per live scheduled rule.
+ * the tick's own work. A quiet tick (nothing due) costs one claim and one
+ * release per RULE_CLAIM_BATCH rules plus one indexed read per rule,
+ * whatever the tenant count: measured at ~5ms for 10 rules, ~165ms for
+ * 1,000, and ~0.8s for 5,000 (~0.16ms per live scheduled rule).
  *
- * An interval as tight as EXECUTOR_INTERVAL_MS would be overrun by a quiet
- * tick once there are a few dozen rules, so it would buy no latency. This
- * one fits a quiet tick for a few hundred rules. Past that, the overlap
- * guard skips beats when a tick overruns instead of stacking them, so
- * latency grows with the rule count.
+ * An interval as tight as 10ms would be overrun by a quiet tick once there
+ * are about 40 rules, so it would buy no latency. This one fits a quiet
+ * tick for about 600 rules. Past that, the overlap guard skips beats when a
+ * tick overruns instead of stacking them, so latency grows with the rule
+ * count (see MAX_SCHEDULED_RULES).
  */
 const SCHEDULER_INTERVAL_MS = 100;
 /*
@@ -100,14 +101,13 @@ const SCHEDULER_INTERVAL_MS = 100;
  * lookups, and rule_runs inserts to a few statements, each well within
  * pg's bind-parameter limit (see RULE_RUN_INSERT_BATCH).
  *
- * SCAN_MAX_PAGES_PER_TICK caps how long one backlogged rule holds a pass
- * slot (see RULE_PASS_CONCURRENCY), so it can't delay every other rule's
- * firings while it catches up. A full page that fires for every row was
- * measured at ~180ms (each first firing in a firing quota window reads
- * pg), so this many pages hold a slot for ~2s: about as long as a quiet
- * tick at MAX_SCHEDULED_RULES (see RULE_CLAIM_MAX_BATCHES_PER_TICK). A
- * backlogged rule still drains SCAN_PAGE_SIZE x SCAN_MAX_PAGES_PER_TICK
- * rows per tick.
+ * SCAN_MAX_PAGES_PER_TICK is the number we choose; the delay follows from
+ * it. A full page that fires for every row takes ~180ms (measured; each
+ * first firing in a firing quota window reads pg), so a backlogged rule's
+ * pages take up to ~1.8s, and since each group of RULE_PASS_CONCURRENCY
+ * passes waits for its slowest, every rule after it in that tick runs that
+ * much later. In exchange, a backlogged rule drains SCAN_PAGE_SIZE x
+ * SCAN_MAX_PAGES_PER_TICK rows per tick.
  */
 export const SCAN_PAGE_SIZE = 1_000;
 export const SCAN_MAX_PAGES_PER_TICK = 10;
@@ -117,16 +117,19 @@ export const SCAN_MAX_PAGES_PER_TICK = 10;
  * rules per round trip. */
 const RULE_CLAIM_BATCH = 50;
 /*
- * Claim statements per tick. Rules past this many batches would never be
- * offered, so createRule caps live scheduled rules at MAX_SCHEDULED_RULES.
- * At ~0.3ms per rule (see SCHEDULER_INTERVAL_MS), a quiet tick at
- * MAX_SCHEDULED_RULES takes ~1.5s, which keeps worst-case firing latency
- * under ~2s.
+ * The most live scheduled rules createRule allows. This is the number we
+ * choose; tick time follows from it. Every live scheduled rule adds
+ * ~0.16ms to every quiet tick (measured locally, one process), so at this
+ * cap a quiet tick takes ~0.8s, and a scheduled rule can fire up to that
+ * late (plus SCHEDULER_INTERVAL_MS). The delay grows in proportion to the
+ * cap: 10,000 rules would make it ~1.6s.
  */
-const RULE_CLAIM_MAX_BATCHES_PER_TICK = 100;
-/** The most live scheduled rules createRule allows: what one tick can offer. */
-export const MAX_SCHEDULED_RULES =
-  RULE_CLAIM_BATCH * RULE_CLAIM_MAX_BATCHES_PER_TICK;
+export const MAX_SCHEDULED_RULES = 5_000;
+/** Claim statements per tick: enough to offer every rule up to
+ * MAX_SCHEDULED_RULES, RULE_CLAIM_BATCH at a time. */
+const RULE_CLAIM_MAX_BATCHES_PER_TICK = Math.ceil(
+  MAX_SCHEDULED_RULES / RULE_CLAIM_BATCH,
+);
 /** Rule passes one process runs at once: well under the pg pool size
  * (postgres-js defaults to 10 connections), leaving room for API requests. */
 const RULE_PASS_CONCURRENCY = 4;
@@ -216,21 +219,21 @@ export function startingCursorAtMicroseconds({ rule }: { rule: Rule }): number {
   return 0;
 }
 
-/** A rule claimed for one pass, with the claim stamp that releases it. */
-type ClaimedRule = { bookmark: Bookmark; claimedAtMs: number; rule: Rule };
+/** A rule claimed for one pass, with where its scan resumes. */
+type ClaimedRule = { bookmark: Bookmark; rule: Rule };
 
 /**
  * Claim rules for one pass, like the executor claims runs: a rule another
  * process claimed within RULE_CLAIM_LEASE_MS is skipped, so processes split
  * the rules instead of each doing all of them. The same upsert writes a
  * starting bookmark for any rule that has none yet (one inserted outside
- * createRule).
+ * createRule). Returns the claim stamp too, which releaseRules needs.
  */
 async function claimRules({
   scheduledRules,
 }: {
   scheduledRules: Rule[];
-}): Promise<ClaimedRule[]> {
+}): Promise<{ claimed: ClaimedRule[]; claimedAtMs: number }> {
   const claimedAtMs = Date.now();
   const rows = await db
     .insert(ruleSchedulerState)
@@ -249,7 +252,7 @@ async function claimRules({
     })
     .returning();
   const ruleById = new Map(scheduledRules.map((rule) => [rule.ruleId, rule]));
-  return rows.flatMap((row) => {
+  const claimed = rows.flatMap((row) => {
     const rule = ruleById.get(row.ruleId);
     if (rule === undefined) {
       return [];
@@ -260,27 +263,29 @@ async function claimRules({
           cursorAtMicroseconds: row.cursorAtMicroseconds,
           cursorId: row.cursorId,
         },
-        claimedAtMs,
         rule,
       },
     ];
   });
+  return { claimed, claimedAtMs };
 }
 
-/** Release a claim, unless another process took the rule over after the
- * lease lapsed mid-pass. */
-async function releaseRule({
-  claimed,
+/** Release a claim batch's rules, except any another process took over
+ * after the lease lapsed mid-pass (their claim stamp changed). */
+async function releaseRules({
+  claimedAtMs,
+  ruleIds,
 }: {
-  claimed: ClaimedRule;
+  claimedAtMs: number;
+  ruleIds: string[];
 }): Promise<void> {
   await db
     .update(ruleSchedulerState)
     .set({ claimedAt: null })
     .where(
       and(
-        eq(ruleSchedulerState.ruleId, claimed.rule.ruleId),
-        eq(ruleSchedulerState.claimedAt, claimed.claimedAtMs),
+        inArray(ruleSchedulerState.ruleId, ruleIds),
+        eq(ruleSchedulerState.claimedAt, claimedAtMs),
       ),
     );
 }
@@ -1320,8 +1325,8 @@ async function getScheduledRules(): Promise<Rule[]> {
     );
 }
 
-/** One rule's pass, then its release. Errors are logged per rule, so one
- * bad rule can't stall the rest. */
+/** One rule's pass. Errors are logged per rule, so one bad rule can't stall
+ * the rest. */
 async function runRulePass({
   claimed,
   frontierMs,
@@ -1354,11 +1359,6 @@ async function runRulePass({
     }
   } catch (error) {
     console.error("rule pass failed", { error, ruleId: rule.ruleId });
-  }
-  try {
-    await releaseRule({ claimed });
-  } catch (error) {
-    console.error("rule claim release failed", { error, ruleId: rule.ruleId });
   }
 }
 
@@ -1395,7 +1395,9 @@ export async function evaluateScheduledRules(): Promise<void> {
     if (offered.length === 0) {
       return;
     }
-    const claimed = await claimRules({ scheduledRules: offered });
+    const { claimed, claimedAtMs } = await claimRules({
+      scheduledRules: offered,
+    });
     for (
       let start = 0;
       start < claimed.length;
@@ -1408,6 +1410,24 @@ export async function evaluateScheduledRules(): Promise<void> {
             runRulePass({ claimed: claimedRule, frontierMs }),
           ),
       );
+    }
+    if (claimed.length === 0) {
+      continue;
+    }
+    /* One release for the whole claim batch rather than one per rule: that
+     * saves a round trip per rule. A rule whose pass finished early stays
+     * claimed until the rest of its batch is done, so another process skips
+     * it a little longer; this process runs it again next tick either way. */
+    try {
+      await releaseRules({
+        claimedAtMs,
+        ruleIds: claimed.map((claimedRule) => claimedRule.rule.ruleId),
+      });
+    } catch (error) {
+      console.error("rule claim release failed", {
+        error,
+        ruleIds: claimed.map((claimedRule) => claimedRule.rule.ruleId),
+      });
     }
   }
 }
