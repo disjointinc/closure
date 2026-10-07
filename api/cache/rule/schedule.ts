@@ -507,11 +507,20 @@ async function fireDetections({
     /* The quota checks spent tokens on firings that never landed. The
      * bookmark doesn't move, so the page is retried; drop those counters so
      * the retry re-counts from rule_runs instead of treating the lost
-     * firings as already fired. */
+     * firings as already fired. If dropping them fails too, the counters
+     * still say those firings happened, so the retry can skip them for good;
+     * log that, but still throw the insert's error, since that's what failed
+     * the page. */
     await Promise.all(
       passed.map(({ billingCycle, firing }) =>
         forgetFiringQuota({ billingCycle, rule, tenantId: firing.tenantId }),
       ),
+    ).catch((forgetError) =>
+      console.error("firing quota give-back failed", {
+        count: passed.length,
+        error: forgetError,
+        ruleId: rule.ruleId,
+      }),
     );
     throw error;
   }
@@ -525,6 +534,13 @@ async function fireDetections({
     ruleId: rule.ruleId,
   });
   const alreadyRecordedFirings = new Set(alreadyRecorded);
+  /* No catch here, unlike the give-back in the catch above: every firing
+   * on this page is already in rule_runs, so a failure can't lose a firing
+   * or run one twice. The throw just means runRulePass logs the error and
+   * the next tick re-reads this page (walkPages skips saveBookmark). The
+   * worst case is a firing quota counter left too high, which can skip
+   * that tenant's next firing in the same firing quota window until the
+   * counter expires. */
   await Promise.all(
     passed
       .filter(({ firing }) => alreadyRecordedFirings.has(firing))
