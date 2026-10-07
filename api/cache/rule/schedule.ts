@@ -954,16 +954,19 @@ async function scanLifecycleEvents({
     throw new Error(`unknown lifecycle event: ${JSON.stringify(exhaustive)}`);
   }
   /* A billing_cycle_end window counts firings per billing period, so it
-   * needs each candidate's current period boundary ("anchor"). Period
-   * boundaries exist only per product line -- a tenant holds at most one
-   * open assignment per product line -- and two upstream checks pin this
-   * rule to one product line: createRule rejects cycle-windowed lifecycle
-   * rules whose scope plans span product lines, and the scope filter
-   * surfaced only tenants with an open assignment on those plans (invoices)
-   * or assignments on those plans (assignment_started). So every in-scope
+   * needs each candidate's current billing period boundary ("anchor").
+   * Billing period boundaries exist only per product line -- a tenant
+   * holds at most one open assignment per product line -- and two upstream
+   * checks pin this rule to one product line: createRule only allows a
+   * billing_cycle_end window on a lifecycle rule with a plan scope whose
+   * plans share one product line, and the scope filter surfaced only
+   * tenants with an open assignment on those plans (invoices) or
+   * assignments on those plans (assignment_started). So every in-scope
    * event has an open assignment in the anchor product line, and this one
-   * lookup covers them all. Rules with rolling/permanent windows never read
-   * the billing cycle. */
+   * lookup covers them all. A tenant or global scope can't pin a product
+   * line (a tenant can be on several, each with its own billing cycle), so
+   * createRule rejects them and they get no anchor here. Rules with
+   * rolling/permanent windows never read the billing cycle. */
   let anchorProductLineId: string | null = null;
   if (rule.scope.kind === "plan") {
     const planRows = await db
