@@ -702,6 +702,11 @@ async function scanInactive({
         .where(
           and(
             eq(tenantLastActivity.meterId, meterId),
+            /* tenantsInScope would drop the other tenants anyway. Filtering
+             * here keeps a tenant-scoped rule from reading every tenant on
+             * the meter just to keep one. (tenant_id, meter_id) is
+             * tenant_last_activity's primary key, so Postgres reads only
+             * this tenant's row: the kind of SQL filter walkPages allows. */
             scope.kind === "tenant"
               ? eq(tenantLastActivity.tenantId, scope.tenantId)
               : undefined,
