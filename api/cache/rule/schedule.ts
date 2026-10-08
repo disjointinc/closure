@@ -1437,7 +1437,11 @@ export async function evaluateScheduledRules(): Promise<void> {
     /* One release for the whole claim batch rather than one per rule: that
      * saves a round trip per rule. A rule whose pass finished early stays
      * claimed until the rest of its batch is done, so another process skips
-     * it a little longer; this process runs it again next tick either way. */
+     * it a little longer; this process runs it again next tick either way.
+     *
+     * One bad rule can't hold this release forever: runRulePass catches
+     * and logs every error, and no Postgres statement can run past
+     * STATEMENT_TIMEOUT_MS (db/index.ts). */
     try {
       await releaseRules({
         claimedAtMs,
