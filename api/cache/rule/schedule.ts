@@ -1050,12 +1050,19 @@ async function scanCycleEnds({
       return fireDetections({
         detections: rows
           .filter((billingPeriod) => {
-            /* Skip billing periods that were cut short: the tenant's
-             * assignment ended (they cancelled or switched plans) before
-             * the billing period's end, so that end never happens. */
+            /* Fire for every billing period the tenant was on for any
+             * amount of time, at its scheduled end plus the rule's offset,
+             * even if the assignment ends partway through it. An assignment
+             * covers [startsAt, endsAt) and a billing period covers
+             * [periodStart, periodEnd): each includes its start and excludes
+             * its end. A billing period never starts before its assignment
+             * does, so the tenant was never on it only when endsAt <=
+             * periodStart. That happens when a future-dated assignment is
+             * cancelled before it starts, since its first billing period is
+             * written when the assignment is created. */
             if (
               billingPeriod.assignmentEndsAt !== null &&
-              billingPeriod.assignmentEndsAt < billingPeriod.periodEnd
+              billingPeriod.assignmentEndsAt <= billingPeriod.periodStart
             ) {
               return false;
             }
@@ -1148,10 +1155,11 @@ async function scanCycleEnds({
  * what lets cycle_end rules find billing period ends by index. Runs at
  * the start of every scheduler tick.
  *
- * Each page is one transaction:
+ * Each page is one transaction, in three steps:
  *   1. Lock up to ENDED_BILLING_PERIOD_PAGE_SIZE current billing periods
- *      that have ended, oldest first. Other processes skip locked rows,
- *      so each row is advanced by exactly one process.
+ *      that have ended, oldest first, and read each one's assignment end
+ *      date. Other processes skip locked rows, so each row is advanced by
+ *      exactly one process.
  *   2. Mark them no longer current.
  *   3. For each whose assignment is still open, write the next billing
  *      period (starting where this one ended) and mark it current.
@@ -1160,13 +1168,20 @@ async function scanCycleEnds({
  *   - Falling behind: the next billing period may already be over too.
  *     It's current and ended, so a later page advances it again, until
  *     the tenant reaches the billing period happening now.
- *   - Ending assignments: step 3 writes the next billing period unless
- *     the assignment ends by the time it would start. One that ends
- *     partway through it (a fixed term, or a plan change scheduled for
- *     later) still gets it, and scanCycleEnds skips it as cut short. The
- *     same goes for an end date set after step 1 read the assignment.
- *     Once that billing period ends, advancing closes it without writing
- *     another.
+ *   - Ending assignments: an assignment covers [startsAt, endsAt), so
+ *     step 3 skips the next billing period when endsAt is at or before
+ *     the time it would start. If the assignment ends partway through it
+ *     instead (a fixed term), the full billing period is still written,
+ *     and cycle_end rules fire on its scheduled end like any other. Once
+ *     the assignment's last billing period ends, step 3 writes nothing
+ *     after it.
+ *   - End dates that change while a page runs: step 1 doesn't lock
+ *     assignments, so an end date can move earlier after step 1 reads it
+ *     (e.g. a plan change backdated to before the next billing period
+ *     starts). Step 3 then writes a billing period the assignment never
+ *     gets to. That's harmless: scanCycleEnds doesn't fire for a billing
+ *     period that starts at or after its assignment ends, and when it
+ *     ends, step 3 writes nothing after it.
  *   - Plan changes backdated to an old billing period's start: the new
  *     assignment's billing periods can start exactly where the old
  *     assignment's rows do. Step 3's insert overwrites a row with the
