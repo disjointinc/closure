@@ -61,7 +61,7 @@ import {
   ruleSchedulerState,
   tenantLastActivity,
 } from "../../db/schema.ts";
-import type { FiringPayload, Rule, RuleTrigger } from "../../schemas/rule.ts";
+import type { FiringPayload, Rule } from "../../schemas/rule.ts";
 import { redis } from "../index.ts";
 import { keys } from "../keys.ts";
 import {
@@ -71,6 +71,7 @@ import {
   forgetFiringQuota,
   getBillingCycles,
   recordFirings,
+  SCHEDULED_TRIGGER_TYPES,
   takeFiringQuotaToken,
 } from "./evaluate.ts";
 
@@ -1331,26 +1332,6 @@ export async function unadvancedFrontierMs(): Promise<number | null> {
   return row?.periodEnd ?? null;
 }
 
-/*
- * Who evaluates each trigger type: this scheduler, or evaluateMeterEventRules
- * when a meter event arrives. Keyed by every trigger type, so adding one to
- * the rule schema fails typecheck until it's listed here.
- */
-const TRIGGER_EVALUATED_BY: Record<
-  RuleTrigger["type"],
-  "meter_event" | "scheduler"
-> = {
-  inactive_for: "scheduler",
-  microcredits_remaining: "meter_event",
-  microcredits_spent: "meter_event",
-  relative_to_lifecycle_event: "scheduler",
-};
-
-/** The trigger types the scheduler evaluates. */
-export const SCHEDULED_TRIGGER_TYPES: string[] = Object.entries(
-  TRIGGER_EVALUATED_BY,
-).flatMap(([type, evaluatedBy]) => (evaluatedBy === "scheduler" ? [type] : []));
-
 /** Live rules the scheduler evaluates. */
 async function getScheduledRules(): Promise<Rule[]> {
   return db
@@ -1437,6 +1418,9 @@ export async function evaluateScheduledRules(): Promise<void> {
     const { claimed, claimedAtMs } = await claimRules({
       scheduledRules: offered,
     });
+    if (claimed.length === 0) {
+      continue;
+    }
     for (
       let start = 0;
       start < claimed.length;
@@ -1449,9 +1433,6 @@ export async function evaluateScheduledRules(): Promise<void> {
             runRulePass({ claimed: claimedRule, frontierMs }),
           ),
       );
-    }
-    if (claimed.length === 0) {
-      continue;
     }
     /* One release for the whole claim batch rather than one per rule: that
      * saves a round trip per rule. A rule whose pass finished early stays
