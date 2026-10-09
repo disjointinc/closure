@@ -145,11 +145,17 @@ type ClaimedBackfill = {
 
 /** Per-pass facts about the rule, read once. */
 type PassContext = {
-  /** Product lines whose billing periods anchor the rule's recurrence
-   * windows and spend periods; empty when the rule has no cycle to anchor
-   * to. */
+  /** Product lines whose billing periods are loaded, so the replay knows
+   * which billing cycle a tenant was in at each past firing. Two things
+   * read it: a firing quota per billing cycle (a billing_cycle_end
+   * recurrence window), and microcredits_spent, whose spend total starts
+   * over each billing cycle. Empty when the rule has no billing cycle to
+   * read (see loadPassContext). */
   billingCycleProductLineIds: string[];
-  /** The rule's meter's product lines; empty for lifecycle rules. */
+  /** The rule's meter's product lines. Together with planDefaults, gives a
+   * tenant's initial allocation of the meter, which only "percentage of
+   * initial allocation" thresholds read. Empty for lifecycle rules, which
+   * have no meter. */
   meterProductLineIds: string[];
   /** Each plan's default allocation of the rule's meter. */
   planDefaults: Map<string, number>;
@@ -337,9 +343,19 @@ async function loadPassContext({ rule }: { rule: Rule }): Promise<PassContext> {
   const trigger = rule.trigger;
   switch (trigger.type) {
     case "relative_to_lifecycle_event": {
-      /* Like the live lifecycle scans: a billing_cycle_end window anchors to
-       * the plan scope's product line, which createRule requires to be a
-       * single one for such rules. Other rules never read a cycle. */
+      /* Lifecycle rules watch invoices, assignments, and billing period
+       * ends instead of a meter, so they have no percentage thresholds and
+       * no meter product lines. The one thing they can need is the billing
+       * cycle, for a firing quota per billing cycle (a billing_cycle_end
+       * recurrence window), and that needs a single product line. Only a
+       * plan scope can name one, since each plan belongs to one product
+       * line. A global or tenant scope can't: a tenant can be on several
+       * product lines at once, each with its own billing cycle. So
+       * createRule only allows a billing_cycle_end window on a lifecycle
+       * rule whose plan scope covers one product line, and every other
+       * lifecycle rule never reads the billing cycle (windowStartMs only
+       * reads it for billing_cycle_end). Same as the live scan
+       * (scanLifecycleEvents in schedule.ts). */
       if (rule.scope.kind !== "plan") {
         return {
           billingCycleProductLineIds: [],
