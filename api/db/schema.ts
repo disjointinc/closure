@@ -1576,15 +1576,19 @@ export const tenantLastActivity = pgTable(
  * of computing them per tenant (boundaries derive from assignment start +
  * cycle length, which isn't searchable).
  *
- * Freshness: a row is written when its period STARTS. Assignment
- * creation writes the first in the same transaction as the assignment,
- * then the scheduler's advance step appends the next row when a period
- * ends. The table lags reality only between a period ending and the next
- * advance, and cycle_end detection never reads past the oldest period that
- * has ended but not been advanced, so lag delays firings, never drops them.
+ * Freshness: a row is written by the time its period STARTS. Assignment
+ * creation writes the first in the same transaction as the assignment
+ * (along with the old assignment's remaining periods before a plan change
+ * scheduled for later), then the scheduler's advance step appends the
+ * next row when a period ends. The table lags reality only between a
+ * period ending and the next advance, and cycle_end detection never reads
+ * past the oldest period that has ended but not been advanced, so lag
+ * delays firings, never drops them.
  *
- * is_current marks the one period currently underway per tenant + product
- * line combination; the partial unique index enforces it.
+ * Each tenant + product line combination has at most one unadvanced period
+ * (advanced_at null): the one the advance step extends next, usually the
+ * one underway, or the first period of a plan change scheduled for later.
+ * The partial unique index enforces it.
  *
  * Each line has at most one period starting at any given moment (the primary
  * key enforces this). When a new period collides with an existing row, the
@@ -1613,22 +1617,25 @@ export const billingPeriods = pgTable(
     periodEnd: epochMs("period_end").notNull(),
     /** Denormalized cycle length so trigger keys derive from the row alone. */
     windowMs: bigint("window_ms", { mode: "number" }).notNull(),
-    isCurrent: boolean("is_current").notNull(),
+    /** When the period after this one was written, or it was settled that
+     * none comes (the assignment ended). Null while the advance step still
+     * owes it. */
+    advancedAt: epochMs("advanced_at"),
   },
   (t) => [
     primaryKey({ columns: [t.tenantId, t.productLineId, t.periodStart] }),
     /* cycle_end detection pages by (period_end, assignment_id), which is
      * unique: an assignment has one period ending at any moment. */
     index("billing_periods_end").on(t.periodEnd, t.assignmentId),
-    /* The advance step's per-tick read is only ever "current rows that just
-     * ended"; without this partial index the range scan walks every ended
-     * receipt in history each tick. */
-    index("billing_periods_current_end")
+    /* The advance step's per-tick read is only ever "unadvanced rows that
+     * just ended"; without this partial index the range scan walks every
+     * ended receipt in history each tick. */
+    index("billing_periods_unadvanced_end")
       .on(t.periodEnd)
-      .where(sql`${t.isCurrent}`),
-    uniqueIndex("billing_periods_one_current_per_line")
+      .where(sql`${t.advancedAt} is null`),
+    uniqueIndex("billing_periods_one_unadvanced_per_product_line")
       .on(t.tenantId, t.productLineId)
-      .where(sql`${t.isCurrent}`),
+      .where(sql`${t.advancedAt} is null`),
   ],
 );
 

@@ -22,8 +22,8 @@
  *     so each billing period is written down as a row: creating the
  *     assignment adds the first (insertFirstPeriodReceipt), along with
  *     the old assignment's remaining ones before a plan change scheduled
- *     for later, and advanceBillingPeriods adds each next one as the
- *     current one ends.
+ *     for later, and advanceBillingPeriods adds each next one as the one
+ *     before it ends.
  *
  * Where a new rule starts reading depends on when it was created (see
  * startingCursorAtMicroseconds): it fires only for conditions met after its
@@ -1155,25 +1155,25 @@ async function scanCycleEnds({
 }
 
 /**
- * When a tenant's current billing period ends, write the row for their
- * next one. Every billing period gets a row by the time it starts (the
- * first when the assignment is created, and any before a plan change
- * scheduled for later; see insertFirstPeriodReceipt), which is what lets
- * cycle_end rules find billing period ends by index. Runs at the start of
- * every scheduler tick.
+ * When an unadvanced billing period (advanced_at null) ends, write the row
+ * for the one after it. Every billing period gets a row by the time it
+ * starts (the first when the assignment is created, and any before a plan
+ * change scheduled for later; see insertFirstPeriodReceipt), which is what
+ * lets cycle_end rules find billing period ends by index. Runs at the start
+ * of every scheduler tick.
  *
  * Each page is one transaction, in three steps:
- *   1. Lock up to ENDED_BILLING_PERIOD_PAGE_SIZE current billing periods
- *      that have ended, oldest first, and read each one's assignment end
- *      date. Other processes skip locked rows, so each row is advanced by
- *      exactly one process.
- *   2. Mark them no longer current.
+ *   1. Lock up to ENDED_BILLING_PERIOD_PAGE_SIZE unadvanced billing
+ *      periods that have ended, oldest first, and read each one's
+ *      assignment end date. Other processes skip locked rows, so each row
+ *      is advanced by exactly one process.
+ *   2. Set their advanced_at.
  *   3. For each whose assignment is still open, write the next billing
- *      period (starting where this one ended) and mark it current.
+ *      period (starting where this one ended), unadvanced.
  *
  * Edge cases:
  *   - Falling behind: the next billing period may already be over too.
- *     It's current and ended, so a later page advances it again, until
+ *     It's unadvanced and ended, so a later page advances it too, until
  *     the tenant reaches the billing period happening now.
  *   - Ending assignments: an assignment covers [startsAt, endsAt), so
  *     step 3 skips the next billing period when endsAt is at or before
@@ -1205,7 +1205,7 @@ async function advanceBillingPeriods(): Promise<void> {
     .from(billingPeriods)
     .where(
       and(
-        eq(billingPeriods.isCurrent, true),
+        isNull(billingPeriods.advancedAt),
         lte(billingPeriods.periodEnd, Date.now()),
       ),
     )
@@ -1235,7 +1235,7 @@ async function advanceBillingPeriods(): Promise<void> {
         )
         .where(
           and(
-            eq(billingPeriods.isCurrent, true),
+            isNull(billingPeriods.advancedAt),
             lte(billingPeriods.periodEnd, Date.now()),
           ),
         )
@@ -1249,8 +1249,9 @@ async function advanceBillingPeriods(): Promise<void> {
        * start) list: Postgres takes ~140ms just to plan a 1,000-entry
        * list of three-part keys, and ~8ms to run this whole update
        * (measured with 1,000 rows). */
+      const advancedAt = Date.now();
       await tx.execute(sql`
-        update ${billingPeriods} as bp set is_current = false
+        update ${billingPeriods} as bp set advanced_at = ${advancedAt}::bigint
         from unnest(
           ${sql.param(ended.map((row) => row.tenantId))}::text[],
           ${sql.param(ended.map((row) => row.productLineId))}::text[],
@@ -1283,7 +1284,7 @@ async function advanceBillingPeriods(): Promise<void> {
             periodStart: row.periodEnd,
             periodEnd: row.periodEnd + row.windowMs,
             windowMs: row.windowMs,
-            isCurrent: true,
+            advancedAt: null,
           },
         ];
       });
@@ -1301,7 +1302,7 @@ async function advanceBillingPeriods(): Promise<void> {
               assignmentId: sql`excluded.assignment_id`,
               periodEnd: sql`excluded.period_end`,
               windowMs: sql`excluded.window_ms`,
-              isCurrent: sql`excluded.is_current`,
+              advancedAt: sql`excluded.advanced_at`,
             },
           });
       }
@@ -1329,7 +1330,7 @@ export async function unadvancedFrontierMs(): Promise<number | null> {
     .from(billingPeriods)
     .where(
       and(
-        eq(billingPeriods.isCurrent, true),
+        isNull(billingPeriods.advancedAt),
         lte(billingPeriods.periodEnd, Date.now()),
       ),
     )
