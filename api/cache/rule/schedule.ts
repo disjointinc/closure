@@ -17,11 +17,13 @@
  *   - cycle_end reads billing_periods by period_end, shifted by the rule's
  *     offset. A negative offset fires before the billing period ends, as
  *     long as it's shorter than the billing cycle: a billing period's row
- *     only exists once it starts. Billing period boundaries are computed
- *     (assignment start + cycle length), which can't be indexed, so each
- *     billing period is written down as a row when it starts: creating the
- *     assignment adds the first (insertFirstPeriodReceipt), and
- *     advanceBillingPeriods adds each next one as the current one ends.
+ *     is only sure to exist once it starts. Billing period boundaries are
+ *     computed (assignment start + cycle length), which can't be indexed,
+ *     so each billing period is written down as a row: creating the
+ *     assignment adds the first (insertFirstPeriodReceipt), along with
+ *     the old assignment's remaining ones before a plan change scheduled
+ *     for later, and advanceBillingPeriods adds each next one as the
+ *     current one ends.
  *
  * Where a new rule starts reading depends on when it was created (see
  * startingCursorAtMicroseconds): it fires only for conditions met after its
@@ -1058,9 +1060,12 @@ async function scanCycleEnds({
              * [periodStart, periodEnd): each includes its start and excludes
              * its end. A billing period never starts before its assignment
              * does, so the tenant was never on it only when endsAt <=
-             * periodStart. That happens when a future-dated assignment is
-             * cancelled before it starts, since its first billing period is
-             * written when the assignment is created. */
+             * periodStart. That happens when an assignment ends before
+             * billing periods already written for it: a future-dated
+             * assignment cancelled before it starts (its first billing
+             * period is written when it's created), or a plan change that
+             * starts before them (backdated, or a plan change scheduled for
+             * later then moved earlier; see insertFirstPeriodReceipt). */
             if (
               billingPeriod.assignmentEndsAt !== null &&
               billingPeriod.assignmentEndsAt <= billingPeriod.periodStart
@@ -1151,10 +1156,11 @@ async function scanCycleEnds({
 
 /**
  * When a tenant's current billing period ends, write the row for their
- * next one. Every billing period gets a row when it starts (the first
- * when the assignment is created; see insertFirstPeriodReceipt), which is
- * what lets cycle_end rules find billing period ends by index. Runs at
- * the start of every scheduler tick.
+ * next one. Every billing period gets a row by the time it starts (the
+ * first when the assignment is created, and any before a plan change
+ * scheduled for later; see insertFirstPeriodReceipt), which is what lets
+ * cycle_end rules find billing period ends by index. Runs at the start of
+ * every scheduler tick.
  *
  * Each page is one transaction, in three steps:
  *   1. Lock up to ENDED_BILLING_PERIOD_PAGE_SIZE current billing periods
