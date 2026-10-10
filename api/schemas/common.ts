@@ -89,7 +89,7 @@ export type CurrencyAmount = z.infer<typeof currencyAmountSchema>;
 export const amountsSchema = z
   .array(
     currencyAmountSchema.extend({
-      value: z.number().int().positive(),
+      value: z.number().int().nonnegative(),
     }),
   )
   .min(1)
