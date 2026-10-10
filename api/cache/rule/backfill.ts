@@ -59,6 +59,7 @@ import { db } from "../../db/index.ts";
 import {
   assignments,
   billingPeriods,
+  cycles,
   invoices,
   meterBalances,
   meterEvents,
@@ -145,12 +146,12 @@ type ClaimedBackfill = {
 
 /** Per-pass facts about the rule, read once. */
 type PassContext = {
-  /** Product lines whose billing periods are loaded, so the replay knows
-   * which billing cycle a tenant was in at each past firing. Two things
-   * read it: a firing quota per billing cycle (a billing_cycle_end
-   * recurrence window), and microcredits_spent, whose spend total starts
-   * over each billing cycle. Empty when the rule has no billing cycle to
-   * read (see loadPassContext). */
+  /** Product lines whose assignments set the tenant's billing cycle, so
+   * the replay knows which billing cycle a tenant was in at each past
+   * firing. Two things read it: a firing quota per billing cycle (a
+   * billing_cycle_end recurrence window), and microcredits_spent, whose
+   * spend total starts over each billing cycle. Empty when the rule has no
+   * billing cycle to read (see loadPassContext). */
   billingCycleProductLineIds: string[];
   /** The rule's meter's product lines. Together with planDefaults, gives a
    * tenant's initial allocation of the meter, which only "percentage of
@@ -164,16 +165,17 @@ type PassContext = {
 /** What the replay reads to judge one tenant as of a past time. */
 type TenantHistory = {
   assignments: AssignmentRow[];
+  /** The tenant's assignments in PassContext.billingCycleProductLineIds
+   * on a repeating cycle, each with its cycle's length. */
+  billingCycles: { assignment: AssignmentRow; windowMs: number }[];
   /** The tenant's overrides of the rule's meter, oldest first. */
   overrides: { createdAt: number; defaultMicrocredits: number }[];
-  /** The tenant's billing periods in PassContext.billingCycleProductLineIds. */
-  periods: { periodEnd: number; periodStart: number; windowMs: number }[];
 };
 
 /** One firing the replay detected, before its recurrence check. */
 type Detection = {
-  /** The billing period containing occurredAt: only used to find which
-   * firing quota window the firing counts toward (for billing_cycle_end
+  /** The billing cycle at occurredAt: only used to find which firing
+   * quota window the firing counts toward (for billing_cycle_end
    * windows). */
   billingCycle: BillingCycle;
   occurredAt: number;
@@ -337,7 +339,7 @@ async function sourcesCaughtUp({ rule }: { rule: Rule }): Promise<boolean> {
 }
 
 /** The rule's per-pass context: its meter's product lines, the product
- * lines its billing periods come from, and the plans' default allocations
+ * lines its billing cycles come from, and the plans' default allocations
  * of its meter. */
 async function loadPassContext({ rule }: { rule: Rule }): Promise<PassContext> {
   const trigger = rule.trigger;
@@ -476,8 +478,8 @@ async function candidateTenantIds({
   }
 }
 
-/** Read the batch's assignments, billing periods, and meter overrides once,
- * keyed by tenant. */
+/** Read the batch's assignments (with their cycles' lengths) and meter
+ * overrides once, keyed by tenant. */
 async function loadHistories({
   context,
   meterId,
@@ -490,37 +492,27 @@ async function loadHistories({
   const histories = new Map<string, TenantHistory>(
     tenantIds.map((tenantId) => [
       tenantId,
-      { assignments: [], overrides: [], periods: [] },
+      { assignments: [], billingCycles: [], overrides: [] },
     ]),
   );
   const assignmentRows = await db
-    .select()
+    .select({ assignment: assignments, cycleLength: cycles.cycleLength })
     .from(assignments)
+    .innerJoin(cycles, eq(cycles.cycleId, assignments.cycleId))
     .where(inArray(assignments.tenantId, tenantIds));
-  for (const row of assignmentRows) {
-    histories.get(row.tenantId)?.assignments.push(row);
-  }
-  if (context.billingCycleProductLineIds.length > 0) {
-    const periodRows = await db
-      .select({
-        periodEnd: billingPeriods.periodEnd,
-        periodStart: billingPeriods.periodStart,
-        tenantId: billingPeriods.tenantId,
-        windowMs: billingPeriods.windowMs,
-      })
-      .from(billingPeriods)
-      .where(
-        and(
-          inArray(billingPeriods.tenantId, tenantIds),
-          inArray(
-            billingPeriods.productLineId,
-            context.billingCycleProductLineIds,
-          ),
-        ),
-      );
-    for (const row of periodRows) {
-      histories.get(row.tenantId)?.periods.push(row);
+  for (const { assignment, cycleLength } of assignmentRows) {
+    const history = histories.get(assignment.tenantId);
+    history?.assignments.push(assignment);
+    if (
+      cycleLength === "one_time" ||
+      !context.billingCycleProductLineIds.includes(assignment.productLineId)
+    ) {
+      continue;
     }
+    history?.billingCycles.push({
+      assignment,
+      windowMs: durationToMs(cycleLength),
+    });
   }
   if (meterId !== null) {
     const overrideRows = await db
@@ -559,11 +551,13 @@ function assignmentOpenAt({
 }
 
 /**
- * The billing period containing atMs, as a recurrence-window anchor
- * (windowStartMs then lands exactly on its start). When a plan change
- * overlapped two periods, the later-starting one belongs to the newer
- * assignment, which is the one the live engine anchors to. Null when the
- * tenant had no recurring cycle then.
+ * The tenant's billing cycle at atMs, read the way the live engine reads it
+ * (getBillingCycle): the assignment open then, anchored at its start, with
+ * its cycle's length. Null when no assignment on a repeating cycle was open
+ * then. Read from assignments rather than billing_periods, which also keeps
+ * billing periods no assignment reached (see scanCycleEnds). If several
+ * were open (a meter shared by several product lines), the latest-started
+ * wins, so a re-run picks the same one.
  */
 function billingCycleAt({
   atMs,
@@ -572,18 +566,21 @@ function billingCycleAt({
   atMs: number;
   history: TenantHistory;
 }): BillingCycle {
-  let containing: TenantHistory["periods"][number] | null = null;
-  for (const period of history.periods) {
-    if (period.periodStart > atMs || atMs >= period.periodEnd) {
+  let open: TenantHistory["billingCycles"][number] | null = null;
+  for (const billingCycle of history.billingCycles) {
+    if (!assignmentOpenAt({ assignment: billingCycle.assignment, atMs })) {
       continue;
     }
-    if (containing === null || period.periodStart > containing.periodStart) {
-      containing = period;
+    if (
+      open === null ||
+      billingCycle.assignment.startsAt > open.assignment.startsAt
+    ) {
+      open = billingCycle;
     }
   }
-  return containing === null
+  return open === null
     ? null
-    : { anchorMs: containing.periodStart, windowMs: containing.windowMs };
+    : { anchorMs: open.assignment.startsAt, windowMs: open.windowMs };
 }
 
 /**
@@ -743,6 +740,60 @@ function thresholdSegments({
         (allocation * at.percentageOfInitialAllocation) / 100,
       ),
       to_microseconds: (starts[i + 1] ?? boundaryMs) * MICROSECONDS_PER_MS,
+    });
+  }
+  return segments;
+}
+
+/** A stretch of a tenant's history in one billing cycle, in the
+ * microseconds meter events are stamped in. Field names match the SQL
+ * record in spentDetections. */
+type BillingCycleSegment = {
+  anchor_microseconds: number;
+  from_microseconds: number;
+  tenant_id: string;
+  to_microseconds: number;
+  window_microseconds: number;
+};
+
+/**
+ * A tenant's billing cycles over its history, as segments, so SQL can tell
+ * which billing cycle each meter event fell in. The billing cycle can only
+ * change when an assignment starts or ends; each stretch between those
+ * takes billingCycleAt's answer, so segments never overlap. Stretches with
+ * no billing cycle get no segment.
+ */
+function billingCycleSegments({
+  boundaryMs,
+  history,
+  tenantId,
+}: {
+  boundaryMs: number;
+  history: TenantHistory;
+  tenantId: string;
+}): BillingCycleSegment[] {
+  const changes = new Set<number>();
+  for (const { assignment } of history.billingCycles) {
+    changes.add(assignment.startsAt);
+    if (assignment.endsAt !== null) {
+      changes.add(assignment.endsAt);
+    }
+  }
+  const starts = [...changes]
+    .filter((ms) => ms < boundaryMs)
+    .sort((a, b) => a - b);
+  const segments: BillingCycleSegment[] = [];
+  for (const [i, fromMs] of starts.entries()) {
+    const billingCycle = billingCycleAt({ atMs: fromMs, history });
+    if (billingCycle === null) {
+      continue;
+    }
+    segments.push({
+      anchor_microseconds: billingCycle.anchorMs * MICROSECONDS_PER_MS,
+      from_microseconds: fromMs * MICROSECONDS_PER_MS,
+      tenant_id: tenantId,
+      to_microseconds: (starts[i + 1] ?? boundaryMs) * MICROSECONDS_PER_MS,
+      window_microseconds: billingCycle.windowMs * MICROSECONDS_PER_MS,
     });
   }
   return segments;
@@ -991,10 +1042,11 @@ async function remainingDetections({
 /**
  * microcredits_spent: the batch's events that took spend from below the
  * threshold to at or above it. Spend is the running total of succeeded
- * events within the billing period the event fell in, or over all time
- * when no period contained it -- what live evaluation reads when the
- * tenant has no cycle. SQL narrows to crossings within each threshold
- * segment; crossedSpendThreshold makes the final call.
+ * events since the start of the billing cycle window the event fell in, or
+ * over all time when the tenant had no billing cycle then -- what live
+ * evaluation reads (evaluateMeterEventRules). SQL narrows to crossings
+ * within each threshold segment; crossedSpendThreshold makes the final
+ * call.
  */
 async function spentDetections({
   context,
@@ -1028,23 +1080,19 @@ async function spentDetections({
   if (segments.length === 0) {
     return detectionsByTenant;
   }
-  /* The period containing each event; the later-starting one when a plan
-   * change overlapped two (see billingCycleAt). */
-  const periodStart =
-    context.billingCycleProductLineIds.length === 0
-      ? sql`null::bigint`
-      : sql`(
-          select bp.period_start
-          from ${billingPeriods} as bp
-          where bp.tenant_id = me.tenant_id
-            and bp.product_line_id in ${context.billingCycleProductLineIds}
-            and bp.period_start * ${MICROSECONDS_PER_MS}::bigint
-              <= me.received_at_microseconds
-            and me.received_at_microseconds
-              < bp.period_end * ${MICROSECONDS_PER_MS}::bigint
-          order by bp.period_start desc
-          limit 1
-        )`;
+  const billingCycles = tenantIds.flatMap((tenantId) => {
+    const history = histories.get(tenantId);
+    return history
+      ? billingCycleSegments({
+          boundaryMs: rule.createdAt,
+          history,
+          tenantId,
+        })
+      : [];
+  });
+  /* The billing cycle window each event fell in starts a whole number of
+   * windows after the anchor, the same as windowStartMs. Integer division
+   * rounds down here, since no event comes before its segment's anchor. */
   const rows = await db.execute<{
     amount_microcredits: string;
     external_id: string;
@@ -1055,8 +1103,19 @@ async function spentDetections({
   }>(sql`
     with events as (
       select me.tenant_id, me.external_id, me.received_at_microseconds,
-        me.amount_microcredits, ${periodStart} as period_start
+        me.amount_microcredits,
+        bc.anchor_microseconds
+          + (me.received_at_microseconds - bc.anchor_microseconds)
+            / bc.window_microseconds * bc.window_microseconds
+          as billing_cycle_start
       from ${meterEvents} as me
+      left join jsonb_to_recordset(${JSON.stringify(billingCycles)}::jsonb)
+        as bc(tenant_id text, from_microseconds bigint,
+          to_microseconds bigint, anchor_microseconds bigint,
+          window_microseconds bigint)
+        on bc.tenant_id = me.tenant_id
+        and me.received_at_microseconds >= bc.from_microseconds
+        and me.received_at_microseconds < bc.to_microseconds
       where me.meter_id = ${trigger.meterId}
         and me.tenant_id in ${tenantIds}
         and me.status = 'succeeded'
@@ -1064,13 +1123,13 @@ async function spentDetections({
     ),
     spend as (
       select events.*,
-        case when period_start is null
+        case when billing_cycle_start is null
           then sum(amount_microcredits) over (
             partition by tenant_id
             order by received_at_microseconds, external_id
             rows between unbounded preceding and current row)
           else sum(amount_microcredits) over (
-            partition by tenant_id, period_start
+            partition by tenant_id, billing_cycle_start
             order by received_at_microseconds, external_id
             rows between unbounded preceding and current row)
         end as spent
