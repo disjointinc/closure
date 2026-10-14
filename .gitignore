@@ -4,3 +4,4 @@ web/dist/
 web/.tanstack/
 .DS_Store
 bin/.hatchet/
+bin/.env
