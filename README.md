@@ -74,10 +74,46 @@ Note: unlike other API changes, all web changes, and all docs changes, DB migrat
 To change a port, set its env var before starting the stack (in your shell or
 in `bin/.env`). Everything follows it: Docker, tests, and scripts.
 
-| Env var                 | Default | Serves      |
-| ----------------------- | ------- | ----------- |
-| `CLOSURE_POSTGRES_PORT` | 54326   | Postgres    |
-| `CLOSURE_REDIS_PORT`    | 63796   | Redis       |
-| `CLOSURE_API_PORT`      | 3216    | API         |
-| `CLOSURE_WEB_PORT`      | 3226    | Web console |
-| `CLOSURE_DOCS_PORT`     | 3236    | Docs site   |
+| Env var                      | Default | Serves                |
+| ---------------------------- | ------- | --------------------- |
+| `CLOSURE_POSTGRES_PORT`      | 54326   | Postgres              |
+| `CLOSURE_REDIS_PORT`         | 63796   | Redis                 |
+| `CLOSURE_API_PORT`           | 3216    | API                   |
+| `CLOSURE_WEB_PORT`           | 3226    | Web console           |
+| `CLOSURE_DOCS_PORT`          | 3236    | Docs site             |
+| `CLOSURE_HATCHET_PORT`       | 3246    | Hatchet dashboard     |
+| `CLOSURE_HATCHET_GRPC_PORT`  | 3247    | Hatchet (workers)     |
+| `CLOSURE_NANGO_PORT`         | 3256    | Nango API + dashboard |
+| `CLOSURE_NANGO_CONNECT_PORT` | 3257    | Nango Connect UI      |
+
+#### Task notification integrations
+
+Task notifications are delivered through two self-hosted services that start
+with the stack:
+
+- [Hatchet](https://hatchet.run) queues each notification, holds it to its
+  integration's rate limit, and retries it. Its dashboard (default login
+  `admin@example.com` / `Admin123!!`) shows every run.
+- [Nango](https://nango.dev) stores Slack, Teams, Linear, and Jira
+  credentials and makes the calls to them. Before anyone can connect one of
+  those systems, add its integration (your OAuth app's client ID and secret)
+  in the Nango dashboard. Webhook integrations don't need Nango.
+
+For any real deploy, set your own `CLOSURE_NANGO_ENCRYPTION_KEY` (32 random
+bytes, base64; never change it after), `CLOSURE_NANGO_SECRET_KEY`, and
+`CLOSURE_NANGO_DASHBOARD_PASSWORD` in `bin/.env`, and your own
+`CLOSURE_SECRETS_KEY_V1` (32 random bytes, base64) for webhook secrets.
+`CLOSURE_POSTGRES_PASSWORD` and `CLOSURE_REDIS_PASSWORD` set every service's
+database and Redis passwords; keep them URL-safe (letters, digits, `-._~`),
+since Hatchet and Nango read them inside connection URLs. The Postgres
+password only takes effect when its volume is first created.
+Tests need Hatchet and Nango running.
+
+Nango only publishes amd64 images. On x64 machines (including Windows) and
+on Apple Silicon (through Docker Desktop's emulation) it just runs. On ARM
+Linux hosts (e.g. AWS Graviton, Raspberry Pi), install amd64 emulation once
+before starting the stack:
+
+```
+docker run --privileged --rm tonistiigi/binfmt --install amd64
+```
