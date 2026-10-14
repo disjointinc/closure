@@ -18,6 +18,10 @@ chmod 600 "$ENV_FILE"
 random_hex() { od -An -tx1 -N16 /dev/urandom | tr -d ' \n'; }
 # 32 random bytes, base64: the size the encryption keys need.
 random_key() { head -c 32 /dev/urandom | base64 | tr -d '\n'; }
+# A random (version 4) UUID, from Linux's built-in source or macOS's uuidgen.
+random_uuid() {
+  cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen | tr 'A-Z' 'a-z'
+}
 
 # ensure_setting NAME VALUE: add NAME=VALUE to .env unless NAME is already set.
 ensure_setting() {
@@ -28,16 +32,19 @@ ensure_setting() {
   printf '%s=%s\n' "$name" "$value" >> "$ENV_FILE"
 }
 
-uuid_hex="$(random_hex)"
 ensure_setting CLOSURE_POSTGRES_PASSWORD "$(random_hex)"
 ensure_setting CLOSURE_REDIS_PASSWORD "$(random_hex)"
 ensure_setting CLOSURE_SECRETS_KEY "$(random_key)"
 ensure_setting CLOSURE_NANGO_ENCRYPTION_KEY "$(random_key)"
-ensure_setting CLOSURE_NANGO_SECRET_KEY \
-  "${uuid_hex:0:8}-${uuid_hex:8:4}-4${uuid_hex:13:3}-8${uuid_hex:17:3}-${uuid_hex:20:12}"
+# Nango rejects API keys that aren't shaped like a UUID (keyRegex in Nango's
+# packages/server/lib/middleware/access.middleware.ts).
+ensure_setting CLOSURE_NANGO_SECRET_KEY "$(random_uuid)"
 ensure_setting CLOSURE_NANGO_DASHBOARD_PASSWORD "$(random_hex)"
-# Hatchet requires an uppercase letter, a lowercase letter, and a number.
-# Hex never has an uppercase letter, so prefix one of each.
+# The strength comes from random_hex's 128 random bits. The fixed "Ab1" adds
+# none, and only satisfies Hatchet's rule that a password contain an
+# uppercase letter, a lowercase letter, and a number (hex has no uppercase).
+# That rule exists to stop people choosing guessable passwords, which a
+# random one isn't.
 ensure_setting CLOSURE_HATCHET_DASHBOARD_PASSWORD "Ab1$(random_hex)"
 
 printf '==> Passwords and keys: %s\n' "$ENV_FILE"
