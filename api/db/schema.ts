@@ -40,6 +40,7 @@ import type {
 } from "../schemas/common.ts";
 import type { Award } from "../schemas/coupon.ts";
 import { idSuffixLengths, type IdPrefix } from "../schemas/ids.ts";
+import type { RateLimit } from "../schemas/integration.ts";
 import type {
   LoanServicingState,
   LoanServicingTerms,
@@ -48,7 +49,7 @@ import type { Payment } from "../schemas/payment.ts";
 import type { PaymentMethod } from "../schemas/payment-method.ts";
 import type { PlanMeter } from "../schemas/plan.ts";
 import type { FiringPayload, Rule } from "../schemas/rule.ts";
-import type { IntegrationTarget } from "../schemas/task-type.ts";
+import type { TaskTypeIntegration } from "../schemas/task-type.ts";
 import type { ExternalRef } from "../schemas/task.ts";
 
 /** Check constraint enforcing "<prefix>_<suffix of [a-z0-9]>" id format. */
@@ -122,6 +123,13 @@ export const ruleBackfillEnum = pgEnum("rule_backfill", [
   "none",
   "once_per_tenant",
   "every_firing",
+]);
+export const integrationSystemEnum = pgEnum("integration_system", [
+  "slack",
+  "teams",
+  "linear",
+  "jira",
+  "webhook",
 ]);
 
 /**
@@ -689,6 +697,50 @@ export const experimentTreatmentTenants = pgTable(
 );
 
 /**
+ * A connection to an external system that task notifications go to. See
+ * schemas/integration.ts. Slack, Teams, Linear, and Jira integrations point
+ * at a Nango connection (Nango holds their credentials); webhook
+ * integrations hold their URL and their encrypted secrets (lib/secrets.ts),
+ * where secrets_key_version names the key that wrote secrets_ciphertext.
+ */
+export const integrations = pgTable(
+  "integrations",
+  {
+    integrationId: text("integration_id").primaryKey(),
+    createdAt: epochMs("created_at").notNull(),
+    deprecatedAt: epochMs("deprecated_at"),
+    name: text("name").notNull(),
+    system: integrationSystemEnum("system").notNull(),
+    rateLimit: jsonb("rate_limit").$type<RateLimit>().notNull(),
+    nangoProviderConfigKey: text("nango_provider_config_key"),
+    nangoConnectionId: text("nango_connection_id"),
+    webhookUrl: text("webhook_url"),
+    secretsKeyVersion: integer("secrets_key_version"),
+    secretsCiphertext: text("secrets_ciphertext"),
+  },
+  (t) => [
+    idFormatCheck("integration", t.integrationId),
+    /* Webhooks carry their own URL and secrets; every other system carries
+     * a Nango connection instead, and never both. */
+    check(
+      "integrations_credentials_variant",
+      sql`(system = 'webhook'
+          and webhook_url is not null
+          and secrets_key_version is not null
+          and secrets_ciphertext is not null
+          and nango_provider_config_key is null
+          and nango_connection_id is null)
+       or (system <> 'webhook'
+          and nango_provider_config_key is not null
+          and nango_connection_id is not null
+          and webhook_url is null
+          and secrets_key_version is null
+          and secrets_ciphertext is null)`,
+    ),
+  ],
+);
+
+/**
  * A category of task (analogous to tax/tax-type): shared behavior and the
  * external systems every instance routes to. See schemas/task-type.ts.
  */
@@ -701,7 +753,9 @@ export const taskTypes = pgTable(
     defaultAssigneeTeamMemberId: text(
       "default_assignee_team_member_id",
     ).references(() => teamMembers.teamMemberId),
-    integrations: jsonb("integrations").$type<IntegrationTarget[]>().notNull(),
+    integrations: jsonb("integrations")
+      .$type<TaskTypeIntegration[]>()
+      .notNull(),
     name: text("name").notNull(),
     description: text("description"),
   },

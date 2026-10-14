@@ -470,6 +470,13 @@
       "when": 1791923697994,
       "tag": "0066_credit_grant_rules_evaluated",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1792006329808,
+      "tag": "0067_integrations",
+      "breakpoints": true
     }
   ]
 }
