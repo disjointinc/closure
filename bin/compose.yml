@@ -113,6 +113,8 @@ services:
       SERVER_AUTH_COOKIE_DOMAIN: localhost
     volumes:
       - ./.hatchet:/config
+      # The repo's bin/ folder (where bin/.env lives). Not mounted at /bin,
+      # which holds the container's own programs (sh, grep).
       - .:/closure-bin
     depends_on:
       closure-hatchet:
