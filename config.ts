@@ -2,9 +2,8 @@
  * Load bin/.env (written by bin/generate-env, plus the Hatchet token
  * bin/compose.yml's closure-hatchet-token adds), so the API and the tests and
  * scripts run from the host all use the same passwords and keys. Variables
- * already set take precedence. A missing file is fine here: settings with
- * defaults below fall back to them, and api/lib/secrets.ts refuses to start
- * without a secrets key.
+ * already set take precedence. If the file is missing, the settings below
+ * with no default (envRequired) throw, pointing at bin/generate-env.
  */
 try {
   process.loadEnvFile(new URL("./bin/.env", import.meta.url));
@@ -17,6 +16,15 @@ try {
 function env(key: string, fallback: string): string {
   const value = process.env[key];
   return value === undefined || value === "" ? fallback : value;
+}
+
+/** A setting bin/generate-env makes, which has no default. */
+function envRequired(key: string): string {
+  const value = env(key, "");
+  if (value === "") {
+    throw new Error(`${key} is not set (run bin/generate-env)`);
+  }
+  return value;
 }
 
 function envPort(key: string, fallback: number): number {
@@ -41,13 +49,13 @@ export const config = {
     host: env("CLOSURE_POSTGRES_HOST", "localhost"),
     port: envPort("CLOSURE_POSTGRES_PORT", 54326),
     user: env("CLOSURE_POSTGRES_USER", "postgres"),
-    password: env("CLOSURE_POSTGRES_PASSWORD", "password"),
+    password: envRequired("CLOSURE_POSTGRES_PASSWORD"),
     database: env("CLOSURE_POSTGRES_DB", "closure_local"),
   },
   redis: {
     host: env("CLOSURE_REDIS_HOST", "localhost"),
     port: envPort("CLOSURE_REDIS_PORT", 63796),
-    password: env("CLOSURE_REDIS_PASSWORD", "password"),
+    password: envRequired("CLOSURE_REDIS_PASSWORD"),
   },
   api: {
     host: env("CLOSURE_API_HOST", "0.0.0.0"),
@@ -58,8 +66,7 @@ export const config = {
     port: envPort("CLOSURE_WEB_PORT", 3226),
   },
   secrets: {
-    // No default: api/lib/secrets.ts refuses to start without one.
-    key: env("CLOSURE_SECRETS_KEY", ""),
+    key: envRequired("CLOSURE_SECRETS_KEY"),
   },
   hatchet: {
     host: env("CLOSURE_HATCHET_HOST", "localhost"),
@@ -75,10 +82,7 @@ export const config = {
     host: env("CLOSURE_NANGO_HOST", "localhost"),
     port: envPort("CLOSURE_NANGO_PORT", 3256),
     // Must match NANGO_SECRET_KEY_PROD on closure-nango (bin/compose.yml).
-    secretKey: env(
-      "CLOSURE_NANGO_SECRET_KEY",
-      "00000000-0000-4000-8000-000000000000",
-    ),
+    secretKey: envRequired("CLOSURE_NANGO_SECRET_KEY"),
   },
   outbound: {
     /*

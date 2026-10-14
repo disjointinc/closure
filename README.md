@@ -111,7 +111,7 @@ saved in `bin/.env`, which the stack and the tests both read:
 bin/generate-env
 ```
 
-Now, you can start and run the whole stack in Docker using a 1-line command:
+Now, to start and run the whole stack in Docker, just run:
 
 ```
 docker compose -p closure -f bin/compose.yml up -d
