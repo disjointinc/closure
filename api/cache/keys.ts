@@ -15,7 +15,9 @@
  * mbal:tracked                 set     every balance key ever written; the
  *                                      checkpoint loop persists these to pg
  * mgrant:{creditGrantId}       string  idempotency marker for a credit grant
- *                                      application (exactly-once INCRBY)
+ *                                      application (exactly-once INCRBY);
+ *                                      the value is the balance right after
+ *                                      the grant
  * mflush:{meterEventId}        string  flush-attempt marker; distinguishes
  *                                      "already in pg via an earlier flush"
  *                                      from "duplicate ingest double-charge"
@@ -32,6 +34,9 @@
  *                                      has fired for a tenant in its current
  *                                      window; cached from rule_runs, TTL'd to
  *                                      the window so keys die with it
+ * rlock:{ruleId}:{tenantId}    string  lock held while a composite trigger is
+ *                                      checked for one tenant, so two
+ *                                      changes at once can't both fire
  * mlast:{tenantId}:{meterId}   string  newest event timestamp (microseconds) for
  *                                      the tenant+meter; GREATEST-updated on
  *                                      ingest, checkpointed to
@@ -85,6 +90,13 @@ export const keys = {
     tenantId: string;
     windowStart: number;
   }) => `rquota:${ruleId}:${tenantId}:${windowStart}`,
+  ruleCompositeLock: ({
+    ruleId,
+    tenantId,
+  }: {
+    ruleId: string;
+    tenantId: string;
+  }) => `rlock:${ruleId}:${tenantId}`,
   lastActivity: ({
     meterId,
     tenantId,
