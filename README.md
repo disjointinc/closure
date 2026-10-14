@@ -34,6 +34,77 @@ If you want to self-host, you can deploy a hobby instance in one line on Linux u
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/disjointinc/closure/HEAD/bin/deploy-hobby)"
 ```
 
+This runs everything on one machine: Closure itself, plus the services it
+relies on.
+
+- **Postgres** and **Redis** store Closure's data.
+- **[Hatchet](https://hatchet.run)** sends task notifications. It lines them
+  up, sends no more than each integration's rate limit allows, and retries
+  ones that fail. Its dashboard (http://localhost:3246) shows every
+  notification it has sent. Log in as `admin@example.com`, with the password
+  `Admin123!!` until you set your own (below).
+- **[Nango](https://nango.dev)** stores the logins for Slack, Teams, Linear,
+  and Jira, and makes the calls to them. Before anyone can connect one of
+  those apps, open the Nango dashboard (http://localhost:3256, username
+  `admin`, password `password` until you set your own) and add the app
+  there, with the client ID and secret from your own Slack (or Teams, Linear,
+  Jira) app. Plain webhooks don't need this.
+
+#### Before using it for real
+
+Out of the box, every password and key is a shared default, which is fine for
+trying Closure out but not for anything real. Put your own values in a file
+named `.env` next to `compose.yml` (`~/.closure/bin/.env` if you used the
+one-liner), then rerun the one-liner.
+
+| Setting                              | What it protects                                   |
+| ------------------------------------ | -------------------------------------------------- |
+| `CLOSURE_ENV=production`             | Makes Closure refuse to start with the default key |
+| `CLOSURE_POSTGRES_PASSWORD`          | The database                                       |
+| `CLOSURE_REDIS_PASSWORD`             | Redis                                              |
+| `CLOSURE_SECRETS_KEY_V1`             | Webhook passwords and tokens Closure stores        |
+| `CLOSURE_NANGO_ENCRYPTION_KEY`       | Slack, Teams, Linear, and Jira logins Nango stores |
+| `CLOSURE_NANGO_SECRET_KEY`           | Closure's access to Nango                          |
+| `CLOSURE_NANGO_DASHBOARD_PASSWORD`   | The Nango dashboard (username `admin`)             |
+| `CLOSURE_HATCHET_DASHBOARD_PASSWORD` | The Hatchet dashboard                              |
+
+For the two keys (`CLOSURE_SECRETS_KEY_V1` and
+`CLOSURE_NANGO_ENCRYPTION_KEY`), make a random one with `openssl rand -base64 32`. For the
+rest, use letters and numbers only: some of these services put the password
+inside a web address, where symbols like `@` or `/` break it.
+
+Three settings can't simply be changed later:
+
+- `CLOSURE_POSTGRES_PASSWORD` only takes effect the first time the database is
+  created. Set it before your first run.
+- `CLOSURE_HATCHET_DASHBOARD_PASSWORD` is the same: it's only used when
+  Hatchet first starts. It needs 8 or more characters, with an uppercase
+  letter, a lowercase letter, and a number.
+- `CLOSURE_NANGO_ENCRYPTION_KEY` must never change once set. If it does, Nango
+  can no longer read the logins it saved, and everyone has to reconnect.
+
+If your webhooks need to reach machines on your own network (like an internal
+service at `http://10.0.0.5`), also set
+`CLOSURE_OUTBOUND_ALLOW_PRIVATE_NETWORKS=true`. It's off by default so that
+nobody can use a webhook to reach machines they shouldn't.
+
+#### Running on an ARM server
+
+Most computers, servers, and Windows machines use Intel or AMD chips, and
+everything just works. Macs with Apple chips work too, because Docker Desktop
+translates for them automatically.
+
+The one exception is a Linux machine with an ARM chip (like an AWS Graviton
+server or a Raspberry Pi). Nango only publishes a version built for Intel and
+AMD chips, so it won't start until you install a translator. On Debian or
+Ubuntu:
+
+```
+sudo apt-get install qemu-user-static
+```
+
+You only need to do this once. It keeps working after restarts.
+
 ## Contributing
 
 We love contributions! We'll have a contributing guidelines section soon.
@@ -86,34 +157,7 @@ in `bin/.env`). Everything follows it: Docker, tests, and scripts.
 | `CLOSURE_NANGO_PORT`         | 3256    | Nango API + dashboard |
 | `CLOSURE_NANGO_CONNECT_PORT` | 3257    | Nango Connect UI      |
 
-#### Task notification integrations
+#### Task notifications
 
-Task notifications are delivered through two self-hosted services that start
-with the stack:
-
-- [Hatchet](https://hatchet.run) queues each notification, holds it to its
-  integration's rate limit, and retries it. Its dashboard (default login
-  `admin@example.com` / `Admin123!!`) shows every run.
-- [Nango](https://nango.dev) stores Slack, Teams, Linear, and Jira
-  credentials and makes the calls to them. Before anyone can connect one of
-  those systems, add its integration (your OAuth app's client ID and secret)
-  in the Nango dashboard. Webhook integrations don't need Nango.
-
-For any real deploy, set your own `CLOSURE_NANGO_ENCRYPTION_KEY` (32 random
-bytes, base64; never change it after), `CLOSURE_NANGO_SECRET_KEY`, and
-`CLOSURE_NANGO_DASHBOARD_PASSWORD` in `bin/.env`, and your own
-`CLOSURE_SECRETS_KEY_V1` (32 random bytes, base64) for webhook secrets.
-`CLOSURE_POSTGRES_PASSWORD` and `CLOSURE_REDIS_PASSWORD` set every service's
-database and Redis passwords; keep them URL-safe (letters, digits, `-._~`),
-since Hatchet and Nango read them inside connection URLs. The Postgres
-password only takes effect when its volume is first created.
-Tests need Hatchet and Nango running.
-
-Nango only publishes amd64 images. On x64 machines (including Windows) and
-on Apple Silicon (through Docker Desktop's emulation) it just runs. On ARM
-Linux hosts (e.g. AWS Graviton, Raspberry Pi), install amd64 emulation once
-before starting the stack:
-
-```
-docker run --privileged --rm tonistiigi/binfmt --install amd64
-```
+Hatchet and Nango (see [Self-hosted](#self-hosted-advanced)) start with the
+stack, and the API tests need both running.
