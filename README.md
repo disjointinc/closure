@@ -65,7 +65,7 @@ it in that file before your first run.
 | `CLOSURE_NANGO_DASHBOARD_PASSWORD`   | The Nango dashboard (username `admin`)             | Yes                                                                                |
 | `CLOSURE_POSTGRES_PASSWORD`          | The database                                       | No: only used when the database is first created; editing it later has no effect   |
 | `CLOSURE_HATCHET_DASHBOARD_PASSWORD` | The Hatchet dashboard                              | No: only used when Hatchet first starts; editing it later has no effect            |
-| `CLOSURE_SECRETS_KEY_V1`             | Webhook passwords and tokens Closure stores        | Never: changing it makes the webhook secrets already saved unreadable              |
+| `CLOSURE_SECRETS_KEY`                | Webhook passwords and tokens Closure stores        | Never: changing it makes the webhook secrets already saved unreadable              |
 | `CLOSURE_NANGO_ENCRYPTION_KEY`       | Slack, Teams, Linear, and Jira logins Nango stores | Never: changing it makes the saved logins unreadable, so everyone has to reconnect |
 
 To change one marked "Yes", edit it in `.env` and rerun the one-liner.
