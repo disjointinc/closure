@@ -174,9 +174,6 @@ export async function collectTestSuiteResources({
           .where(inArray(meterOverrides.tenantId, markedTenantIds))
           .returning({ meterOverrideId: meterOverrides.meterOverrideId })
       ).length;
-      /* An assignment's start writes credit grants that point at it, so
-       * they go before the assignments do, after the lots and the meter
-       * reset rows that point at them and at the assignment. */
       counts.meterResets = (
         await tx
           .delete(meterResets)
