@@ -33,7 +33,11 @@ import {
   uniqueIndex,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
-import type { CurrencyAmount, Duration } from "../schemas/common.ts";
+import type {
+  CurrencyAmount,
+  CurrencyCode,
+  Duration,
+} from "../schemas/common.ts";
 import type { Award } from "../schemas/coupon.ts";
 import { idSuffixLengths, type IdPrefix } from "../schemas/ids.ts";
 import type {
@@ -93,10 +97,21 @@ const topUpCreditPackSizes = (name: string) =>
   jsonb(name).$type<PlanMeter["topUpCreditPackSizes"]>().notNull();
 
 export const chargedEnum = pgEnum("charged", ["upfront", "arrears"]);
+export const supersededCreditEnum = pgEnum("superseded_credit", [
+  "unused_time",
+  "none",
+]);
 export const meterEventStatusEnum = pgEnum("meter_event_status", [
   "succeeded",
   "insufficient_balance",
   "unexpected_error",
+]);
+export const creditGrantKindEnum = pgEnum("credit_grant_kind", [
+  "team_member",
+  "allocation",
+  "plan_change",
+  "coupon",
+  "expiry",
 ]);
 export const grantorTypeEnum = pgEnum("grantor_type", [
   "team_member",
@@ -258,9 +273,9 @@ export const meters = pgTable(
   "meters",
   {
     meterId: text("meter_id").primaryKey(),
-    /* The lines this meter applies to. Array elements can't FK in Postgres;
-     * line membership is validated in the service. */
-    productLineIds: text("product_line_ids").array().notNull(),
+    productLineId: text("product_line_id")
+      .notNull()
+      .references(() => productLines.productLineId),
     createdAt: epochMs("created_at").notNull(),
     deprecatedAt: epochMs("deprecated_at"),
     name: text("name").notNull(),
@@ -740,6 +755,10 @@ export const tenants = pgTable(
     externalIds: jsonb("external_ids")
       .$type<Record<string, string>>()
       .notNull(),
+    /** The currency Closure invoices the tenant in; null means Closure
+     * doesn't invoice the tenant. Can't change once the tenant has an
+     * invoice (see patchTenant). */
+    billingCurrency: text("billing_currency").$type<CurrencyCode>(),
   },
   (t) => [idFormatCheck("tenant", t.tenantId)],
 );
@@ -769,10 +788,26 @@ export const assignments = pgTable(
     createdAt: epochMs("created_at").notNull(),
     startsAt: epochMs("starts_at").notNull(),
     endsAt: epochMs("ends_at"),
+    /** Where billing periods are counted from (see billingPeriodAt): the
+     * assignment's own start, or for a plan change that keeps the billing
+     * date, the billing anchor of the assignment it supersedes. */
+    billingAnchorAt: epochMs("billing_anchor_at").notNull(),
+    /** Whether the assignment this one supersedes partway through a
+     * billing period is credited for the time it was paid for but won't
+     * use (see unusedTimeCredits), when this one starts. */
+    supersededCredit: supersededCreditEnum("superseded_credit").notNull(),
+    /** When Closure did the work an assignment's start needs (see
+     * handleAssignmentStart). Null until then. */
+    startHandledAt: epochMs("start_handled_at"),
   },
   (t) => [
     idFormatCheck("assignment", t.assignmentId),
     index("assignments_tenant").on(t.tenantId),
+    /* handleAssignmentStarts pages the started assignments it owes by
+     * starts_at; covering only those keeps it small. */
+    index("assignments_start_unhandled")
+      .on(t.startsAt)
+      .where(sql`${t.startHandledAt} is null`),
     /* The assignment_started scheduler scan pages by (starts_at, id). */
     index("assignments_started").on(t.startsAt, t.assignmentId),
     /* A tenant may hold several open assignments, but at most one per product
@@ -910,13 +945,26 @@ export const invoices = pgTable(
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.tenantId),
+    /** Decides which pending items the invoice takes; see createInvoice. */
+    productLineId: text("product_line_id").references(
+      () => productLines.productLineId,
+    ),
     createdAt: epochMs("created_at").notNull(),
     finalizedAt: epochMs("finalized_at"),
     /* When payment is due: finalized_at for upfront invoices, finalized_at
      * plus credit_period for arrears ones. Written with finalized_at (see
-     * finalizeInvoice) rather than computed in queries, so invoice_due
+     * finalizeInvoiceDraft) rather than computed in queries, so invoice_due
      * rules can page through it by index. */
     dueAt: epochMs("due_at"),
+    /** For an invoice Closure created for a billing period: that billing
+     * period's start (with the tenant and product line, it names the
+     * billing period). Null for invoices created through the API. */
+    billingPeriodStart: epochMs("billing_period_start"),
+    /** When Closure finalizes this draft on its own (see finalizeDueDrafts).
+     * Null for invoices the caller finalizes. */
+    finalizesAt: epochMs("finalizes_at"),
+    /** When a payment for the invoice succeeded. */
+    paidAt: epochMs("paid_at"),
     ...chargingColumns,
   },
   (t) => [
@@ -940,16 +988,40 @@ export const invoices = pgTable(
     index("invoices_due")
       .on(t.dueAt, t.invoiceId)
       .where(sql`${t.dueAt} is not null`),
+    /* One invoice per billing period, so two scheduler processes invoicing
+     * the same billing period can't both write one. */
+    uniqueIndex("invoices_one_per_billing_period")
+      .on(t.tenantId, t.productLineId, t.billingPeriodStart)
+      .where(sql`${t.billingPeriodStart} is not null`),
+    /* finalizeDueDrafts pages the drafts Closure finalizes by
+     * finalizes_at; covering only drafts keeps it small. */
+    index("invoices_finalizing")
+      .on(t.finalizesAt)
+      .where(sql`${t.finalizedAt} is null and ${t.finalizesAt} is not null`),
   ],
 );
 
+/**
+ * Something the tenant owes. An item is recorded when it's owed and waits
+ * with no invoice (pending) until an invoice takes it (see createInvoice),
+ * so rules can record fees without finding an invoice to put them on.
+ */
 export const items = pgTable(
   "items",
   {
     itemId: text("item_id").primaryKey(),
-    invoiceId: text("invoice_id")
+    tenantId: text("tenant_id")
       .notNull()
-      .references(() => invoices.invoiceId),
+      .references(() => tenants.tenantId),
+    /** Null for an item that isn't for any one product line. */
+    productLineId: text("product_line_id").references(
+      () => productLines.productLineId,
+    ),
+    /** Null while the item is pending. */
+    invoiceId: text("invoice_id").references(() => invoices.invoiceId),
+    createdAt: epochMs("created_at").notNull(),
+    /** Set when a pending item is cancelled; a voided item is never invoiced. */
+    voidedAt: epochMs("voided_at"),
     perUnitAmounts: amounts("per_unit_amounts"),
     units: doublePrecision("units").notNull(),
     name: text("name").notNull(),
@@ -959,10 +1031,23 @@ export const items = pgTable(
      * hand. */
     sourceRuleId: text("source_rule_id").references(() => rules.ruleId),
     sourceFiring: jsonb("source_firing").$type<FiringPayload>(),
+    /* Set when Closure charged (or credited) an assignment's plan or add-on
+     * for a stretch of time: the assignment, and the time
+     * [service_period_start, service_period_end) the item covers, which is
+     * what a later credit for unused time is measured against. */
+    assignmentId: text("assignment_id").references(
+      () => assignments.assignmentId,
+    ),
+    servicePeriodStart: epochMs("service_period_start"),
+    servicePeriodEnd: epochMs("service_period_end"),
   },
   (t) => [
     idFormatCheck("item", t.itemId),
-    check("items_units_nonnegative", sql`units >= 0`),
+    /* Listing a tenant's items, and finding its pending items when an
+     * invoice is created, both start from the tenant. */
+    index("items_tenant").on(t.tenantId, t.createdAt),
+    /* Reading an invoice reads its items. */
+    index("items_invoice").on(t.invoiceId),
   ],
 );
 
@@ -1145,7 +1230,17 @@ export const featureOverrides = pgTable(
       .references(() => teamMembers.teamMemberId),
     reason: text("reason"),
   },
-  (t) => [idFormatCheck("feature_override", t.featureOverrideId)],
+  (t) => [
+    idFormatCheck("feature_override", t.featureOverrideId),
+    /* Readers take the newest override per tenant and feature, so two
+     * overrides sharing a created_at would make that answer arbitrary. The
+     * create path stamps each new override after the newest one. */
+    uniqueIndex("feature_overrides_one_per_created_at").on(
+      t.tenantId,
+      t.featureId,
+      t.createdAt,
+    ),
+  ],
 );
 
 export const meterOverrides = pgTable(
@@ -1167,6 +1262,13 @@ export const meterOverrides = pgTable(
   },
   (t) => [
     idFormatCheck("meter_override", t.meterOverrideId),
+    /* The same as feature_overrides_one_per_created_at, per tenant and
+     * meter. */
+    uniqueIndex("meter_overrides_one_per_created_at").on(
+      t.tenantId,
+      t.meterId,
+      t.createdAt,
+    ),
     limitGteDefaultCheck("meter_overrides"),
     check(
       "meter_overrides_default_nonnegative",
@@ -1176,6 +1278,13 @@ export const meterOverrides = pgTable(
   ],
 );
 
+/**
+ * Every move of a meter balance that isn't a meter event: credits a team
+ * member grants, a plan's allocation (at an assignment's start, and again
+ * at each reset), the difference a plan change makes, a coupon's credits,
+ * and credits expiring (see cache/meter/reset.ts). Each is applied to the
+ * Redis balance exactly once and replayed by balance rebuilds.
+ */
 export const creditGrants = pgTable(
   "credit_grants",
   {
@@ -1187,11 +1296,25 @@ export const creditGrants = pgTable(
       .notNull()
       .references(() => meters.meterId),
     grantedAt: epochMs("granted_at").notNull(),
-    byTeamMemberId: text("by_team_member_id")
-      .notNull()
-      .references(() => teamMembers.teamMemberId),
+    /** What moved the balance. Each kind sets its own reference below and
+     * no other (see credit_grants_kind_variant): team_member sets
+     * by_team_member_id; allocation and plan_change set assignment_id;
+     * coupon sets coupon_receipt_id; expiry sets none. */
+    kind: creditGrantKindEnum("kind").notNull(),
+    byTeamMemberId: text("by_team_member_id").references(
+      () => teamMembers.teamMemberId,
+    ),
+    assignmentId: text("assignment_id").references(
+      () => assignments.assignmentId,
+    ),
+    couponReceiptId: text("coupon_receipt_id").references(
+      () => couponReceipts.couponReceiptId,
+    ),
     reason: text("reason"),
     amountMicrocredits: microcredits("amount_microcredits").notNull(),
+    /** When the credits expire if they aren't spent first. Null means
+     * never (and for a grant that takes credits away). */
+    expiresAt: epochMs("expires_at"),
     /**
      * When the grant was applied to the Redis balance, in MICROseconds on the
      * Redis server's clock (see meter_events.received_at_microseconds). NULL
@@ -1203,10 +1326,131 @@ export const creditGrants = pgTable(
     appliedAtMicroseconds: bigint("applied_at_microseconds", {
       mode: "number",
     }),
+    /* The balance right after the grant was applied, stamped along with
+     * applied_at_microseconds. Meter events carry their own
+     * (balance_after_microcredits); with this, a balance's whole history
+     * can be read back, which the rule backfill does
+     * (cache/rule/backfill.ts). */
+    balanceAfterMicrocredits: microcredits("balance_after_microcredits"),
+    /* When Closure checked whether the balance this grant left should fire
+     * any rules (fireCreditGrantFlips in cache/rule/composite.ts). Null
+     * until that check runs. If the server crashes after the grant changes
+     * the balance but before the check, the reconciler finds the grant by
+     * its null rules_evaluated_at and runs the check then, so no rule is
+     * missed. */
+    rulesEvaluatedAt: epochMs("rules_evaluated_at"),
   },
   (t) => [
     idFormatCheck("credit_grant", t.creditGrantId),
-    check("credit_grants_amount_positive", sql`amount_microcredits > 0`),
+    /* The reconciler finds applied grants whose rules were never
+     * evaluated, oldest first. Nearly every grant is evaluated within
+     * milliseconds, so this stays almost empty. */
+    index("credit_grants_rules_unevaluated")
+      .on(t.appliedAtMicroseconds)
+      .where(sql`${t.rulesEvaluatedAt} is null`),
+    /* A tenant's grants on a meter, in the order they reached the balance:
+     * the rule backfill reads them alongside the meter's events
+     * (remainingDetections in cache/rule/backfill.ts). */
+    index("credit_grants_tenant_meter_applied").on(
+      t.tenantId,
+      t.meterId,
+      t.appliedAtMicroseconds,
+    ),
+    check(
+      "credit_grants_kind_variant",
+      sql`(kind = 'team_member' and by_team_member_id is not null and assignment_id is null and coupon_receipt_id is null)
+       or (kind in ('allocation', 'plan_change') and by_team_member_id is null and assignment_id is not null and coupon_receipt_id is null)
+       or (kind = 'coupon' and by_team_member_id is null and assignment_id is null and coupon_receipt_id is not null)
+       or (kind = 'expiry' and by_team_member_id is null and assignment_id is null and coupon_receipt_id is null)`,
+    ),
+    /* A plan change to a smaller allocation takes credits back, and so
+     * does an expiry. */
+    check(
+      "credit_grants_amount",
+      sql`amount_microcredits > 0 or (kind in ('plan_change', 'expiry') and amount_microcredits < 0)`,
+    ),
+  ],
+);
+
+/**
+ * The credits one credit grant added, and how many of them are left: a
+ * tenant's balance on a meter, split by where the credits came from, so the
+ * ones due to expire can be told apart. Spend isn't taken out of lots as it
+ * happens (the hot path only moves the balance): it's taken out, soonest to
+ * expire first, each time the tenant's meter is settled. See
+ * cache/meter/reset.ts.
+ */
+export const creditLots = pgTable(
+  "credit_lots",
+  {
+    creditLotId: text("credit_lot_id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.tenantId),
+    meterId: text("meter_id")
+      .notNull()
+      .references(() => meters.meterId),
+    creditGrantId: text("credit_grant_id")
+      .notNull()
+      .references(() => creditGrants.creditGrantId),
+    createdAt: epochMs("created_at").notNull(),
+    amountMicrocredits: microcredits("amount_microcredits").notNull(),
+    /* What's left as of the meter's last settlement
+     * (meter_resets.settled_through_microseconds). Once the lot has
+     * expired, what was left when it did. */
+    unspentMicrocredits: microcredits("unspent_microcredits").notNull(),
+    /** Null means the credits never expire. */
+    expiresAt: epochMs("expires_at"),
+    /** When a settlement expired the lot; null while it's live. */
+    expiredAt: epochMs("expired_at"),
+  },
+  (t) => [
+    idFormatCheck("credit_lot", t.creditLotId),
+    /* A settlement reads one tenant+meter's live lots. */
+    index("credit_lots_live")
+      .on(t.tenantId, t.meterId)
+      .where(sql`${t.expiredAt} is null`),
+    /* The scheduler finds lots whose time has come, soonest first. */
+    index("credit_lots_expiring")
+      .on(t.expiresAt)
+      .where(sql`${t.expiredAt} is null and ${t.expiresAt} is not null`),
+  ],
+);
+
+/**
+ * Where one tenant's meter stands with its lots and its allocation's reset
+ * schedule. Written when the tenant first gets credits on the meter. See
+ * cache/meter/reset.ts.
+ */
+export const meterResets = pgTable(
+  "meter_resets",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.tenantId),
+    meterId: text("meter_id")
+      .notNull()
+      .references(() => meters.meterId),
+    /* Spend up to this time has been taken out of the tenant's lots. In
+     * microseconds on the Redis server's clock, like the meter events it's
+     * compared against. */
+    settledThroughMicroseconds: bigint("settled_through_microseconds", {
+      mode: "number",
+    }).notNull(),
+    /** When the plan's allocation is next granted again. Null when it
+     * doesn't reset (no reset schedule, or no assignment granting one). */
+    nextResetAt: epochMs("next_reset_at"),
+    /** The assignment whose plan's allocation resets. */
+    assignmentId: text("assignment_id").references(
+      () => assignments.assignmentId,
+    ),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.meterId] }),
+    /* The scheduler finds meters whose reset has come, soonest first. */
+    index("meter_resets_due")
+      .on(t.nextResetAt)
+      .where(sql`${t.nextResetAt} is not null`),
   ],
 );
 
@@ -1307,39 +1551,50 @@ export const ruleRuns = pgTable(
 );
 
 /**
- * Per-rule scheduler bookmark: the last source row the rule has read
+ * Per-scan scheduler bookmark: the last source row the scan has read
  * (invoices, assignments, billing periods, or tenant_last_activity, per the
  * trigger), so each tick reads only rows past it instead of the full
- * history. One row per scheduler-driven rule, written when the rule is
- * created (or on its first tick). See cache/rule/schedule.ts.
+ * history. A rule with a primitive trigger has one scan. A rule with a
+ * composite trigger has one for each time one of its primitive triggers
+ * can change value as time passes (see ruleScans in
+ * cache/rule/schedule.ts). Written when the rule is created (or on its
+ * first tick).
  */
-export const ruleSchedulerState = pgTable("rule_scheduler_state", {
-  /* Cascade is inert in production (rules are deprecated, never deleted)
-   * and exists for test cleanup deleting rules while a scheduler tick
-   * re-writes their bookmark rows. */
-  ruleId: text("rule_id")
-    .primaryKey()
-    .references(() => rules.ruleId, { onDelete: "cascade" }),
-  /* Where the rule stopped reading: the time of the last row it read, in
-   * microseconds since the epoch. It has to be at least as precise as the
-   * times it reads, or the rule can't pick up exactly after the last row.
-   * Last-activity times are in microseconds (copies of metering's event
-   * stamps); every other source is in ms and converts to microseconds
-   * exactly (× 1000). Converting the other way, microseconds down to ms,
-   * would round, and the rule would re-read rows from the same millisecond
-   * every time it picks up. */
-  cursorAtMicroseconds: bigint("cursor_at_microseconds", {
-    mode: "number",
-  }).notNull(),
-  /* The last row's id (invoice, assignment, or tenant), which orders rows
-   * that share a cursor_at_microseconds. '' sorts before every id. */
-  cursorId: text("cursor_id").notNull().default(""),
-  /* When a scheduler process claimed this rule (claimRules in
-   * cache/rule/schedule.ts); null when no one holds it. Other processes
-   * skip it until claimed_at is RULE_CLAIM_LEASE_MS old, so a process that
-   * dies mid-pass without clearing it is taken over after that long. */
-  claimedAt: epochMs("claimed_at"),
-});
+export const ruleSchedulerState = pgTable(
+  "rule_scheduler_state",
+  {
+    /* Cascade is inert in production (rules are deprecated, never deleted)
+     * and exists for test cleanup deleting rules while a scheduler tick
+     * re-writes their bookmark rows. */
+    ruleId: text("rule_id")
+      .notNull()
+      .references(() => rules.ruleId, { onDelete: "cascade" }),
+    /* Which of the rule's scans this bookmark belongs to (RuleScan.scanKey
+     * in cache/rule/schedule.ts). '' for a rule with a primitive trigger. */
+    scanKey: text("scan_key").notNull().default(""),
+    /* Where the scan stopped reading: the time of the last row it read, in
+     * microseconds since the epoch. It has to be at least as precise as the
+     * times it reads, or the scan can't pick up exactly after the last row.
+     * Last-activity times are in microseconds (copies of metering's event
+     * stamps); every other source is in ms and converts to microseconds
+     * exactly (× 1000). Converting the other way, microseconds down to ms,
+     * would round, and the scan would re-read rows from the same
+     * millisecond every time it picks up. */
+    cursorAtMicroseconds: bigint("cursor_at_microseconds", {
+      mode: "number",
+    }).notNull(),
+    /* The last row's id (invoice, assignment, or tenant), which orders rows
+     * that share a cursor_at_microseconds. '' sorts before every id. */
+    cursorId: text("cursor_id").notNull().default(""),
+    /* When a scheduler process claimed this scan (claimScans in
+     * cache/rule/schedule.ts); null when no one holds it. Other processes
+     * skip it until claimed_at is RULE_CLAIM_LEASE_MS old, so a process
+     * that dies mid-pass without clearing it is taken over after that
+     * long. */
+    claimedAt: epochMs("claimed_at"),
+  },
+  (t) => [primaryKey({ columns: [t.ruleId, t.scanKey] })],
+);
 
 /**
  * Per-rule backfill progress, for rules created with backfill other than
@@ -1615,12 +1870,19 @@ export const billingPeriods = pgTable(
       .references(() => assignments.assignmentId, { onDelete: "cascade" }),
     periodStart: epochMs("period_start").notNull(),
     periodEnd: epochMs("period_end").notNull(),
-    /** Denormalized cycle length so trigger keys derive from the row alone. */
-    windowMs: bigint("window_ms", { mode: "number" }).notNull(),
     /** When the period after this one was written, or it was settled that
      * none comes (the assignment ended). Null while the advance step still
      * owes it. */
     advancedAt: epochMs("advanced_at"),
+    /** When Closure creates this billing period's invoice: its start for
+     * an upfront cycle, its end for an arrears one. Written with the row,
+     * from the assignment's cycle. */
+    invoiceDueAt: epochMs("invoice_due_at").notNull(),
+    /** When Closure created this billing period's invoice, or settled that
+     * none is needed (the tenant has no billing currency, or the assignment
+     * never reached the billing period). Null while invoiceBillingPeriods
+     * still owes it. */
+    invoicedAt: epochMs("invoiced_at"),
   },
   (t) => [
     primaryKey({ columns: [t.tenantId, t.productLineId, t.periodStart] }),
@@ -1636,6 +1898,11 @@ export const billingPeriods = pgTable(
     uniqueIndex("billing_periods_one_unadvanced_per_product_line")
       .on(t.tenantId, t.productLineId)
       .where(sql`${t.advancedAt} is null`),
+    /* invoiceBillingPeriods' per-tick read is only ever "uninvoiced rows
+     * now due"; covering only uninvoiced rows keeps it small. */
+    index("billing_periods_uninvoiced")
+      .on(t.invoiceDueAt)
+      .where(sql`${t.invoicedAt} is null`),
   ],
 );
 

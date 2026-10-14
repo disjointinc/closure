@@ -393,6 +393,83 @@
       "when": 1791596279037,
       "tag": "0055_billing_periods_advanced_at",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1791598294650,
+      "tag": "0056_meter_product_line",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1791737937250,
+      "tag": "0057_override_created_at_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1791738143221,
+      "tag": "0058_pending_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1791915398138,
+      "tag": "0059_assignment_billing_anchor",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1791915891953,
+      "tag": "0060_tenant_billing_currency",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1791916235518,
+      "tag": "0061_closure_invoices",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1791917027126,
+      "tag": "0062_plan_change_start",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1791919880674,
+      "tag": "0063_composite_rule_triggers",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1791922336959,
+      "tag": "0064_meter_resets",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1791922880947,
+      "tag": "0065_credit_grants_by_tenant_and_meter",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1791923697994,
+      "tag": "0066_credit_grant_rules_evaluated",
+      "breakpoints": true
     }
   ]
 }

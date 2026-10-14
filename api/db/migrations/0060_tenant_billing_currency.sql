@@ -1,0 +1,1 @@
+ALTER TABLE "tenants" ADD COLUMN "billing_currency" text;
