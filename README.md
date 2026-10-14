@@ -104,7 +104,14 @@ We love contributions! We'll have a contributing guidelines section soon.
 
 ### Developing locally
 
-Run the whole stack (Postgres, Redis, API, web) in Docker from your checkout:
+The first time only, make the passwords and keys the stack needs. They're
+saved in `bin/.env`, which the stack and the tests both read:
+
+```
+bin/generate-env
+```
+
+Now, you can start and run the whole stack in Docker using a 1-line command:
 
 ```
 docker compose -p closure -f bin/compose.yml up -d
