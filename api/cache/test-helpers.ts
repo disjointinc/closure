@@ -459,8 +459,6 @@ export async function cleanupTestState(): Promise<void> {
     await db
       .delete(meterEvents)
       .where(inArray(meterEvents.tenantId, tenantIds));
-    /* The meter's reset row first: without it the scheduler settles
-     * nothing more for the tenant, so no new lot or grant lands mid-delete. */
     await db
       .delete(meterResets)
       .where(inArray(meterResets.tenantId, tenantIds));
@@ -483,7 +481,6 @@ export async function cleanupTestState(): Promise<void> {
     await db
       .delete(billingPeriods)
       .where(inArray(billingPeriods.tenantId, tenantIds));
-    // Items reference assignments (a plan's charges) and invoices.
     const tenantInvoiceIds = db
       .select({ invoiceId: invoices.invoiceId })
       .from(invoices)
