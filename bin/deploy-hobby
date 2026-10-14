@@ -22,7 +22,8 @@ cat <<'EOF'
   (https://www.disjoint.com/tools).
 
   This script is the handroll path: it boots Closure's prerequisites
-  (PostgreSQL + Redis) and the Closure API locally via Docker Compose.
+  (PostgreSQL, Redis, Hatchet, Nango) and the Closure API locally via
+  Docker Compose.
 
 EOF
 
@@ -49,7 +50,11 @@ else
   curl -fsSL "$SOURCE_URL" | tar -xz -C "$CLOSURE_HOME" --strip-components=1
 fi
 
-# 5. Boot the prerequisites (PostgreSQL + Redis) and the Closure API.
+# 5. Give every password and key a value in .env next to the compose file
+# (see generate-env).
+bash "$(dirname -- "$COMPOSE_FILE")/generate-env"
+
+# 6. Boot the prerequisites (PostgreSQL + Redis) and the Closure API.
 log "Starting Closure"
 docker compose --project-name closure -f "$COMPOSE_FILE" up -d
 
@@ -58,3 +63,5 @@ log "Web:      localhost:${CLOSURE_WEB_PORT:-3226}"
 log "API:      localhost:${CLOSURE_API_PORT:-3216}"
 log "Redis:    localhost:${CLOSURE_REDIS_PORT:-63796}"
 log "Postgres: localhost:${CLOSURE_POSTGRES_PORT:-54326}"
+log "Hatchet:  localhost:${CLOSURE_HATCHET_PORT:-3246}"
+log "Nango:    localhost:${CLOSURE_NANGO_PORT:-3256}"
