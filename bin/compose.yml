@@ -7,7 +7,7 @@ services:
       POSTGRES_DB: closure_local
       # Only applied when the volume is first created: changing it later
       # won't change an existing database's password.
-      POSTGRES_PASSWORD: "${CLOSURE_POSTGRES_PASSWORD:?run bin/generate-env}"
+      POSTGRES_PASSWORD: "${CLOSURE_POSTGRES_PASSWORD:?run node bin/generate-env.ts}"
       POSTGRES_USER: postgres
     volumes:
       - closure-pgdata:/var/lib/postgresql
@@ -22,7 +22,7 @@ services:
       [
         "redis-server",
         "--requirepass",
-        "${CLOSURE_REDIS_PASSWORD:?run bin/generate-env}",
+        "${CLOSURE_REDIS_PASSWORD:?run node bin/generate-env.ts}",
       ]
     ports:
       - "${CLOSURE_REDIS_PORT:-63796}:6379"
@@ -41,7 +41,7 @@ services:
     environment:
       PGHOST: closure-db
       PGUSER: postgres
-      PGPASSWORD: "${CLOSURE_POSTGRES_PASSWORD:?run bin/generate-env}"
+      PGPASSWORD: "${CLOSURE_POSTGRES_PASSWORD:?run node bin/generate-env.ts}"
     depends_on:
       closure-db:
         condition: service_healthy
@@ -57,10 +57,10 @@ services:
       # Refer to https://docs.hatchet.run/self-hosting/configuration-options
       # hatchet-migrate only reads a URL, so CLOSURE_POSTGRES_PASSWORD must
       # be URL-safe (letters, digits, - . _ ~).
-      DATABASE_URL: "postgresql://postgres:${CLOSURE_POSTGRES_PASSWORD:?run bin/generate-env}@closure-db:5432/hatchet?sslmode=disable"
+      DATABASE_URL: "postgresql://postgres:${CLOSURE_POSTGRES_PASSWORD:?run node bin/generate-env.ts}@closure-db:5432/hatchet?sslmode=disable"
       # The dashboard login for admin@example.com, set when Hatchet first
       # starts (changing it later has no effect).
-      ADMIN_PASSWORD: "${CLOSURE_HATCHET_DASHBOARD_PASSWORD:?run bin/generate-env}"
+      ADMIN_PASSWORD: "${CLOSURE_HATCHET_DASHBOARD_PASSWORD:?run node bin/generate-env.ts}"
       # Hatchet won't start without a cookie domain (there's no default).
       SERVER_AUTH_COOKIE_DOMAIN: localhost
       SERVER_AUTH_COOKIE_INSECURE: "true"
@@ -91,7 +91,7 @@ services:
       - |
         set -e
         if [ ! -f /closure-bin/.env ]; then
-          echo "bin/.env is missing: run bin/generate-env first" >&2
+          echo "bin/.env is missing: run node bin/generate-env.ts first" >&2
           exit 1
         fi
         if grep -q '^CLOSURE_HATCHET_CLIENT_TOKEN=' /closure-bin/.env; then
@@ -108,7 +108,7 @@ services:
         printf 'CLOSURE_HATCHET_CLIENT_TOKEN=%s\n' "$$token" >> /closure-bin/.env
     restart: "no"
     environment:
-      DATABASE_URL: "postgresql://postgres:${CLOSURE_POSTGRES_PASSWORD:?run bin/generate-env}@closure-db:5432/hatchet?sslmode=disable"
+      DATABASE_URL: "postgresql://postgres:${CLOSURE_POSTGRES_PASSWORD:?run node bin/generate-env.ts}@closure-db:5432/hatchet?sslmode=disable"
       # token create loads the server config, which needs this too.
       SERVER_AUTH_COOKIE_DOMAIN: localhost
     volumes:
@@ -136,18 +136,18 @@ services:
       # closure-create-databases).
       NANGO_DB_HOST: closure-db
       NANGO_DB_USER: postgres
-      NANGO_DB_PASSWORD: "${CLOSURE_POSTGRES_PASSWORD:?run bin/generate-env}"
+      NANGO_DB_PASSWORD: "${CLOSURE_POSTGRES_PASSWORD:?run node bin/generate-env.ts}"
       # Logical db 1, so Nango's keys never mix with Closure's (db 0). Only a
       # URL can pick the db, so CLOSURE_REDIS_PASSWORD must be URL-safe
       # (letters, digits, - . _ ~).
-      NANGO_REDIS_URL: "redis://:${CLOSURE_REDIS_PASSWORD:?run bin/generate-env}@closure-redis:6379/1"
+      NANGO_REDIS_URL: "redis://:${CLOSURE_REDIS_PASSWORD:?run node bin/generate-env.ts}@closure-redis:6379/1"
       # Encrypts the credentials Nango stores. Never change it once set, or
       # stored credentials become unreadable.
-      NANGO_ENCRYPTION_KEY: "${CLOSURE_NANGO_ENCRYPTION_KEY:?run bin/generate-env}"
+      NANGO_ENCRYPTION_KEY: "${CLOSURE_NANGO_ENCRYPTION_KEY:?run node bin/generate-env.ts}"
       # The API key Closure calls Nango with (must match config.ts).
-      NANGO_SECRET_KEY_PROD: "${CLOSURE_NANGO_SECRET_KEY:?run bin/generate-env}"
+      NANGO_SECRET_KEY_PROD: "${CLOSURE_NANGO_SECRET_KEY:?run node bin/generate-env.ts}"
       NANGO_DASHBOARD_USERNAME: "${CLOSURE_NANGO_DASHBOARD_USERNAME:-admin}"
-      NANGO_DASHBOARD_PASSWORD: "${CLOSURE_NANGO_DASHBOARD_PASSWORD:?run bin/generate-env}"
+      NANGO_DASHBOARD_PASSWORD: "${CLOSURE_NANGO_DASHBOARD_PASSWORD:?run node bin/generate-env.ts}"
       NANGO_SERVER_URL: "http://localhost:${CLOSURE_NANGO_PORT:-3256}"
       NANGO_PUBLIC_CONNECT_URL: "http://localhost:${CLOSURE_NANGO_CONNECT_PORT:-3257}"
       # Nango's entrypoint only serves the Connect UI when this is "true".
@@ -178,7 +178,7 @@ services:
     environment:
       CLOSURE_POSTGRES_HOST: closure-db
       CLOSURE_POSTGRES_PORT: "5432"
-      CLOSURE_POSTGRES_PASSWORD: "${CLOSURE_POSTGRES_PASSWORD:?run bin/generate-env}"
+      CLOSURE_POSTGRES_PASSWORD: "${CLOSURE_POSTGRES_PASSWORD:?run node bin/generate-env.ts}"
     depends_on:
       closure-db:
         condition: service_healthy
@@ -201,19 +201,19 @@ services:
       CLOSURE_API_PORT: "3216"
       CLOSURE_POSTGRES_HOST: closure-db
       CLOSURE_POSTGRES_PORT: "5432"
-      CLOSURE_POSTGRES_PASSWORD: "${CLOSURE_POSTGRES_PASSWORD:?run bin/generate-env}"
+      CLOSURE_POSTGRES_PASSWORD: "${CLOSURE_POSTGRES_PASSWORD:?run node bin/generate-env.ts}"
       CLOSURE_REDIS_HOST: closure-redis
       CLOSURE_REDIS_PORT: "6379"
-      CLOSURE_REDIS_PASSWORD: "${CLOSURE_REDIS_PASSWORD:?run bin/generate-env}"
+      CLOSURE_REDIS_PASSWORD: "${CLOSURE_REDIS_PASSWORD:?run node bin/generate-env.ts}"
       CLOSURE_HATCHET_HOST: closure-hatchet
       CLOSURE_HATCHET_PORT: "8888"
       CLOSURE_HATCHET_GRPC_PORT: "7070"
       CLOSURE_NANGO_HOST: closure-nango
       CLOSURE_NANGO_PORT: "8080"
-      CLOSURE_NANGO_SECRET_KEY: "${CLOSURE_NANGO_SECRET_KEY:?run bin/generate-env}"
-      # Encrypts webhook secrets (from bin/generate-env). The API won't start
+      CLOSURE_NANGO_SECRET_KEY: "${CLOSURE_NANGO_SECRET_KEY:?run node bin/generate-env.ts}"
+      # Encrypts webhook secrets (from bin/generate-env.ts). The API won't start
       # without it.
-      CLOSURE_SECRETS_KEY: "${CLOSURE_SECRETS_KEY:?run bin/generate-env}"
+      CLOSURE_SECRETS_KEY: "${CLOSURE_SECRETS_KEY:?run node bin/generate-env.ts}"
       CLOSURE_OUTBOUND_ALLOW_PRIVATE_NETWORKS: "${CLOSURE_OUTBOUND_ALLOW_PRIVATE_NETWORKS:-false}"
     # The docs container syncs this service's /openapi.json to a local file
     # before mint boots, so the API must be serving first. Generous retries:

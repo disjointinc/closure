@@ -1,9 +1,9 @@
 /*
- * Load bin/.env (written by bin/generate-env, plus the Hatchet token
+ * Load bin/.env (written by bin/generate-env.ts, plus the Hatchet token
  * bin/compose.yml's closure-hatchet-token adds), so the API and the tests and
  * scripts run from the host all use the same passwords and keys. Variables
  * already set take precedence. If the file is missing, the settings below
- * with no default (envRequired) throw, pointing at bin/generate-env.
+ * with no default (envRequired) throw, pointing at bin/generate-env.ts.
  */
 try {
   process.loadEnvFile(new URL("./bin/.env", import.meta.url));
@@ -18,11 +18,11 @@ function env(key: string, fallback: string): string {
   return value === undefined || value === "" ? fallback : value;
 }
 
-/** A setting bin/generate-env makes, which has no default. */
+/** A setting bin/generate-env.ts makes, which has no default. */
 function envRequired(key: string): string {
   const value = env(key, "");
   if (value === "") {
-    throw new Error(`${key} is not set (run bin/generate-env)`);
+    throw new Error(`${key} is not set (run node bin/generate-env.ts)`);
   }
   return value;
 }

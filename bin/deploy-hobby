@@ -51,8 +51,12 @@ else
 fi
 
 # 5. Give every password and key a value in .env next to the compose file
-# (see generate-env).
-bash "$(dirname -- "$COMPOSE_FILE")/generate-env"
+# (see generate-env.ts). Runs in Docker's Node image, so the host needs no
+# Node, and as the current user, so .env stays readable by them.
+BIN_DIR="$(cd -- "$(dirname -- "$COMPOSE_FILE")" && pwd)"
+docker run --rm --user "$(id -u):$(id -g)" -v "$BIN_DIR:/closure-bin" \
+  node:24-alpine node /closure-bin/generate-env.ts >/dev/null
+log "Passwords and keys: $BIN_DIR/.env"
 
 # 6. Boot the prerequisites (PostgreSQL + Redis) and the Closure API.
 log "Starting Closure"

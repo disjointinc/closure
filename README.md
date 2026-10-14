@@ -74,7 +74,8 @@ If you choose your own: make the two keys with `openssl rand -base64 32`, and
 use only letters and numbers for the passwords (some of these services put
 the password inside a web address, where symbols like `@` or `/` break it).
 The Hatchet password also needs an uppercase letter, a lowercase letter, and a
-number.
+number. `CLOSURE_NANGO_SECRET_KEY` must be a UUID (make one with `uuidgen`),
+since Nango rejects anything else.
 
 If your webhooks need to reach machines on your own network (like an internal
 service at `http://10.0.0.5`), also add
@@ -108,7 +109,7 @@ The first time only, make the passwords and keys the stack needs. They're
 saved in `bin/.env`, which the stack and the tests both read:
 
 ```
-bin/generate-env
+node bin/generate-env.ts
 ```
 
 Now, to start and run the whole stack in Docker, just run:
@@ -118,6 +119,11 @@ docker compose -p closure -f bin/compose.yml up -d
 ```
 
 Default UI is available at http://localhost:3226.
+
+Both commands work the same in PowerShell on Windows. One Windows tip: clone
+the repo inside WSL (e.g. into `~/closure` in an Ubuntu terminal) rather than
+onto the Windows drive. Docker reads files there much faster, and it reliably
+notices your edits, which the live reloading below depends on.
 
 This starts the same services as the one-liner above: `deploy-hobby` uses the
 checkout's `bin/compose.yml` when run from a clone, so both paths produce the
