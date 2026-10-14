@@ -22,6 +22,7 @@ import {
   assignments,
   billingPeriods,
   creditGrants,
+  creditLots,
   cycles,
   experiments,
   experimentTreatmentPlans,
@@ -32,8 +33,10 @@ import {
   meterBalances,
   meterEvents,
   meterEventsDlq,
+  meterResets,
   meters,
   meterSpends,
+  paymentInvoices,
   planMeters,
   plans,
   productLines,
@@ -43,10 +46,13 @@ import {
   rules,
   tasks,
   taskTypes,
+  taxationAmountItems,
+  taxationAmounts,
   teamMembers,
   tenantLastActivity,
   tenants,
 } from "../db/schema.ts";
+import type { Duration } from "../schemas/common.ts";
 import type { Rule } from "../schemas/rule.ts";
 import { redis } from "./index.ts";
 import { keys } from "./keys.ts";
@@ -115,7 +121,7 @@ export async function makeMeter({
   const resolvedMeterId = meterId ?? newMeterId();
   await db.insert(meters).values({
     meterId: resolvedMeterId,
-    productLineIds: [productLineId ?? (await makeProductLine())],
+    productLineId: productLineId ?? (await makeProductLine()),
     createdAt: Date.now(),
     deprecatedAt: null,
     name: "Test meter",
@@ -126,16 +132,19 @@ export async function makeMeter({
 
 /** Attach a meter to a plan (allocation rows the assignment service seeds from). */
 export async function makePlanMeter({
+  defaultMicrocredits,
   meterId,
   planId,
 }: {
+  /** Defaults to 1,000,000. */
+  defaultMicrocredits?: number;
   meterId: string;
   planId: string;
 }): Promise<void> {
   await db.insert(planMeters).values({
     planId,
     meterId,
-    defaultMicrocredits: 1_000_000,
+    defaultMicrocredits: defaultMicrocredits ?? 1_000_000,
     limitMicrocredits: null,
     reset: null,
     rollovers: null,
@@ -144,7 +153,12 @@ export async function makePlanMeter({
   });
 }
 
-export async function makeCycle(): Promise<string> {
+export async function makeCycle({
+  cycleLength,
+}: {
+  /** Defaults to 30 days. */
+  cycleLength?: Duration;
+} = {}): Promise<string> {
   const cycleId = newCycleId();
   await db.insert(cycles).values({
     cycleId,
@@ -154,7 +168,7 @@ export async function makeCycle(): Promise<string> {
     name: "Test cycle",
     description: null,
     charged: "upfront",
-    cycleLength: { days: 30, months: null },
+    cycleLength: cycleLength ?? { days: 30, months: null },
     creditPeriod: null,
     gracePeriod: null,
   });
@@ -179,21 +193,28 @@ export async function makePlan({
 
 /** Assign a tenant to a plan on a fresh cycle. Returns the assignmentId. */
 export async function makeAssignment({
+  billingAnchorAt,
   createdAt,
+  cycleLength,
   planId,
   startsAt,
   tenantId,
 }: {
+  /** Defaults to startsAt. */
+  billingAnchorAt?: number;
   /** Defaults to now; pass a past time for an assignment with history. */
   createdAt?: number;
+  /** Defaults to 30 days. */
+  cycleLength?: Duration;
   planId: string;
   /** Defaults to now; pass a future time for a not-yet-open assignment. */
   startsAt?: number;
   tenantId: string;
 }): Promise<string> {
   const assignmentId = newAssignmentId();
-  const cycleId = await makeCycle();
+  const cycleId = await makeCycle({ cycleLength });
   const [plan] = await db.select().from(plans).where(eq(plans.planId, planId));
+  const start = startsAt ?? Date.now();
   await db.insert(assignments).values({
     assignmentId,
     tenantId,
@@ -202,8 +223,15 @@ export async function makeAssignment({
     experimentId: null,
     cycleId,
     createdAt: createdAt ?? Date.now(),
-    startsAt: startsAt ?? Date.now(),
+    startsAt: start,
     endsAt: null,
+    billingAnchorAt: billingAnchorAt ?? start,
+    supersededCredit: "unused_time",
+    /* Marked as already handled so the scheduler skips handleAssignmentStart
+     * for this assignment. Tests set up their own meter balances and credit
+     * grants, and handleAssignmentStart would otherwise add grants or invoices
+     * on top of them. */
+    startHandledAt: createdAt ?? Date.now(),
   });
   return assignmentId;
 }
@@ -431,6 +459,12 @@ export async function cleanupTestState(): Promise<void> {
     await db
       .delete(meterEvents)
       .where(inArray(meterEvents.tenantId, tenantIds));
+    /* The meter's reset row first: without it the scheduler settles
+     * nothing more for the tenant, so no new lot or grant lands mid-delete. */
+    await db
+      .delete(meterResets)
+      .where(inArray(meterResets.tenantId, tenantIds));
+    await db.delete(creditLots).where(inArray(creditLots.tenantId, tenantIds));
     await db
       .delete(creditGrants)
       .where(inArray(creditGrants.tenantId, tenantIds));
@@ -449,20 +483,32 @@ export async function cleanupTestState(): Promise<void> {
     await db
       .delete(billingPeriods)
       .where(inArray(billingPeriods.tenantId, tenantIds));
+    // Items reference assignments (a plan's charges) and invoices.
+    const tenantInvoiceIds = db
+      .select({ invoiceId: invoices.invoiceId })
+      .from(invoices)
+      .where(inArray(invoices.tenantId, tenantIds));
+    await db
+      .delete(taxationAmountItems)
+      .where(
+        inArray(
+          taxationAmountItems.taxationAmountId,
+          db
+            .select({ taxationAmountId: taxationAmounts.taxationAmountId })
+            .from(taxationAmounts)
+            .where(inArray(taxationAmounts.invoiceId, tenantInvoiceIds)),
+        ),
+      );
+    await db
+      .delete(taxationAmounts)
+      .where(inArray(taxationAmounts.invoiceId, tenantInvoiceIds));
+    await db
+      .delete(paymentInvoices)
+      .where(inArray(paymentInvoices.invoiceId, tenantInvoiceIds));
+    await db.delete(items).where(inArray(items.tenantId, tenantIds));
     await db
       .delete(assignments)
       .where(inArray(assignments.tenantId, tenantIds));
-    await db
-      .delete(items)
-      .where(
-        inArray(
-          items.invoiceId,
-          db
-            .select({ invoiceId: invoices.invoiceId })
-            .from(invoices)
-            .where(inArray(invoices.tenantId, tenantIds)),
-        ),
-      );
     await db.delete(invoices).where(inArray(invoices.tenantId, tenantIds));
   }
   if (taskTypeIds.length > 0) {
