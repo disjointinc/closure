@@ -27,6 +27,8 @@ import { keys } from "../cache/keys.ts";
 import { db } from "../db/index.ts";
 import {
   assignments,
+  creditGrants,
+  creditLots,
   cycles,
   featureOptions,
   featureOverrides,
@@ -35,6 +37,7 @@ import {
   meterBalances,
   meterEvents,
   meterOverrides,
+  meterResets,
   meters,
   meterSpends,
   meterTaxTypes,
@@ -170,6 +173,27 @@ export async function collectTestSuiteResources({
           .delete(meterOverrides)
           .where(inArray(meterOverrides.tenantId, markedTenantIds))
           .returning({ meterOverrideId: meterOverrides.meterOverrideId })
+      ).length;
+      /* An assignment's start writes credit grants that point at it, so
+       * they go before the assignments do, after the lots and the meter
+       * reset rows that point at them and at the assignment. */
+      counts.meterResets = (
+        await tx
+          .delete(meterResets)
+          .where(inArray(meterResets.tenantId, markedTenantIds))
+          .returning({ tenantId: meterResets.tenantId })
+      ).length;
+      counts.creditLots = (
+        await tx
+          .delete(creditLots)
+          .where(inArray(creditLots.tenantId, markedTenantIds))
+          .returning({ creditLotId: creditLots.creditLotId })
+      ).length;
+      counts.creditGrants = (
+        await tx
+          .delete(creditGrants)
+          .where(inArray(creditGrants.tenantId, markedTenantIds))
+          .returning({ creditGrantId: creditGrants.creditGrantId })
       ).length;
       counts.assignments = (
         await tx
