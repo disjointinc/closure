@@ -1,3 +1,8 @@
+# Long-running services restart on their own (restart: unless-stopped), so
+# the stack comes back after a crash or a machine reboot. One-shot setup
+# services (closure-create-databases, closure-hatchet-token,
+# closure-migrate) don't: they've already done their job by then.
+#
 # Every port below is published on 127.0.0.1 only, so it's reachable from
 # this machine but not the network. The one way in from outside is
 # closure-gateway's HTTPS ports (CLOSURE_GATEWAY_HTTP_PORT and
@@ -6,6 +11,7 @@
 services:
   closure-db:
     image: postgres:18
+    restart: unless-stopped
     ports:
       - "127.0.0.1:${CLOSURE_POSTGRES_PORT:-54326}:5432"
     environment:
@@ -23,6 +29,7 @@ services:
       retries: 5
   closure-redis:
     image: redis:8-alpine
+    restart: unless-stopped
     command:
       [
         "redis-server",
@@ -55,6 +62,7 @@ services:
   # api/cache/task-notification/worker.ts.
   closure-hatchet:
     image: ghcr.io/hatchet-dev/hatchet/hatchet-lite:v0.110.5
+    restart: unless-stopped
     ports:
       - "127.0.0.1:${CLOSURE_HATCHET_PORT:-3246}:8888"
       - "127.0.0.1:${CLOSURE_HATCHET_GRPC_PORT:-3247}:7070"
@@ -129,6 +137,7 @@ services:
   # notifications make to Slack, Teams, Linear, and Jira.
   closure-nango:
     image: nangohq/nango-server:hosted-0.71.13
+    restart: unless-stopped
     # Nango only publishes amd64 images. x64 hosts (including Windows) run
     # it natively; ARM hosts emulate it (see README for ARM Linux).
     platform: linux/amd64
@@ -189,6 +198,7 @@ services:
         condition: service_healthy
   closure-api:
     image: node:24-alpine
+    restart: unless-stopped
     working_dir: /closure
     volumes:
       # Read-write, like closure-web: npm install needs to manage node_modules.
@@ -251,6 +261,7 @@ services:
         condition: service_started
   closure-web:
     image: node:24-alpine
+    restart: unless-stopped
     working_dir: /closure
     volumes:
       # Read-write: the TanStack Router vite plugin writes its generated
@@ -276,6 +287,7 @@ services:
       VITE_CLOSURE_DOCS_URL: ${CLOSURE_PUBLIC_DOCS_URL:-http://localhost:${CLOSURE_DOCS_PORT:-3236}}
   closure-docs:
     image: node:24-alpine
+    restart: unless-stopped
     working_dir: /closure
     volumes:
       - ..:/closure
@@ -301,6 +313,7 @@ services:
   # password CLOSURE_API_KEY). See bin/Caddyfile.
   closure-gateway:
     image: caddy:2.11.7-alpine
+    restart: unless-stopped
     # basic_auth only takes a bcrypt hash, so hash CLOSURE_API_KEY at start
     # rather than storing a second secret in bin/.env.
     command:
