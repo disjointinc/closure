@@ -26,6 +26,7 @@ const randomPassword = () => randomBytes(PASSWORD_BYTES).toString("hex");
 const randomKey = () => randomBytes(ENCRYPTION_KEY_BYTES).toString("base64");
 
 const settings: { name: string; value: () => string }[] = [
+  { name: "CLOSURE_API_KEY", value: randomPassword },
   { name: "CLOSURE_POSTGRES_PASSWORD", value: randomPassword },
   { name: "CLOSURE_REDIS_PASSWORD", value: randomPassword },
   { name: "CLOSURE_SECRETS_KEY", value: randomKey },

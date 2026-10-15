@@ -199,6 +199,9 @@ services:
       - "${CLOSURE_API_PORT:-3216}:3216"
     environment:
       CLOSURE_API_PORT: "3216"
+      # Every API route except /healthz requires it (from
+      # bin/generate-env.ts). The API won't start without it.
+      CLOSURE_API_KEY: "${CLOSURE_API_KEY:?run node bin/generate-env.ts}"
       CLOSURE_POSTGRES_HOST: closure-db
       CLOSURE_POSTGRES_PORT: "5432"
       CLOSURE_POSTGRES_PASSWORD: "${CLOSURE_POSTGRES_PASSWORD:?run node bin/generate-env.ts}"
@@ -254,14 +257,16 @@ services:
     # --ignore-scripts: skips the repo's "prepare" hook (lefthook), which
     # has no .git to install into here.
     command: sh -c "npm install --ignore-scripts && exec npm run dev -w web"
-    ports:
-      - "${CLOSURE_WEB_PORT:-3226}:3226"
+    # No published port: browsers reach it through closure-gateway, which
+    # asks for CLOSURE_API_KEY first.
     environment:
       CLOSURE_WEB_PORT: "3226"
-      # Browser-side origin of the API; the dev server passes VITE_* through
-      # to the bundle (web/src/lib/api.ts). Follows CLOSURE_API_PORT unless
-      # VITE_CLOSURE_API_URL is set directly.
-      VITE_CLOSURE_API_URL: ${VITE_CLOSURE_API_URL:-http://localhost:${CLOSURE_API_PORT:-3216}}
+      # Browser-side URL of the API; the dev server passes VITE_* through to
+      # the bundle (web/src/lib/api.ts). closure-gateway serves the API at
+      # /api on the web portal's own origin and adds CLOSURE_API_KEY to each
+      # call. Follows CLOSURE_WEB_PORT unless VITE_CLOSURE_API_URL is set
+      # directly.
+      VITE_CLOSURE_API_URL: ${VITE_CLOSURE_API_URL:-http://localhost:${CLOSURE_WEB_PORT:-3226}/api}
       VITE_CLOSURE_DOCS_URL: ${VITE_CLOSURE_DOCS_URL:-http://localhost:${CLOSURE_DOCS_PORT:-3236}}
   closure-docs:
     image: node:24-alpine
@@ -279,11 +284,41 @@ services:
       CI: "true"
       CLOSURE_API_URL: http://closure-api:3216/openapi.json
       CLOSURE_DOCS_PORT: "3236"
-    ports:
-      - "${CLOSURE_DOCS_PORT:-3236}:3236"
+      # sync-openapi.ts sends it to fetch /openapi.json.
+      CLOSURE_API_KEY: "${CLOSURE_API_KEY:?run node bin/generate-env.ts}"
+    # No published port: browsers reach it through closure-gateway (see
+    # closure-web).
     depends_on:
       closure-api:
         condition: service_healthy
+  # Puts a login in front of the web portal and docs (username admin,
+  # password CLOSURE_API_KEY). See bin/Caddyfile.
+  closure-gateway:
+    image: caddy:2.11.7-alpine
+    # basic_auth only takes a bcrypt hash, so hash CLOSURE_API_KEY at start
+    # rather than storing a second secret in bin/.env.
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        CLOSURE_API_KEY_HASH="$$(caddy hash-password --plaintext "$$CLOSURE_API_KEY")"
+        export CLOSURE_API_KEY_HASH
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    ports:
+      - "${CLOSURE_WEB_PORT:-3226}:3226"
+      - "${CLOSURE_DOCS_PORT:-3236}:3236"
+    environment:
+      CLOSURE_API_KEY: "${CLOSURE_API_KEY:?run node bin/generate-env.ts}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      closure-api:
+        condition: service_started
+      closure-web:
+        condition: service_started
+      closure-docs:
+        condition: service_started
 
 volumes:
   closure-pgdata:

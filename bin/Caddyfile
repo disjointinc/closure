@@ -1,0 +1,34 @@
+# closure-gateway (bin/compose.yml): the only way into the web portal and
+# docs. The browser asks for a login: username admin, password
+# CLOSURE_API_KEY. CLOSURE_API_KEY_HASH is a bcrypt hash of CLOSURE_API_KEY
+# that closure-gateway makes when it starts, since basic_auth only accepts
+# hashed passwords.
+{
+	# Plain http on localhost, like every other service in bin/compose.yml.
+	auto_https off
+	admin off
+}
+
+(api_key_login) {
+	basic_auth {
+		admin {$CLOSURE_API_KEY_HASH}
+	}
+}
+
+:3226 {
+	import api_key_login
+	# The web portal calls the API through /api on its own origin, so the
+	# browser's login covers its API calls and CLOSURE_API_KEY never ships
+	# in the web bundle: the gateway adds it here instead.
+	handle_path /api/* {
+		reverse_proxy closure-api:3216 {
+			header_up Authorization "Bearer {$CLOSURE_API_KEY}"
+		}
+	}
+	reverse_proxy closure-web:3226
+}
+
+:3236 {
+	import api_key_login
+	reverse_proxy closure-docs:3236
+}

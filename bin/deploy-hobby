@@ -63,6 +63,8 @@ log "Starting Closure"
 docker compose --project-name closure -f "$COMPOSE_FILE" up -d
 
 log "Done."
+log "Login:    username admin, password CLOSURE_API_KEY in $BIN_DIR/.env"
+log "          (web and docs; API calls send it as 'Authorization: Bearer')"
 log "Web:      localhost:${CLOSURE_WEB_PORT:-3226}"
 log "API:      localhost:${CLOSURE_API_PORT:-3216}"
 log "Redis:    localhost:${CLOSURE_REDIS_PORT:-63796}"
