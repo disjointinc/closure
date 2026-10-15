@@ -2,7 +2,7 @@
 
 # Closure: Entitlements and Metering Infrastructure for Agentic Products
 
-### Implement any pricing that best captures your product's value without needing to think through the math.
+### Capture your product's value without needing to think through the math.
 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-43AF11.svg)](http://makeapullrequest.com)
 [![Commit activity](https://img.shields.io/github/commit-activity/m/jxutaposition/closure?color=black)](https://github.com/jxutaposition/closure/commits/main)
@@ -30,16 +30,15 @@ billing system you want. Some inspiration:
 - OpenAI's [hybrid access systems](https://openai.com/index/beyond-rate-limits/)
 - Buy now, pay later
 - Marginal PNL modeling
-- Granting discounts and referral bonuses
+- Discounts and referral bonuses
 - Lots of experimentation
 
 ### Teams
 
 - **Finance** can send invoices automatically and reconcile revenue with usage costs.
-- **Growth** can run promotions, coupons, and referrals, and experiment with plans and pricing.
-- **Sales** can create custom deals in-house, without buying or paying for a CPQ vendor.
-- **Customer success** can get notified about key customers in Slack, Teams, Linear, and Jira.
-- **Engineering** can ship at the speed of Claude and charge per token in the hot path (see [How Closure works](#how-closure-works)).
+- **Growth** can run promotions, coupons, and referrals, and analyze lifecycle data without engineers.
+- **Sales and Customer Success** can create custom deals in-house and get notified about key customers in product activity in Slack, Teams, Linear, and Jira.
+- **Engineering** can ship at the speed of Claude and implement blocks before charges happen.
 
 ## How Closure works
 
