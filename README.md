@@ -1,13 +1,13 @@
 <div align="center">
 
-# Closure: hot path metering
+# Closure: Entitlements and Metering Infrastructure for Agentic Products
 
-### Implement any pricing that best captures your product's value without needing to think through the math: credit wallets, sliding-scale top-up packs, soft limits, reserved action pools, usage-based alerts, auto-generated invoices, even OpenAI's [hybrid access systems](https://openai.com/index/beyond-rate-limits/).
+### Implement any pricing that best captures your product's value without needing to think through the math.
 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-43AF11.svg)](http://makeapullrequest.com)
-[![Commit activity](https://img.shields.io/github/commit-activity/m/jxutaposition/closure)](https://github.com/jxutaposition/closure/commits/main)
-[![Skills](https://img.shields.io/badge/skills-closure--setup--assistant-blue)](skills/SKILL.md)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Commit activity](https://img.shields.io/github/commit-activity/m/jxutaposition/closure?color=black)](https://github.com/jxutaposition/closure/commits/main)
+[![Skills](https://img.shields.io/badge/skills-closure--setup--assistant-1f6feb)](skills/SKILL.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-9d2235)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%5E24.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
 
 [Use cases](#use-cases) · [How Closure works](#how-closure-works) · [Quickstart](#quickstart) · [Contributing](#contributing)
@@ -16,42 +16,34 @@
 
 ## Use cases
 
-Closure is a system for metering, entitlements, and billing. Closure lets you build powerful functionality on top of these primitives, like:
+With the right primitives, you can build any metering, entitlements, and
+billing system you want. Some inspiration:
 
-1. Actioning and alerting on customer lifecycle events
-1. Granting discounts and referral bonuses
-1. Experimenting with plans and pricing
-1. Processing buy-now-pay-later
-1. Modeling marginal revenue and expenses
+### Configurations
 
-and more!
+- Credit wallets
+- Sliding-scale top-up packs
+- Soft limits
+- Reserved action pools
+- Usage-based alerts
+- Auto-generated invoices
+- OpenAI's [hybrid access systems](https://openai.com/index/beyond-rate-limits/)
+- Buy now, pay later
+- Marginal PNL modeling
+- Granting discounts and referral bonuses
+- Lots of experimentation
 
-### AI and agent products
+### Teams
 
-- Charge per token, action, or run without slowing down responses
-- Sell credit wallets and top-up packs so heavy users pay for what they use
-- Use soft limits so a customer mid-task gets a warning, not a hard cutoff
-- Mix rate limits with credits, so power users can keep going after they hit a cap
-
-### APIs and developer tools
-
-- Meter every call safely: retried requests are never double-charged
-- Give enterprise customers reserved pools of actions for their contract
-- Get a Slack, Teams, Linear, or Jira task before a big customer runs out
-
-### B2B SaaS
-
-- Try new plans and prices without breaking existing customers
-- Give one customer a custom deal without making a new plan
-- Run discounts, coupons, and referral bonuses from one place
-
-### Finance and ops
-
-- Send invoices automatically, with payments and taxes handled by your payment provider
-- Offer buy-now-pay-later on larger purchases
-- See what each customer earns you after usage costs
+- **Finance** can send invoices automatically and reconcile revenue with usage costs.
+- **Growth** can run promotions, coupons, and referrals, and experiment with plans and pricing.
+- **Sales** can create custom deals in-house, without buying or paying for a CPQ vendor.
+- **Customer success** can get notified about key customers in Slack, Teams, Linear, and Jira.
+- **Engineering** can ship at the speed of Claude and charge per token in the hot path (see [How Closure works](#how-closure-works)).
 
 ## How Closure works
+
+### Architecture
 
 ![Closure architecture](docs/assets/architecture.png)
 
@@ -61,13 +53,15 @@ Events are flushed to Postgres in batches, which keeps a full record and can
 rebuild Redis if it's ever lost. When a usage threshold is hit, Hatchet sends a
 task to Slack, Teams, Linear, Jira, or a webhook.
 
+### Principles
+
 It's built on a few principles:
 
 1. Pricing should be managed in code
 1. Pricing is always being tweaked
 1. Plans are versioned and immutable
 1. Assignments almost always tweak plan settings
-1. Metering shouldn't introduce a visible delay for users
+1. **Metering shouldn't introduce a visible delay for users**
 1. Metering events should be idempotent
 1. Tasks should be created immediately when metering thresholds are hit
 1. Sensitive payment info shouldn't be stored on your servers
@@ -77,8 +71,8 @@ It's built on a few principles:
 
 ### Guided (recommended)
 
-We'll be making a managed version soon. We're starting to work more closely
-with a handful of teams, see if you're a fit [here](https://www.findclosure.dev/alpha).
+We're starting to work more closely with a handful of teams, see if you're a
+fit [here](https://www.findclosure.dev/alpha).
 
 ### Self-hosted (advanced)
 
