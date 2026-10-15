@@ -1,6 +1,6 @@
 <div align="center">
 
-# Closure: Entitlements and Metering Infrastructure for Agentic Products
+# Closure: Pricing, metering, and actions for AI products
 
 ### Capture your product's value without needing to think through the math.
 
