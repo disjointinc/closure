@@ -10,35 +10,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-9d2235)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%5E24.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
 
-[Use cases](#use-cases) · [How Closure works](#how-closure-works) · [Quickstart](#quickstart) · [Contributing](#contributing)
+[How Closure works](#how-closure-works) · [Use cases](#use-cases) · [Quickstart](#quickstart) · [Contributing](#contributing)
 
 </div>
-
-## Use cases
-
-With the right primitives, you can build any metering, entitlements, and
-billing system you want. Some inspiration:
-
-### Configurations
-
-- Credit wallets
-- Sliding-scale top-up packs
-- Soft limits
-- Reserved action pools
-- Usage-based alerts
-- Auto-generated invoices
-- OpenAI's [hybrid access systems](https://openai.com/index/beyond-rate-limits/)
-- Buy now, pay later
-- Marginal PNL modeling
-- Discounts and referral bonuses
-- Lots of experimentation
-
-### Teams
-
-- **Finance** can send invoices automatically and reconcile revenue with usage costs.
-- **Growth** can run promotions, coupons, and referrals, and analyze lifecycle data without engineers.
-- **Sales and Customer Success** can create custom deals in-house and get notified about key customers in product activity in Slack, Teams, Linear, and Jira.
-- **Engineering** can ship at the speed of Claude and implement blocks before charges happen.
 
 ## How Closure works
 
@@ -65,6 +39,27 @@ It's built on a few principles:
 1. Tasks should be created immediately when metering thresholds are hit
 1. Sensitive payment info shouldn't be stored on your servers
 1. 3P providers should process payment and calculate taxes
+
+## Use cases
+
+With the right primitives, you can build any metering, entitlements, and
+billing system you want.
+
+### Inspiration
+
+- Credit wallets
+- Sliding-scale top-up packs
+- Soft limits
+- Reserved action pools
+- OpenAI's [hybrid access systems](https://openai.com/index/beyond-rate-limits/)
+- Discounts and referral bonuses
+
+### Teams
+
+- **Finance** can send invoices automatically and reconcile revenue with usage costs.
+- **Growth** can run promotions, coupons, and referrals, and analyze lifecycle data without engineers.
+- **Sales and Customer Success** can create custom deals in-house and get notified about key customers in product activity in Slack, Teams, Linear, and Jira.
+- **Engineering** can ship at the speed of Claude and implement blocks before charges happen.
 
 ## Quickstart
 
