@@ -1,5 +1,10 @@
 # Closure
 
+[![Last commit](https://img.shields.io/github/last-commit/jxutaposition/closure)](https://github.com/jxutaposition/closure/commits/main)
+[![Skills](https://img.shields.io/badge/skills-closure--setup--assistant-blue)](skills/SKILL.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%5E24.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
+
 Closure is a system for metering, entitlements, and billing. Closure lets you build powerful functionality on top of these primitives, like:
 
 1. Actioning and alerting on customer lifecycle events
