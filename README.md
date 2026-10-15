@@ -2,7 +2,7 @@
 
 # Closure: Pricing, metering, and actions for AI products
 
-### Capture your product's value without needing to think through the math.
+### Iterate on pricing, and act on customer usage, without breaking your engineers' meters.
 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-43AF11.svg)](http://makeapullrequest.com)
 [![Commit activity](https://img.shields.io/github/commit-activity/m/jxutaposition/closure?color=black)](https://github.com/jxutaposition/closure/commits/main)
