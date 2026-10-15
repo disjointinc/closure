@@ -1,8 +1,13 @@
+# Every port below is published on 127.0.0.1 only, so it's reachable from
+# this machine but not the network. The one way in from outside is
+# closure-gateway's HTTPS ports (CLOSURE_GATEWAY_HTTP_PORT and
+# CLOSURE_GATEWAY_HTTPS_PORT), once bin/Caddyfile's site addresses are set to
+# domain names.
 services:
   closure-db:
     image: postgres:18
     ports:
-      - "${CLOSURE_POSTGRES_PORT:-54326}:5432"
+      - "127.0.0.1:${CLOSURE_POSTGRES_PORT:-54326}:5432"
     environment:
       POSTGRES_DB: closure_local
       # Only applied when the volume is first created: changing it later
@@ -25,7 +30,7 @@ services:
         "${CLOSURE_REDIS_PASSWORD:?run node bin/generate-env.ts}",
       ]
     ports:
-      - "${CLOSURE_REDIS_PORT:-63796}:6379"
+      - "127.0.0.1:${CLOSURE_REDIS_PORT:-63796}:6379"
   # One-shot: creates the databases Hatchet and Nango keep their own state in,
   # on closure-db, then exits. Idempotent, so it's safe on every `up`.
   closure-create-databases:
@@ -51,8 +56,8 @@ services:
   closure-hatchet:
     image: ghcr.io/hatchet-dev/hatchet/hatchet-lite:v0.110.5
     ports:
-      - "${CLOSURE_HATCHET_PORT:-3246}:8888"
-      - "${CLOSURE_HATCHET_GRPC_PORT:-3247}:7070"
+      - "127.0.0.1:${CLOSURE_HATCHET_PORT:-3246}:8888"
+      - "127.0.0.1:${CLOSURE_HATCHET_GRPC_PORT:-3247}:7070"
     environment:
       # Refer to https://docs.hatchet.run/self-hosting/configuration-options
       # hatchet-migrate only reads a URL, so CLOSURE_POSTGRES_PASSWORD must
@@ -129,8 +134,8 @@ services:
     platform: linux/amd64
     ports:
       # 8080: the port the nango-server image itself sets (PORT).
-      - "${CLOSURE_NANGO_PORT:-3256}:8080"
-      - "${CLOSURE_NANGO_CONNECT_PORT:-3257}:3009"
+      - "127.0.0.1:${CLOSURE_NANGO_PORT:-3256}:8080"
+      - "127.0.0.1:${CLOSURE_NANGO_CONNECT_PORT:-3257}:3009"
     environment:
       # Nango's database name defaults to "nango" (made by
       # closure-create-databases).
@@ -196,7 +201,7 @@ services:
     # the server when the mounted source changes (dev).
     command: sh -c "npm install --ignore-scripts && exec node --watch api/server.ts"
     ports:
-      - "${CLOSURE_API_PORT:-3216}:3216"
+      - "127.0.0.1:${CLOSURE_API_PORT:-3216}:3216"
     environment:
       CLOSURE_API_PORT: "3216"
       # Every API route except /healthz requires it (from
@@ -261,13 +266,14 @@ services:
     # asks for CLOSURE_API_KEY first.
     environment:
       CLOSURE_WEB_PORT: "3226"
-      # Browser-side URL of the API; the dev server passes VITE_* through to
-      # the bundle (web/src/lib/api.ts). closure-gateway serves the API at
-      # /api on the web portal's own origin and adds CLOSURE_API_KEY to each
-      # call. Follows CLOSURE_WEB_PORT unless VITE_CLOSURE_API_URL is set
-      # directly.
-      VITE_CLOSURE_API_URL: ${VITE_CLOSURE_API_URL:-http://localhost:${CLOSURE_WEB_PORT:-3226}/api}
-      VITE_CLOSURE_DOCS_URL: ${VITE_CLOSURE_DOCS_URL:-http://localhost:${CLOSURE_DOCS_PORT:-3236}}
+      # Browser-side URLs of the API and docs; the dev server passes VITE_*
+      # through to the bundle (web/src/lib/api.ts). closure-gateway serves
+      # the API at /api on the web portal's own origin and adds
+      # CLOSURE_API_KEY to each call. Both follow CLOSURE_PUBLIC_WEB_URL and
+      # CLOSURE_PUBLIC_DOCS_URL when set (see closure-gateway), and localhost
+      # otherwise.
+      VITE_CLOSURE_API_URL: ${CLOSURE_PUBLIC_WEB_URL:-http://localhost:${CLOSURE_WEB_PORT:-3226}}/api
+      VITE_CLOSURE_DOCS_URL: ${CLOSURE_PUBLIC_DOCS_URL:-http://localhost:${CLOSURE_DOCS_PORT:-3236}}
   closure-docs:
     image: node:24-alpine
     working_dir: /closure
@@ -306,12 +312,27 @@ services:
         export CLOSURE_API_KEY_HASH
         exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     ports:
-      - "${CLOSURE_WEB_PORT:-3226}:3226"
-      - "${CLOSURE_DOCS_PORT:-3236}:3236"
+      - "127.0.0.1:${CLOSURE_WEB_PORT:-3226}:3226"
+      - "127.0.0.1:${CLOSURE_DOCS_PORT:-3236}:3236"
+      # HTTPS (443) and the http port Caddy uses to prove it owns a domain
+      # and to redirect to HTTPS (80). Open to the network on purpose. A
+      # deploy with a domain sets these to 80 and 443; local dev keeps the
+      # defaults, which nothing listens on.
+      - "${CLOSURE_GATEWAY_HTTP_PORT:-3266}:80"
+      - "${CLOSURE_GATEWAY_HTTPS_PORT:-3267}:443"
     environment:
       CLOSURE_API_KEY: "${CLOSURE_API_KEY:?run node bin/generate-env.ts}"
+      # Public URLs to serve over HTTPS (see bin/Caddyfile). The defaults
+      # are bare ports: plain http on localhost. Caddy can't fall back on
+      # its own if a variable is set but empty, so the defaults live here.
+      CLOSURE_PUBLIC_API_URL: "${CLOSURE_PUBLIC_API_URL:-:3216}"
+      CLOSURE_PUBLIC_WEB_URL: "${CLOSURE_PUBLIC_WEB_URL:-:3226}"
+      CLOSURE_PUBLIC_DOCS_URL: "${CLOSURE_PUBLIC_DOCS_URL:-:3236}"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # HTTPS certificates. Kept across restarts so Caddy doesn't request
+      # new ones each time (certificate authorities rate-limit that).
+      - closure-gateway-data:/data
     depends_on:
       closure-api:
         condition: service_started
@@ -326,3 +347,4 @@ volumes:
   closure-api-node-modules:
   closure-web-node-modules:
   closure-docs-node-modules:
+  closure-gateway-data:
