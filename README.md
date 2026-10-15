@@ -8,7 +8,6 @@
 [![Commit activity](https://img.shields.io/github/commit-activity/m/jxutaposition/closure?color=black)](https://github.com/jxutaposition/closure/commits/main)
 [![Skills](https://img.shields.io/badge/skills-closure--setup--assistant-1f6feb)](skills/SKILL.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-9d2235)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%5E24.0.0-339933?logo=nodedotjs&logoColor=white)](package.json)
 
 [How Closure works](#how-closure-works) · [Use cases](#use-cases) · [Quickstart](#quickstart) · [Contributing](#contributing)
 
@@ -32,11 +31,8 @@ Closure is built on a few principles:
 
 1. Pricing should be managed in code
 1. Pricing is always being tweaked
-1. Plans are versioned and immutable
-1. Assignments almost always tweak plan settings
-1. **Metering shouldn't introduce a visible delay for users**
-1. Metering events should be idempotent
-1. Tasks should be created immediately when metering thresholds are hit
+1. Metering shouldn't introduce a visible delay for users
+1. Resources are versioned and immutable
 1. Sensitive payment info shouldn't be stored on your servers
 1. 3P providers should process payment and calculate taxes
 
@@ -58,7 +54,7 @@ billing system you want.
 
 - **Finance** can send invoices automatically and reconcile revenue with usage costs.
 - **Growth** can run promotions, coupons, and referrals, and analyze lifecycle data without engineers.
-- **Sales and Customer Success** can create custom deals in-house and get notified about key customers in product activity in Slack, Teams, Linear, and Jira.
+- **Sales and Customer Success** can create custom deals in-house and get notified about customers' product activity in Slack, Teams, Linear, Jira, or any other webhook-enabled system.
 - **Engineering** can ship at the speed of Claude and implement blocks before charges happen.
 
 ## Quickstart
