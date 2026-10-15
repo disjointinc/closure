@@ -5,7 +5,7 @@
 ### Iterate on pricing, and act on customer usage, while your meters stay precise.
 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-43AF11.svg)](http://makeapullrequest.com)
-[![Commit activity](https://img.shields.io/github/commit-activity/m/jxutaposition/closure?color=black)](https://github.com/jxutaposition/closure/commits/main)
+[![Commit activity](https://img.shields.io/github/commit-activity/m/disjointinc/closure?color=black)](https://github.com/disjointinc/closure/commits/main)
 [![Skills](https://img.shields.io/badge/skills-closure--setup--assistant-1f6feb)](skills/SKILL.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-9d2235)](LICENSE)
 
@@ -61,7 +61,7 @@ billing system you want.
 
 ### Guided (recommended)
 
-We're starting to work more closely with a handful of teams, see if you're a
+We're starting to work more closely with a handful of teams; see if you're a
 fit [here](https://www.findclosure.dev/alpha).
 
 ### Self-hosted (advanced)
@@ -181,9 +181,9 @@ HTTPS:
 Contributions are what make open source great, and any contribution you make
 is greatly appreciated.
 
-Have an idea that would make Closure better? [Fork the repo](https://github.com/jxutaposition/closure/fork)
+Have an idea that would make Closure better? [Fork the repo](https://github.com/disjointinc/closure/fork)
 and [open a pull request](http://makeapullrequest.com), or just
-[open an issue](https://github.com/jxutaposition/closure/issues/new). And if
+[open an issue](https://github.com/disjointinc/closure/issues/new). And if
 Closure helps you, give it a star. Thanks!
 
 ### Developing locally
