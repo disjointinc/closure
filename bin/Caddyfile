@@ -1,11 +1,24 @@
 # closure-gateway (bin/compose.yml): the only way into the web portal and
-# docs. The browser asks for a login: username admin, password
-# CLOSURE_API_KEY. CLOSURE_API_KEY_HASH is a bcrypt hash of CLOSURE_API_KEY
-# that closure-gateway makes when it starts, since basic_auth only accepts
-# hashed passwords.
+# docs. The API doesn't need it: calls from the same machine go straight to
+# closure-api on CLOSURE_API_PORT. The gateway only handles API calls in two
+# cases:
+#   - the web portal's, which it sends through /api (below)
+#   - calls from other machines when CLOSURE_PUBLIC_API_URL is set, where
+#     the gateway only adds HTTPS (the API still checks CLOSURE_API_KEY)
+#
+# The browser asks for a login on the web portal and docs: username admin,
+# password CLOSURE_API_KEY. CLOSURE_API_KEY_HASH is a bcrypt hash of
+# CLOSURE_API_KEY that closure-gateway makes when it starts, since basic_auth
+# only accepts hashed passwords.
+#
+# Each site's address comes from CLOSURE_PUBLIC_WEB_URL,
+# CLOSURE_PUBLIC_DOCS_URL, and CLOSURE_PUBLIC_API_URL (defaults in
+# bin/compose.yml). A bare port (e.g. :3226) is served as plain http on
+# localhost. An https URL (e.g. https://app.example.com) gets a certificate
+# that Caddy requests and renews itself; README.md's "Reaching it from other
+# machines" covers setting that up.
 {
-	# Plain http on localhost, like every other service in bin/compose.yml.
-	auto_https off
+	# Caddy's config-editing API (port 2019) is unused here.
 	admin off
 }
 
@@ -15,7 +28,7 @@
 	}
 }
 
-:3226 {
+{$CLOSURE_PUBLIC_WEB_URL} {
 	import api_key_login
 	# The web portal calls the API through /api on its own origin, so the
 	# browser's login covers its API calls and CLOSURE_API_KEY never ships
@@ -25,10 +38,19 @@
 			header_up Authorization "Bearer {$CLOSURE_API_KEY}"
 		}
 	}
-	reverse_proxy closure-web:3226
+	# Vite's dev server rejects requests for any host but localhost
+	# (server.allowedHosts), so present every request to it as localhost.
+	reverse_proxy closure-web:3226 {
+		header_up Host localhost
+	}
 }
 
-:3236 {
+{$CLOSURE_PUBLIC_DOCS_URL} {
 	import api_key_login
 	reverse_proxy closure-docs:3236
+}
+
+# No login here: the API checks CLOSURE_API_KEY itself (api/handler.ts).
+{$CLOSURE_PUBLIC_API_URL} {
+	reverse_proxy closure-api:3216
 }
