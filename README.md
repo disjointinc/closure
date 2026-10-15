@@ -118,7 +118,9 @@ Now, to start and run the whole stack in Docker, just run:
 docker compose -p closure -f bin/compose.yml up -d
 ```
 
-Default UI is available at http://localhost:3226.
+Default UI is available at http://localhost:3226. The web portal and docs ask
+for a login: username `admin`, password `CLOSURE_API_KEY` from `bin/.env`.
+API calls send the same key as an `Authorization: Bearer` header.
 
 Both commands work the same in PowerShell on Windows. One Windows tip: clone
 the repo inside WSL (e.g. into `~/closure` in an Ubuntu terminal) rather than

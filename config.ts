@@ -60,6 +60,10 @@ export const config = {
   api: {
     host: env("CLOSURE_API_HOST", "0.0.0.0"),
     port: envPort("CLOSURE_API_PORT", 3216),
+    /* Every API route except /healthz requires it as a bearer token, and
+     * closure-gateway (bin/compose.yml) asks for it as the password to the
+     * web portal and docs. */
+    key: envRequired("CLOSURE_API_KEY"),
   },
   web: {
     host: env("CLOSURE_WEB_HOST", "0.0.0.0"),
