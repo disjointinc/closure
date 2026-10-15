@@ -14,9 +14,11 @@
 # Each site's address comes from CLOSURE_PUBLIC_WEB_URL,
 # CLOSURE_PUBLIC_DOCS_URL, and CLOSURE_PUBLIC_API_URL (defaults in
 # bin/compose.yml). A bare port (e.g. :3226) is served as plain http on
-# localhost. An https URL (e.g. https://app.example.com) gets a certificate
-# that Caddy requests and renews itself; README.md's "Reaching it from other
-# machines" covers setting that up.
+# localhost. An https URL (e.g. https://app.example.com) gets a free
+# certificate that Caddy requests from a public certificate authority (Let's
+# Encrypt by default) when it starts and renews automatically, so no
+# certificate setup (like AWS ACM) is needed. README.md's "Reaching it from
+# other machines" covers setting that up.
 {
 	# Caddy's config-editing API (port 2019) is unused here.
 	admin off
