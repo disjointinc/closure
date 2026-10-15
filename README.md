@@ -28,7 +28,7 @@ task to Slack, Teams, Linear, Jira, or a webhook.
 
 ### Principles
 
-It's built on a few principles:
+Closure is built on a few principles:
 
 1. Pricing should be managed in code
 1. Pricing is always being tweaked
