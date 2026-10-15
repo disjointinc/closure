@@ -700,8 +700,7 @@ export const experimentTreatmentTenants = pgTable(
  * A connection to an external system that task notifications go to. See
  * schemas/integration.ts. Slack, Teams, Linear, and Jira integrations point
  * at a Nango connection (Nango holds their credentials); webhook
- * integrations hold their URL and their encrypted secrets (lib/secrets.ts),
- * where secrets_key_version names the key that wrote secrets_ciphertext.
+ * integrations hold their URL and their encrypted secrets (lib/secrets.ts).
  */
 export const integrations = pgTable(
   "integrations",
@@ -715,7 +714,6 @@ export const integrations = pgTable(
     nangoProviderConfigKey: text("nango_provider_config_key"),
     nangoConnectionId: text("nango_connection_id"),
     webhookUrl: text("webhook_url"),
-    secretsKeyVersion: integer("secrets_key_version"),
     secretsCiphertext: text("secrets_ciphertext"),
   },
   (t) => [
@@ -726,7 +724,6 @@ export const integrations = pgTable(
       "integrations_credentials_variant",
       sql`(system = 'webhook'
           and webhook_url is not null
-          and secrets_key_version is not null
           and secrets_ciphertext is not null
           and nango_provider_config_key is null
           and nango_connection_id is null)
@@ -734,7 +731,6 @@ export const integrations = pgTable(
           and nango_provider_config_key is not null
           and nango_connection_id is not null
           and webhook_url is null
-          and secrets_key_version is null
           and secrets_ciphertext is null)`,
     ),
   ],
