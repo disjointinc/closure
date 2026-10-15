@@ -60,6 +60,7 @@ it in that file before your first run.
 
 | Setting                              | What it protects                                   | Can you change it later?                                                           |
 | ------------------------------------ | -------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `CLOSURE_API_KEY`                    | The API, web portal, and docs (username `admin`)   | Yes                                                                                |
 | `CLOSURE_REDIS_PASSWORD`             | Redis                                              | Yes                                                                                |
 | `CLOSURE_NANGO_SECRET_KEY`           | Closure's access to Nango                          | Yes                                                                                |
 | `CLOSURE_NANGO_DASHBOARD_PASSWORD`   | The Nango dashboard (username `admin`)             | Yes                                                                                |
@@ -98,6 +99,44 @@ sudo apt-get install qemu-user-static
 ```
 
 You only need to do this once. It keeps working after restarts.
+
+#### Reaching it from other machines (HTTPS)
+
+Out of the box, Closure only accepts connections from the machine it runs
+on. To reach it from elsewhere, you can serve it on your own domain over
+HTTPS:
+
+1. **Pick three domain names**, one each for the web portal, docs, and API
+   (e.g. `app.example.com`, `docs.example.com`, `api.example.com`).
+2. **Point each one at your server** with a DNS A record. Do this before
+   anything else: Closure requests HTTPS certificates as soon as it starts,
+   and the request fails if the domain doesn't reach your server yet.
+3. **Open ports 80 and 443** to the internet in your server's firewall (on
+   AWS, its security group). Leave every other port closed.
+4. **Add these lines to `.env`**, with your own domains. Keep the
+   `https://` at the start of each URL:
+
+   ```
+   CLOSURE_PUBLIC_WEB_URL=https://app.example.com
+   CLOSURE_PUBLIC_DOCS_URL=https://docs.example.com
+   CLOSURE_PUBLIC_API_URL=https://api.example.com
+   CLOSURE_GATEWAY_HTTP_PORT=80
+   CLOSURE_GATEWAY_HTTPS_PORT=443
+   ```
+
+5. **Rerun the one-liner.**
+6. **Check it works:** `https://app.example.com` should ask for a login
+   (username `admin`, password `CLOSURE_API_KEY` from `.env`), and this
+   should print `200`:
+
+   ```
+   curl -s -o /dev/null -w '%{http_code}\n' \
+     -H "Authorization: Bearer <CLOSURE_API_KEY>" \
+     https://api.example.com/v0/plan
+   ```
+
+   If it doesn't, the gateway's logs say why:
+   `docker compose -p closure logs closure-gateway`.
 
 ## Contributing
 
